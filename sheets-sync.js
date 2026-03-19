@@ -1,16 +1,7 @@
 /**
- * sheets-sync.js — v5 corrigido
- *
- * CORREÇÕES:
- * 1. URL /exec correta
- * 2. POST com URLSearchParams + no-cors
- * 3. Push antes do pull
- * 4. Pull não sobrescreve se planilha vazia
- * 5. scheduleSync exposto globalmente
- * 6. NOVO: controle de exclusões — itens deletados localmente
- *    não voltam no pull seguinte
+ * sheets-sync.js — v6
+ * Exclusões sincronizadas entre dispositivos via aba _deleted na planilha
  */
-
 (function () {
   const API_URL = window.BELA_SHEETS_API_URL || "";
   const SYNC_INTERVAL_MS = Number(window.BELA_SHEETS_SYNC_INTERVAL_MS || 120000);
@@ -19,36 +10,63 @@
   function safeParse(v, fb) { try { return JSON.parse(v); } catch (e) { return fb; } }
   function readLocal(name) { return safeParse(localStorage.getItem("bm_" + name) || "[]", []); }
   function isoNow() { return new Date().toISOString(); }
+  let _rawSet = localStorage.setItem.bind(localStorage);
 
-  /* ── controle de exclusões ───────────────────────────────── */
-  function getDeleted() {
+  /* ── deleted local ───────────────────────────────────────── */
+  function getDeletedLocal() {
     return safeParse(localStorage.getItem("bm__deleted") || "{}", {});
   }
-  function saveDeleted(obj) {
-    _rawSet("bm__deleted", JSON.stringify(obj));
-  }
-  function registerDeleted(sheet, ids) {
-    const del = getDeleted();
+  function addDeletedLocal(sheet, ids) {
+    const del = getDeletedLocal();
     if (!del[sheet]) del[sheet] = [];
-    ids.forEach(id => { if (!del[sheet].includes(String(id))) del[sheet].push(String(id)); });
-    saveDeleted(del);
+    ids.forEach(id => { if (id && !del[sheet].includes(String(id))) del[sheet].push(String(id)); });
+    _rawSet("bm__deleted", JSON.stringify(del));
+  }
+  function getAllDeletedIds() {
+    // retorna Set com "sheet:id" para filtrar rapidamente
+    const del = getDeletedLocal();
+    const set = new Set();
+    Object.entries(del).forEach(([sheet, ids]) => ids.forEach(id => set.add(sheet + ":" + id)));
+    return set;
   }
   function filterDeleted(sheet, rows) {
-    const del = getDeleted();
-    const deletedIds = new Set((del[sheet] || []).map(String));
-    return rows.filter(r => !deletedIds.has(String(r.id || "")));
+    const del = getDeletedLocal();
+    const ids = new Set((del[sheet] || []).map(String));
+    return rows.filter(r => !ids.has(String(r.id || "")));
   }
 
-  /* ── detecta exclusões comparando snapshots ──────────────── */
-  function detectAndRegisterDeletions(sheetKey, localKey, idField) {
+  /* ── detecta exclusões por comparação de snapshots ──────── */
+  function detectDeletions(sheetKey, localKey) {
     const prev = safeParse(localStorage.getItem("bm__prev_" + localKey) || "[]", []);
     const curr = readLocal(localKey);
-    const prevIds = new Set(prev.map(r => String(r[idField] || r.id || "")));
-    const currIds = new Set(curr.map(r => String(r[idField] || r.id || "")));
-    const deletedIds = [...prevIds].filter(id => id && !currIds.has(id));
-    if (deletedIds.length > 0) registerDeleted(sheetKey, deletedIds);
-    // salva snapshot atual para próxima comparação
+    const prevIds = new Set(prev.map(r => String(r.id || "")));
+    const currIds = new Set(curr.map(r => String(r.id || "")));
+    const deleted = [...prevIds].filter(id => id && !currIds.has(id));
+    if (deleted.length > 0) addDeletedLocal(sheetKey, deleted);
     _rawSet("bm__prev_" + localKey, JSON.stringify(curr));
+  }
+
+  /* ── serializa lista de deletados para planilha ──────────── */
+  function serializeDeleted() {
+    const del = getDeletedLocal();
+    const rows = [];
+    Object.entries(del).forEach(([sheet, ids]) => {
+      ids.forEach(id => rows.push({ sheet, id, deletedAt: isoNow() }));
+    });
+    return rows;
+  }
+
+  /* ── merge deletados vindos da planilha ──────────────────── */
+  function mergeRemoteDeleted(remoteRows) {
+    const del = getDeletedLocal();
+    (remoteRows || []).forEach(r => {
+      const sheet = String(r.sheet || "");
+      const id    = String(r.id || "");
+      if (!sheet || !id) return;
+      if (!del[sheet]) del[sheet] = [];
+      if (!del[sheet].includes(id)) del[sheet].push(id);
+    });
+    _rawSet("bm__deleted", JSON.stringify(del));
   }
 
   /* ── fetch ───────────────────────────────────────────────── */
@@ -71,8 +89,8 @@
 
   /* ── serialização ────────────────────────────────────────── */
   function normalizeClientLocal(c) {
-    const stamp = c.updatedAt || c.createdAt || c.data || isoNow();
-    return { id: c.id || ("cli_" + Math.random().toString(36).slice(2,10)), nome: c.nome||"", tel: c.tel||c.telefone||"", end: c.end||c.endereco||"", createdAt: c.createdAt||c.data||stamp, updatedAt: stamp };
+    const stamp = c.updatedAt||c.createdAt||c.data||isoNow();
+    return { id:c.id||("cli_"+Math.random().toString(36).slice(2,10)), nome:c.nome||"", tel:c.tel||c.telefone||"", end:c.end||c.endereco||"", createdAt:c.createdAt||c.data||stamp, updatedAt:stamp };
   }
   function serializeClients(list) {
     return (list||[]).map(c => { c=normalizeClientLocal(c); return {id:c.id,nome:c.nome,telefone:c.tel,endereco:c.end,data:c.updatedAt}; });
@@ -80,7 +98,6 @@
   function deserializeClients(rows) {
     return (rows||[]).map(r => ({id:String(r.id||""),nome:r.nome||"",tel:r.telefone||"",end:r.endereco||"",createdAt:r.data||isoNow(),updatedAt:r.data||isoNow()})).filter(x=>x.id||x.nome);
   }
-
   function normalizeProductLocal(p) {
     const stamp = p.updatedAt||p.createdAt||isoNow();
     return { id:p.id||("pro_"+Math.random().toString(36).slice(2,10)), nome:p.nome||"", preco:Number(p.preco||0), estq:Number(p.estq!=null?p.estq:(p.estoque!=null?p.estoque:0)), updatedAt:stamp };
@@ -91,7 +108,6 @@
   function deserializeProducts(rows) {
     return (rows||[]).map(r => ({id:String(r.id||""),nome:r.nome||"",preco:Number(r.preco||0),estq:Number(r.estoque||0),createdAt:isoNow(),updatedAt:isoNow()})).filter(x=>x.id||x.nome);
   }
-
   function normalizeVendaLocal(v) {
     const stamp = v.updatedAt||v.createdAt||v.data||isoNow();
     return { id:v.id||("ven_"+Math.random().toString(36).slice(2,10)), cliNome:v.cliNome||v.cliente||"Balcão", forma:v.forma||v.forma_pagamento||"", total:Number(v.total||0), data:v.data||stamp, updatedAt:stamp };
@@ -102,23 +118,21 @@
   function deserializeVendas(rows) {
     return (rows||[]).map(r => ({id:String(r.id||""),cliNome:r.cliente||"Balcão",total:Number(r.total||0),forma:r.forma_pagamento||"",data:r.data||isoNow(),createdAt:r.data||isoNow(),updatedAt:r.data||isoNow()})).filter(x=>x.id||x.cliNome);
   }
-
   function serializePagamentos(list) {
     return (list||[]).map(p => { const stamp=p.updatedAt||p.createdAt||p.data||isoNow(); const vendaId=p.vid||(p.cid?("cid:"+p.cid):""); return {id:p.id||("pag_"+Math.random().toString(36).slice(2,10)),venda_id:vendaId,valor:Number(p.val||p.valor||0),forma_pagamento:p.forma||p.forma_pagamento||"",data:p.data||stamp}; });
   }
   function deserializePagamentos(rows, vendas, clientes) {
     const vendaMap=new Map((vendas||[]).map(v=>[String(v.id),v]));
-    const clientMapByName=new Map((clientes||[]).map(c=>[String(c.nome||"").toLowerCase(),c]));
-    return (rows||[]).map(r => { const vendaId=String(r.venda_id||""); let cid=""; if(vendaId.startsWith("cid:"))cid=vendaId.slice(4); if(!cid&&vendaMap.has(vendaId)){const venda=vendaMap.get(vendaId);const cli=clientMapByName.get(String(venda.cliNome||"").toLowerCase());if(cli)cid=cli.id;} return {id:String(r.id||""),vid:vendaId&&!vendaId.startsWith("cid:")?vendaId:"",cid:cid||"",val:Number(r.valor||0),forma:r.forma_pagamento||"",data:r.data||isoNow(),createdAt:r.data||isoNow(),updatedAt:r.data||isoNow()}; }).filter(x=>x.id||x.val);
+    const cliMap=new Map((clientes||[]).map(c=>[String(c.nome||"").toLowerCase(),c]));
+    return (rows||[]).map(r => { const vid=String(r.venda_id||""); let cid=""; if(vid.startsWith("cid:"))cid=vid.slice(4); if(!cid&&vendaMap.has(vid)){const venda=vendaMap.get(vid);const cli=cliMap.get(String(venda.cliNome||"").toLowerCase());if(cli)cid=cli.id;} return {id:String(r.id||""),vid:vid&&!vid.startsWith("cid:")?vid:"",cid:cid||"",val:Number(r.valor||0),forma:r.forma_pagamento||"",data:r.data||isoNow(),createdAt:r.data||isoNow(),updatedAt:r.data||isoNow()}; }).filter(x=>x.id||x.val);
   }
-
   function serializeCreditos(list, clientes) {
     const cliById=new Map((clientes||[]).map(c=>[String(c.id),c]));
     return (list||[]).map(c => { const stamp=c.updatedAt||c.createdAt||c.data||isoNow(); const cli=cliById.get(String(c.cid||""))||{}; return {id:c.id||("cre_"+Math.random().toString(36).slice(2,10)),cliente:c.cliNome||cli.nome||"",valor:Number(c.val||c.valor||0),status:c.status||"aberto",vencimento:c.vencimento||c.data||stamp}; });
   }
   function deserializeCreditos(rows, clientes) {
-    const clientMapByName=new Map((clientes||[]).map(c=>[String(c.nome||"").toLowerCase(),c]));
-    return (rows||[]).map(r => { const cli=clientMapByName.get(String(r.cliente||"").toLowerCase())||{}; return {id:String(r.id||""),cid:cli.id||"",cliNome:r.cliente||"",val:Number(r.valor||0),status:r.status||"aberto",vencimento:r.vencimento||"",data:r.vencimento||isoNow(),createdAt:r.vencimento||isoNow(),updatedAt:r.vencimento||isoNow()}; }).filter(x=>x.id||x.cliNome);
+    const cliMap=new Map((clientes||[]).map(c=>[String(c.nome||"").toLowerCase(),c]));
+    return (rows||[]).map(r => { const cli=cliMap.get(String(r.cliente||"").toLowerCase())||{}; return {id:String(r.id||""),cid:cli.id||"",cliNome:r.cliente||"",val:Number(r.valor||0),status:r.status||"aberto",vencimento:r.vencimento||"",data:r.vencimento||isoNow(),createdAt:r.vencimento||isoNow(),updatedAt:r.vencimento||isoNow()}; }).filter(x=>x.id||x.cliNome);
   }
 
   function totalRemoto(data) {
@@ -137,7 +151,6 @@
     el.style.background = isError ? "rgba(180,30,30,.92)" : "rgba(17,24,39,.88)";
     el.textContent = text;
   }
-
   function installButton() {
     if (document.getElementById("belaSheetsSyncButton")) return;
     const btn = document.createElement("button");
@@ -153,17 +166,20 @@
   let debounceTimer = null;
   let syncing = false;
   let patchDone = false;
-  let _rawSet = localStorage.setItem.bind(localStorage);
 
   async function pullRemote() {
     const data = await fetchGet(API_URL);
+
+    // merge exclusões vindas de outros dispositivos
+    mergeRemoteDeleted(data._deleted || []);
+
     if (totalRemoto(data) === 0) return;
 
-    const clientes  = filterDeleted("clientes",     deserializeClients(data.clientes || []));
-    const produtos  = filterDeleted("produtos",      deserializeProducts(data.produtos || []));
-    const vendas    = filterDeleted("vendas",         deserializeVendas(data.vendas || []));
-    const pagamentos= filterDeleted("recebimentos",   deserializePagamentos(data.recebimentos || [], vendas, clientes));
-    const creditos  = filterDeleted("cobrancas",      deserializeCreditos(data.cobrancas || [], clientes));
+    const clientes   = filterDeleted("clientes",     deserializeClients(data.clientes||[]));
+    const produtos   = filterDeleted("produtos",      deserializeProducts(data.produtos||[]));
+    const vendas     = filterDeleted("vendas",         deserializeVendas(data.vendas||[]));
+    const pagamentos = filterDeleted("recebimentos",   deserializePagamentos(data.recebimentos||[], vendas, clientes));
+    const creditos   = filterDeleted("cobrancas",      deserializeCreditos(data.cobrancas||[], clientes));
 
     _rawSet("bm_clientes",   JSON.stringify(clientes));
     _rawSet("bm_produtos",   JSON.stringify(produtos));
@@ -173,12 +189,11 @@
   }
 
   async function pushLocal() {
-    // detecta o que foi deletado antes de enviar
-    detectAndRegisterDeletions("clientes",     "clientes",   "id");
-    detectAndRegisterDeletions("produtos",     "produtos",   "id");
-    detectAndRegisterDeletions("vendas",       "vendas",     "id");
-    detectAndRegisterDeletions("recebimentos", "pagamentos", "id");
-    detectAndRegisterDeletions("cobrancas",    "creditos",   "id");
+    detectDeletions("clientes",     "clientes");
+    detectDeletions("produtos",     "produtos");
+    detectDeletions("vendas",       "vendas");
+    detectDeletions("recebimentos", "pagamentos");
+    detectDeletions("cobrancas",    "creditos");
 
     const clientes   = readLocal("clientes");
     const produtos   = readLocal("produtos");
@@ -194,6 +209,8 @@
     await postSheet({ action:"replaceAll", sheet:"vendas",       rows: serializeVendas(vendas) });
     await postSheet({ action:"replaceAll", sheet:"recebimentos", rows: serializePagamentos(pagamentos) });
     await postSheet({ action:"replaceAll", sheet:"cobrancas",    rows: serializeCreditos(creditos, clientes) });
+    // envia lista de deletados para a planilha
+    await postSheet({ action:"replaceAll", sheet:"_deleted",     rows: serializeDeleted() });
   }
 
   async function syncNow() {
