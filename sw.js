@@ -3,7 +3,7 @@ const ASSETS = [
   './',
   './app.html',
   './index.html',
-  './mobile.html',
+  './celular.html',
   './manifest.json',
   './core-base.js',
   './app-enhancements.js',
