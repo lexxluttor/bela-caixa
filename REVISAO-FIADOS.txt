@@ -1,0 +1,5 @@
+CORREÇÃO APLICADA
+- fiados agora entra na sincronização junto com creditos
+- backup local inclui fiados
+- exclusões relacionadas a fiados também são propagadas
+- melhora a consistência do crediário entre PC e celular

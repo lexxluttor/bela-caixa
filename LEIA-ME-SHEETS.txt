@@ -1,0 +1,25 @@
+Integração com Google Sheets habilitada.
+
+Apps Script:
+https://script.google.com/macros/s/AKfycbylVqvMnF99hHM-1QOeFOYMU-cZgHE38WgVcm73Y7u48_X6JsQ4Ne7CzozTv6kEAoMu/exec
+
+O pacote adiciona:
+- sheets-config.js
+- sheets-sync.js
+
+Comportamento:
+- puxa dados da planilha ao abrir e ao voltar para a tela
+- envia alterações locais para a planilha após salvar
+- botão flutuante "Sincronizar"
+- sincronização automática a cada 2 minutos
+
+Abas usadas:
+- clientes
+- produtos
+- vendas
+- recebimentos
+- cobrancas
+
+Observação:
+- integração pensada para operação leve e custo zero
+- em uso simultâneo intenso, o último envio pode sobrescrever uma alteração muito recente da outra ponta

@@ -1,0 +1,11 @@
+VERSÃO SOMENTE DESKTOP
+
+O que foi feito:
+- mobile.html removido
+- redirecionamento automático para mobile removido
+- app.html agora abre somente o index.html
+- manifest ajustado para iniciar no desktop
+
+Objetivo:
+- estabilizar o sistema no PC primeiro
+- depois criar um mobile novo do zero, separado e mais seguro

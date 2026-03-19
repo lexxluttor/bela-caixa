@@ -1,0 +1,23 @@
+
+/* Bela Caixa - melhorias visuais e organização */
+.sync-bar{padding:6px 12px;background:rgba(0,0,0,.25);border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--txt2);cursor:pointer;}
+.sync-left{display:flex;align-items:center;gap:7px;min-width:0}
+.sync-now-btn{padding:5px 8px !important;font-size:11px !important;line-height:1.1 !important;white-space:nowrap}
+.sdot{width:9px;height:9px;border-radius:50%;background:#555;flex-shrink:0;transition:background .3s;}
+.sdot.ok{background:#2ecc71;}
+.sdot.sync{background:#f0b429;animation:bl .7s infinite;}
+.sdot.err{background:#e74c3c;}
+@keyframes bl{0%,100%{opacity:1;}50%{opacity:.2;}}
+
+.ph,.fr{gap:8px}
+.ph .fr{flex-wrap:wrap}
+.pb{padding-top:10px}
+.card .tw{overflow:auto}
+.btn.sm{white-space:nowrap}
+#cfg-backup-bar .fr{flex-wrap:wrap}
+#pg-caixa .ph .fr{flex-wrap:wrap}
+#pg-receb .ph .fr{flex-wrap:wrap}
+@media (max-width: 900px){
+  .ph{display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+  .ph .fr{width:100%}
+}

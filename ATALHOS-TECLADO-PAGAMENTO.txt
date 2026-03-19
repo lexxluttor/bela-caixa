@@ -1,0 +1,9 @@
+ATALHOS ADICIONADOS NO MODAL DE PAGAMENTO
+
+- TAB: avança entre as formas de pagamento
+- SHIFT+TAB: volta
+- SETAS: também navegam
+- ENTER: confirma a venda
+- ESC: fecha o modal
+
+Isso vale na versão desktop.

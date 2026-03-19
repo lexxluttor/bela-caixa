@@ -1,0 +1,45 @@
+PACOTE FINAL PARA SUBIR UMA VEZ
+
+Este pacote já está pronto com os nomes corretos:
+- index.html
+- mobile.html
+- app.html
+- app-enhancements.css
+- app-enhancements.js
+- manifest.json
+- sw.js
+- package.json
+- netlify.toml
+- pasta netlify/functions
+
+IMPORTANTE
+- Não existe celular.html neste pacote.
+- O index.html redireciona automaticamente para mobile.html no celular.
+- Suba este pacote inteiro no GitHub.
+- Depois disso o Netlify atualiza sozinho.
+
+COMO SUBIR
+1. Extraia este zip.
+2. No GitHub, abra o repositório bela-caixa.
+3. Clique em Adicionar arquivo > Fazer upload de arquivos.
+4. Arraste TODOS os arquivos e a pasta netlify deste pacote.
+5. Clique em Confirmar alterações.
+6. Aguarde 30 a 60 segundos.
+7. Teste:
+   PC: https://classy-salmiakki-a43ca5.netlify.app/
+   Mobile: https://classy-salmiakki-a43ca5.netlify.app/mobile.html
+
+
+CORREÇÃO APLICADA NESTA VERSÃO
+- corrigido o envio do PC para o celular
+- o botão "Sincronizar agora" agora força:
+  1. envio das alterações locais
+  2. leitura das novidades do servidor
+- ações do PC agora marcam alteração para sincronização:
+  venda, recebimento, cliente, produto e exclusões/edições principais
+
+
+CORREÇÃO EXTRA APLICADA NESTA VERSÃO
+- servidor agora faz mesclagem dos dados em vez de substituir tudo
+- evita que alterações do celular apaguem ações feitas no PC
+- melhora a comunicação nos dois sentidos: PC -> celular e celular -> PC

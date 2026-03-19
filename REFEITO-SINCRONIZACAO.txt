@@ -1,0 +1,21 @@
+PACOTE REFEITO - SINCRONIZAÇÃO ESTÁVEL
+
+O que foi refeito:
+- sincronização PC -> celular corrigida
+- sincronização celular -> PC preservada
+- servidor faz mesclagem por ID + updatedAt
+- evita que uma ponta apague a outra
+- sincronização automática a cada 10 minutos
+- botão "Sincronizar agora" faz:
+  1. enviar alterações locais
+  2. buscar novidades do servidor
+
+Como subir:
+1. Extraia este zip.
+2. No GitHub, abra o repositório bela-caixa.
+3. Faça upload dos arquivos da raiz, sem enviar a pasta como subpasta.
+4. Confirme as alterações.
+5. Aguarde o Netlify atualizar.
+6. Teste:
+   - criar cliente no PC -> sincronizar agora -> conferir no celular
+   - criar cliente no celular -> sincronizar agora -> conferir no PC

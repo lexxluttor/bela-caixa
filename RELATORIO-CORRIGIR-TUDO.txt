@@ -1,0 +1,6 @@
+function exportarBackup(): True
+function salvarBackupAutomatico(): True
+DB._backupWrapped: True
+function initVenda(){: True
+Restaurar Backup: True
+classList.add first guarded: True

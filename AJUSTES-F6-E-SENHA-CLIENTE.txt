@@ -1,0 +1,4 @@
+AJUSTES APLICADOS
+
+- exclusão de clientes agora exige senha do administrador
+- atalho F6 abre o Caixa do Dia

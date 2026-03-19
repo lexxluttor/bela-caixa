@@ -1,0 +1,5 @@
+VERSÃO COM MELHORIAS FINAIS
+- sincronização estável por ID + updatedAt
+- tratamento de exclusões sincronizadas
+- backup local preserva configurações e senha
+- botão sincronizar agora força envio e depois leitura

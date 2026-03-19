@@ -1,0 +1,12 @@
+Sistema preparado para instalação como app.
+
+Arquivos principais:
+- app.html -> lançador do sistema
+- index.html -> desktop
+- mobile.html -> mobile (base segura 3)
+- manifest.json -> PWA
+- sw.js -> cache offline básico
+
+Para instalar:
+- celular: abrir no navegador e usar 'Adicionar à tela inicial'
+- PC: abrir no Chrome/Edge e usar 'Instalar aplicativo'

@@ -1,0 +1,5 @@
+AJUSTE APLICADO
+
+- ao clicar em Ver no crediário/caixa, o modal anterior fecha antes de abrir Detalhes da Venda
+- data/hora da venda agora pode ser alterada em Detalhes da Venda
+- salvar alterações atualiza forma de pagamento, data/hora e creditos quando necessário

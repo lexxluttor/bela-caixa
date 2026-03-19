@@ -1,0 +1,7 @@
+BLINDAGEM APLICADA
+
+- garante id em clientes, produtos, vendas, creditos e pagamentos
+- garante createdAt
+- garante updatedAt
+- corrige dados antigos automaticamente ao abrir
+- novos salvamentos ficam prontos para sincronização futura

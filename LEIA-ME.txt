@@ -1,0 +1,32 @@
+VERSÃO COM SENHAS UNIFICADAS
+
+Inclui:
+- index.html
+- mobile.html
+
+Ajustes feitos:
+- senha restaurada para Adm1234 em todas as telas
+- senha de recuperação mantida como Bela3001
+- validação da senha unificada em modais e telas de configuração
+- cancelar/corrigir recebimentos no Caixa do Dia
+- modal de senha acima de qualquer tela
+
+Senhas:
+- administrador: Adm1234
+- recuperação: Bela3001
+
+- botão Devedores agora abre uma lista/modal igual ao botão Lista da tela de vendas
+- mostra somente clientes que estão devendo no crediário
+
+
+- botões de backup interno adicionados em Configurações
+- Fazer Backup: baixa um arquivo .json com os dados do sistema
+- Restaurar Backup: importa um arquivo .json e substitui os dados atuais
+
+- os botões de backup ficam visíveis no topo da tela de Configurações, dentro do card 'Backup de Segurança'
+
+- sincronização a cada 10 min e também após alterações importantes
+- botão visível Sincronizar agora
+- pacote mais leve com app-enhancements.js e app-enhancements.css
+
+- correção do fluxo PC -> celular: sincronizar agora agora envia e depois busca dados do servidor

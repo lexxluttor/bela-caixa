@@ -1,0 +1,14 @@
+Pacote unificado do sistema.
+
+Desktop:
+- index.html (mantido intacto)
+
+Mobile:
+- mobile.html (Base segura 3)
+
+Os dois usam a mesma estrutura de dados local:
+- bm_clientes
+- bm_produtos
+- bm_vendas
+- bm_creditos
+- bm_pagamentos

@@ -1,0 +1,61 @@
+BELA CAIXA - OPÇÃO B FINAL
+Instalável + comunicação PC/Mobile a cada 2 minutos + backup local + painel de sincronização
+
+ARQUIVOS PARA SUBIR
+- app.html
+- index.html
+- mobile.html
+- manifest.json
+- sw.js
+- icon-192.png
+- icon-512.png
+- icon-maskable-512.png
+- netlify/functions/sync.js
+- netlify.toml
+- package.json
+
+CAMINHO CERTO
+Esta versão usa Netlify Functions e Netlify Blobs.
+Publique por:
+1. GitHub
+2. conectar ao Netlify
+3. fazer deploy pelo repositório
+
+PASSO A PASSO
+1. Extraia este zip.
+2. Crie um repositório novo no GitHub.
+3. Envie TODOS os arquivos, mantendo as pastas.
+4. No Netlify, clique em Add new site.
+5. Clique em Import an existing project.
+6. Escolha GitHub.
+7. Selecione o repositório do Bela Caixa.
+8. Build command: deixe em branco.
+9. Publish directory: use .
+10. Faça o deploy.
+
+COMO FUNCIONA
+- PC e mobile trocam dados a cada 2 minutos.
+- O sistema continua salvando localmente.
+- Há backup local em Configurações.
+- Há painel de sincronização clicando na barra superior/lateral.
+
+IMPORTANTE
+- Esta é a versão que ativa a comunicação entre aparelhos.
+- Como você não vai usar os dois ao mesmo tempo, o modo "last write wins" atende bem.
+
+
+FECHAMENTO DE CAIXA
+- Na tela Caixa do Dia foi adicionado o botão "🔒 Fechar Caixa".
+- Ao clicar, o sistema pergunta se você tem certeza.
+- Confirmando, o sistema gera automaticamente o backup local.
+- Se a sincronização estiver ativa, também tenta gerar backup no servidor.
+
+
+MELHORIAS APLICADAS NESTA VERSÃO
+- sincronização automática reduzida para 10 minutos
+- sincronização imediata após alterações importantes (venda, recebimento, cadastro e edição)
+- botão visível "Sincronizar agora"
+- limpeza do pacote com scripts e estilos extras separados em:
+  * app-enhancements.js
+  * app-enhancements.css
+- organização visual melhorada em cabeçalhos e barras de ação
