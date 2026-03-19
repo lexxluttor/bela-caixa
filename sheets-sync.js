@@ -1,6 +1,7 @@
+
 /**
- * sheets-sync.js — v6
- * Exclusões sincronizadas entre dispositivos via aba _deleted na planilha
+ * sheets-sync.js — v7
+ * Correções: re-renderiza tela após pull, exclusões sincronizadas entre dispositivos
  */
 (function () {
   const API_URL = window.BELA_SHEETS_API_URL || "";
@@ -22,13 +23,6 @@
     ids.forEach(id => { if (id && !del[sheet].includes(String(id))) del[sheet].push(String(id)); });
     _rawSet("bm__deleted", JSON.stringify(del));
   }
-  function getAllDeletedIds() {
-    // retorna Set com "sheet:id" para filtrar rapidamente
-    const del = getDeletedLocal();
-    const set = new Set();
-    Object.entries(del).forEach(([sheet, ids]) => ids.forEach(id => set.add(sheet + ":" + id)));
-    return set;
-  }
   function filterDeleted(sheet, rows) {
     const del = getDeletedLocal();
     const ids = new Set((del[sheet] || []).map(String));
@@ -46,7 +40,7 @@
     _rawSet("bm__prev_" + localKey, JSON.stringify(curr));
   }
 
-  /* ── serializa lista de deletados para planilha ──────────── */
+  /* ── serializa deletados para planilha ───────────────────── */
   function serializeDeleted() {
     const del = getDeletedLocal();
     const rows = [];
@@ -139,6 +133,21 @@
     return (data.clientes||[]).length+(data.produtos||[]).length+(data.vendas||[]).length+(data.recebimentos||[]).length+(data.cobrancas||[]).length;
   }
 
+  /* ── re-renderiza tela ───────────────────────────────────── */
+  function rerender() {
+    try { if (typeof renderDash          === "function") renderDash(); }          catch(e){}
+    try { if (typeof renderClis          === "function") renderClis(); }          catch(e){}
+    try { if (typeof renderProds         === "function") renderProds(); }         catch(e){}
+    try { if (typeof renderPGrid         === "function") renderPGrid(); }         catch(e){}
+    try { if (typeof renderVendas        === "function") renderVendas(); }        catch(e){}
+    try { if (typeof renderCrediario     === "function") renderCrediario(); }     catch(e){}
+    try { if (typeof renderCaixa         === "function") renderCaixa(); }         catch(e){}
+    try { if (typeof renderReceb         === "function") renderReceb(); }         catch(e){}
+    try { if (typeof renderCobrancas     === "function") renderCobrancas(); }     catch(e){}
+    try { if (typeof renderCaixaDia      === "function") renderCaixaDia(); }      catch(e){}
+    try { if (typeof renderRecebClientes === "function") renderRecebClientes(); } catch(e){}
+  }
+
   /* ── UI ──────────────────────────────────────────────────── */
   function setStatus(text, isError) {
     let el = document.getElementById("belaSheetsSyncStatus");
@@ -170,7 +179,6 @@
   async function pullRemote() {
     const data = await fetchGet(API_URL);
 
-    // merge exclusões vindas de outros dispositivos
     mergeRemoteDeleted(data._deleted || []);
 
     if (totalRemoto(data) === 0) return;
@@ -186,6 +194,9 @@
     _rawSet("bm_vendas",     JSON.stringify(vendas));
     _rawSet("bm_pagamentos", JSON.stringify(pagamentos));
     _rawSet("bm_creditos",   JSON.stringify(creditos));
+
+    // Atualiza a tela com os dados novos
+    rerender();
   }
 
   async function pushLocal() {
@@ -209,7 +220,6 @@
     await postSheet({ action:"replaceAll", sheet:"vendas",       rows: serializeVendas(vendas) });
     await postSheet({ action:"replaceAll", sheet:"recebimentos", rows: serializePagamentos(pagamentos) });
     await postSheet({ action:"replaceAll", sheet:"cobrancas",    rows: serializeCreditos(creditos, clientes) });
-    // envia lista de deletados para a planilha
     await postSheet({ action:"replaceAll", sheet:"_deleted",     rows: serializeDeleted() });
   }
 
