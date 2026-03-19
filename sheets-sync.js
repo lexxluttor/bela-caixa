@@ -13,7 +13,7 @@
   function post(body){
     return fetchJson(API_URL, {
       method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: JSON.stringify(body)
     });
   }
