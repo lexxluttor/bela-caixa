@@ -1,13 +1,14 @@
+
 /**
- * sheets-sync.js — v3 corrigido
+ * sheets-sync.js — v4 corrigido
  *
  * CORREÇÕES APLICADAS:
- * 1. URL trocada de /echo para /exec (no sheets-config.js)
- * 2. POST: body enviado como URLSearchParams com payload JSON dentro do campo "payload"
- * 3. GET: mantém fetch normal (retorna JSON legível)
- * 4. POST: usa mode:"no-cors" para evitar bloqueio de preflight CORS
- * 5. scheduleSync e syncNow expostos globalmente (window.scheduleSync)
- *    para que DB.set() do index.html consiga chamar scheduleSync()
+ * 1. URL trocada de /echo para /exec
+ * 2. POST com URLSearchParams + mode:no-cors
+ * 3. GET normal com fetch
+ * 4. scheduleSync e syncNow expostos globalmente
+ * 5. pullRemote não sobrescreve dados locais se planilha estiver vazia
+ * 6. Ordem corrigida: push primeiro, pull depois
  */
 
 (function () {
@@ -191,6 +192,14 @@
     }).filter(x => x.id || x.cliNome);
   }
 
+  function totalRemoto(data) {
+    return (data.clientes || []).length +
+           (data.produtos || []).length +
+           (data.vendas || []).length +
+           (data.recebimentos || []).length +
+           (data.cobrancas || []).length;
+  }
+
   function setStatus(text, isError) {
     let el = document.getElementById("belaSheetsSyncStatus");
     if (!el) {
@@ -232,6 +241,10 @@
 
   async function pullRemote() {
     const data = await fetchGet(API_URL);
+
+    // Segurança: só sobrescreve local se a planilha tiver dados
+    if (totalRemoto(data) === 0) return;
+
     const clientes = deserializeClients(data.clientes || []);
     const produtos = deserializeProducts(data.produtos || []);
     const vendas = deserializeVendas(data.vendas || []);
@@ -252,6 +265,11 @@
     const pagamentos = readLocal("pagamentos");
     const creditos = readLocal("creditos");
 
+    // Só envia se tiver algum dado local
+    const totalLocal = clientes.length + produtos.length + vendas.length +
+                       pagamentos.length + creditos.length;
+    if (totalLocal === 0) return;
+
     await postSheet({ action: "replaceAll", sheet: "clientes",     rows: serializeClients(clientes) });
     await postSheet({ action: "replaceAll", sheet: "produtos",     rows: serializeProducts(produtos) });
     await postSheet({ action: "replaceAll", sheet: "vendas",       rows: serializeVendas(vendas) });
@@ -264,8 +282,10 @@
     syncing = true;
     try {
       setStatus("☁ Sincronizando...");
-      await pullRemote();
+      // ✅ Push primeiro para não perder dados locais
       await pushLocal();
+      // ✅ Pull depois — só sobrescreve se planilha tiver dados
+      await pullRemote();
       setStatus("✓ Sincronizado " + new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
       _rawSet("bm_last_sync_at", isoNow());
     } catch (err) {
@@ -304,7 +324,7 @@
     syncTimer = setInterval(syncNow, SYNC_INTERVAL_MS);
   }
 
-  // Expõe globalmente para que DB.set() do index.html consiga chamar scheduleSync()
+  // Expõe globalmente para DB.set() do index.html
   window.scheduleSync = scheduleSync;
   window.syncNow = syncNow;
 
