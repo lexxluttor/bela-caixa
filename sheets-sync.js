@@ -1,17 +1,13 @@
 /**
- * sheets-sync.js — v2 corrigido
+ * sheets-sync.js — v3 corrigido
  *
  * CORREÇÕES APLICADAS:
- * 1. sheets-config.js: URL trocada de /echo para /exec
- * 2. POST: body enviado como URLSearchParams (form-urlencoded real),
- *    com o payload JSON dentro do campo "payload" — único formato
- *    que o Apps Script lê via e.parameter.payload sem preflight CORS.
- * 3. GET: mantém fetchJson normal (retorna JSON legível).
- * 4. POST: usa mode:"no-cors" para evitar bloqueio de preflight.
- *    Como no-cors retorna resposta opaque, a confirmação do POST
- *    é feita por pull subsequente, não pela resposta do POST.
- * 5. pushLocal: cada aba é enviada em série com await para não
- *    sobrecarregar o Apps Script.
+ * 1. URL trocada de /echo para /exec (no sheets-config.js)
+ * 2. POST: body enviado como URLSearchParams com payload JSON dentro do campo "payload"
+ * 3. GET: mantém fetch normal (retorna JSON legível)
+ * 4. POST: usa mode:"no-cors" para evitar bloqueio de preflight CORS
+ * 5. scheduleSync e syncNow expostos globalmente (window.scheduleSync)
+ *    para que DB.set() do index.html consiga chamar scheduleSync()
  */
 
 (function () {
@@ -19,13 +15,10 @@
   const SYNC_INTERVAL_MS = Number(window.BELA_SHEETS_SYNC_INTERVAL_MS || 120000);
   if (!API_URL) { console.warn("BELA_SHEETS_API_URL não configurada."); return; }
 
-  /* ── utilitários ─────────────────────────────────────────── */
   function safeParse(v, fb) { try { return JSON.parse(v); } catch (e) { return fb; } }
   function readLocal(name) { return safeParse(localStorage.getItem("bm_" + name) || "[]", []); }
-  function writeLocal(name, rows) { localStorage.setItem("bm_" + name, JSON.stringify(Array.isArray(rows) ? rows : [])); }
   function isoNow() { return new Date().toISOString(); }
 
-  /* ── GET — retorna JSON normalmente ─────────────────────── */
   function fetchGet(url) {
     return fetch(url, { method: "GET" }).then(r => {
       if (!r.ok) throw new Error("GET falhou: " + r.status);
@@ -33,28 +26,17 @@
     });
   }
 
-  /**
-   * POST — usa URLSearchParams + mode:no-cors
-   *
-   * O Apps Script lê via:  e.parameter.payload  →  JSON.parse(e.parameter.payload)
-   *
-   * Por usar no-cors, a resposta é opaque (não podemos ler).
-   * Isso é intencional — o Apps Script vai gravar os dados
-   * e o próximo pullRemote vai confirmar a escrita.
-   */
   function postSheet(body) {
     const params = new URLSearchParams();
     params.append("payload", JSON.stringify(body));
     return fetch(API_URL, {
       method: "POST",
-      mode: "no-cors",                              // evita preflight CORS
+      mode: "no-cors",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: params.toString()
     });
-    // não fazemos .json() — resposta é opaque com no-cors
   }
 
-  /* ── serialização / deserialização ──────────────────────── */
   function normalizeClientLocal(c) {
     const stamp = c.updatedAt || c.createdAt || c.data || isoNow();
     return {
@@ -209,7 +191,6 @@
     }).filter(x => x.id || x.cliNome);
   }
 
-  /* ── UI ──────────────────────────────────────────────────── */
   function setStatus(text, isError) {
     let el = document.getElementById("belaSheetsSyncStatus");
     if (!el) {
@@ -243,11 +224,11 @@
     document.body.appendChild(btn);
   }
 
-  /* ── sync ────────────────────────────────────────────────── */
   let syncTimer = null;
   let debounceTimer = null;
   let syncing = false;
   let patchDone = false;
+  let _rawSet = localStorage.setItem.bind(localStorage);
 
   async function pullRemote() {
     const data = await fetchGet(API_URL);
@@ -257,7 +238,6 @@
     const pagamentos = deserializePagamentos(data.recebimentos || [], vendas, clientes);
     const creditos = deserializeCreditos(data.cobrancas || [], clientes);
 
-    // usa raw para não disparar scheduleSync em cascata
     _rawSet("bm_clientes", JSON.stringify(clientes));
     _rawSet("bm_produtos", JSON.stringify(produtos));
     _rawSet("bm_vendas", JSON.stringify(vendas));
@@ -272,7 +252,6 @@
     const pagamentos = readLocal("pagamentos");
     const creditos = readLocal("creditos");
 
-    // série (await cada um) para não sobrecarregar o Apps Script
     await postSheet({ action: "replaceAll", sheet: "clientes",     rows: serializeClients(clientes) });
     await postSheet({ action: "replaceAll", sheet: "produtos",     rows: serializeProducts(produtos) });
     await postSheet({ action: "replaceAll", sheet: "vendas",       rows: serializeVendas(vendas) });
@@ -302,9 +281,6 @@
     debounceTimer = setTimeout(syncNow, 1200);
   }
 
-  /* guarda referência ao setItem original ANTES do patch */
-  let _rawSet = localStorage.setItem.bind(localStorage);
-
   function patchStorage() {
     if (patchDone) return;
     patchDone = true;
@@ -327,6 +303,10 @@
     clearInterval(syncTimer);
     syncTimer = setInterval(syncNow, SYNC_INTERVAL_MS);
   }
+
+  // Expõe globalmente para que DB.set() do index.html consiga chamar scheduleSync()
+  window.scheduleSync = scheduleSync;
+  window.syncNow = syncNow;
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);
