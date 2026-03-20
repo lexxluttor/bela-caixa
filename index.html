@@ -3,7 +3,7 @@
 <head>
 <script>
 if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)) {
-  window.location.href = "index.html";
+  window.location.href = "mobile.html";
 }
 </script>
 <meta charset="UTF-8">
@@ -892,28 +892,42 @@ function setSS(s,m){
   var d=document.getElementById('sdot'), t=document.getElementById('stxt');
   if(d)d.className='sdot '+s; if(t)t.textContent=m;
 }
-function scheduleSync(){clearTimeout(_st); _st=setTimeout(syncUp,2000);}
+function scheduleSync(){
+  clearTimeout(_st);
+  _st=setTimeout(function(){
+    if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
+      window.BelaSheetsSync.scheduleSync();
+      return;
+    }
+    syncUp();
+  },500);
+}
 function syncUp(){
-  if(_sy)return; _sy=true; setSS('sync','Salvando...');
-  var db={clientes:DB.get('clientes'),produtos:DB.get('produtos'),vendas:DB.get('vendas'),creditos:DB.get('creditos'),pagamentos:DB.get('pagamentos')};
-  fetch(GURL,{method:'POST',body:JSON.stringify({action:'save',db:db})})
-    .then(function(r){return r.json();})
-    .then(function(){_sy=false; setSS('ok','Salvo '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));})
-    .catch(function(){_sy=false; setSS('err','Offline — dados locais');});
+  if(window.BelaSheetsSync && typeof window.BelaSheetsSync.syncNow==='function'){
+    setSS('sync','Sincronizando...');
+    return window.BelaSheetsSync.syncNow().then(function(){
+      setSS('ok','Sincronizado ✓');
+    }).catch(function(){
+      setSS('err','Offline — dados locais');
+    });
+  }
+  setSS('err','Sync legado desativado');
+  return Promise.resolve();
 }
 function syncDown(){
-  setSS('sync','Carregando...');
-  fetch(GURL,{method:'POST',body:JSON.stringify({action:'load'})})
-    .then(function(r){return r.json();})
-    .then(function(r){
-      if(r&&r.ok&&r.db){
-        var d=r.db;
-        ['clientes','produtos','vendas','creditos','pagamentos'].forEach(function(k){if(d[k])localStorage.setItem('bm_'+k,JSON.stringify(d[k]));});
-        setSS('ok','Sincronizado ✓');
-      } else { setSS('ok','Dados locais'); }
+  if(window.BelaSheetsSync && typeof window.BelaSheetsSync.syncNow==='function'){
+    setSS('sync','Carregando...');
+    return window.BelaSheetsSync.syncNow().then(function(){
+      setSS('ok','Sincronizado ✓');
       renderDash();
-    })
-    .catch(function(){setSS('err','Offline'); renderDash();});
+    }).catch(function(){
+      setSS('err','Offline');
+      renderDash();
+    });
+  }
+  setSS('ok','Dados locais');
+  renderDash();
+  return Promise.resolve();
 }
 
 var DB={
@@ -921,6 +935,25 @@ var DB={
   set:function(k,v){localStorage.setItem('bm_'+k,JSON.stringify(v));if(typeof scheduleSync!=='undefined')scheduleSync();},
   uid:function(){return Date.now().toString(36)+Math.random().toString(36).substr(2,4);}
 };
+
+function pad2(n){return String(n).padStart(2,'0');}
+function localDateKey(v){
+  var d=v?new Date(v):new Date();
+  if(isNaN(d.getTime())) d=new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
+}
+function localDateTimeIso(v){
+  var d=v?new Date(v):new Date();
+  if(isNaN(d.getTime())) d=new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds());
+}
+function toInputDateTimeValue(v){
+  if(!v) return '';
+  var d=new Date(v);
+  if(isNaN(d.getTime())) return '';
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes());
+}
+
 
 function initDB(){
   if(localStorage.getItem('bm_ok2'))return;
@@ -1004,7 +1037,7 @@ function ir(pg){
 
 // DASHBOARD
 function renderDash(){
-  var n=new Date(),hoje=new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10),mes=n.getMonth(),ano=n.getFullYear();
+  var n=new Date(),hoje=localDateKey(n),mes=n.getMonth(),ano=n.getFullYear();
   document.getElementById('dash-dt').textContent=n.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   var vendas=DB.get('vendas'),clis=DB.get('clientes');
   var vh=vendas.filter(function(v){return v.data.startsWith(hoje);});
@@ -1342,7 +1375,7 @@ function finalizarVenda(){
   if(!cart.length){toast('⚠️ Carrinho vazio!');return;}
   if(vForma==='fiado'&&!vCli){toast('⚠️ Selecione um cliente para crediário!');return;}
   var total=cart.reduce(function(s,i){return s+i.preco*i.qty;},0);
-  var venda={id:DB.uid(),data:new Date(new Date().getTime()-new Date().getTimezoneOffset()*60000).toISOString(),cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:JSON.parse(JSON.stringify(cart)),total:total};
+  var venda={id:DB.uid(),data:localDateTimeIso(),cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:JSON.parse(JSON.stringify(cart)),total:total};
   var vendas=DB.get('vendas');vendas.push(venda);DB.set('vendas',vendas);
   if(vForma==='fiado'&&vCli){
     var crds=DB.get('creditos');
@@ -1474,7 +1507,7 @@ function confirmarPag(){
   if(!rCli){toast('⚠️ Selecione um cliente!');return;}
   var val=parseFloat(document.getElementById('r-val').value);
   if(!val||val<=0){toast('⚠️ Informe o valor!');return;}
-  var pag={id:DB.uid(),cid:rCli.id,data:new Date(new Date().getTime()-new Date().getTimezoneOffset()*60000).toISOString(),val:val,forma:document.getElementById('r-forma').value,obs:document.getElementById('r-obs').value};
+  var pag={id:DB.uid(),cid:rCli.id,data:localDateTimeIso(),val:val,forma:document.getElementById('r-forma').value,obs:document.getElementById('r-obs').value};
   var pgs=DB.get('pagamentos');pgs.push(pag);DB.set('pagamentos',pgs);
   toast('✅ Pagamento registrado!','ok');var cliComp=rCli;document.getElementById('r-obs').value='';renderRecebPainel();mostrarComp(null,cliComp,pag);
 }
@@ -1637,8 +1670,8 @@ function renderCrediario(){
 
 function renderCaixa(){
   var data=document.getElementById('cx-d').value; if(!data)return;
-  var vendas=DB.get('vendas').filter(function(v){return v.data.startsWith(data);});
-  var pgs=DB.get('pagamentos').filter(function(p){return p.data.startsWith(data);});
+  var vendas=DB.get('vendas').filter(function(v){return localDateKey(v.data)===data;});
+  var pgs=DB.get('pagamentos').filter(function(p){return localDateKey(p.data)===data;});
   var vendaVista=vendas.filter(function(v){return v.forma!=='fiado';});
   var vendaCred=vendas.filter(function(v){return v.forma==='fiado';});
   var tvista=vendaVista.reduce(function(s,v){return s+v.total;},0);
@@ -1741,7 +1774,7 @@ function fecharCaixaDia(){
 
 function printCaixa(){
   var data=document.getElementById('cx-d').value;
-  var vendas=DB.get('vendas').filter(function(v){return v.data.startsWith(data);});
+  var vendas=DB.get('vendas').filter(function(v){return localDateKey(v.data)===data;});
   var total=vendas.reduce(function(s,v){return s+v.total;},0);
   document.getElementById('pz').innerHTML='<h2 style="text-align:center;">Bela Modas — Caixa do Dia</h2><p style="text-align:center;color:#666;margin-bottom:12px;">'+new Date(data+'T12:00').toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</p><hr style="margin-bottom:10px;">'+
     vendas.map(function(v){return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee;font-size:13px;"><span>'+v.cliNome+' · '+FF(v.forma)+'</span><span>'+R(v.total)+'</span></div>';}).join('')+
@@ -1839,7 +1872,7 @@ window.addEventListener('load', function(){
 
   initDB();
   document.getElementById('logo').src='logo.png';
-  document.getElementById('cx-d').value=new Date(new Date().getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  document.getElementById('cx-d').value=localDateKey();
   var n=new Date();
   document.getElementById('rl-m').value=n.getMonth();
   var sa=document.getElementById('rl-a');
@@ -2163,7 +2196,7 @@ function renderVendas(){
   var data=(document.getElementById('vs-data')||{value:''}).value;
   var vendas=DB.get('vendas').slice().reverse();
   if(busca) vendas=vendas.filter(function(v){return (v.cliNome||'').toLowerCase().includes(busca);});
-  if(data)  vendas=vendas.filter(function(v){return v.data&&v.data.startsWith(data);});
+  if(data)  vendas=vendas.filter(function(v){return v.data&&localDateKey(v.data)===data;});
 
   var total=vendas.reduce(function(s,v){return s+v.total;},0);
   var st=document.getElementById('vs-st');
@@ -2190,21 +2223,16 @@ function renderVendas(){
 
 
 function fmtInputDateTime(v){
-  if(!v) return '';
-  try{
-    var d=new Date(v);
-    if(isNaN(d.getTime())) return '';
-    return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);
-  }catch(e){ return ''; }
+  return toInputDateTimeValue(v);
 }
 function parseInputDateTime(v,fallback){
-  if(!v) return fallback || new Date().toISOString();
+  if(!v) return fallback || localDateTimeIso();
   try{
     var d=new Date(v);
-    if(isNaN(d.getTime())) return fallback || new Date().toISOString();
-    return d.toISOString();
+    if(isNaN(d.getTime())) return fallback || localDateTimeIso();
+    return localDateTimeIso(d);
   }catch(e){
-    return fallback || new Date().toISOString();
+    return fallback || localDateTimeIso();
   }
 }
 
@@ -2392,7 +2420,7 @@ function salvarSenhaCfg(){
 function verVendasCaixa(tipo){
   var data=document.getElementById('cx-d').value; if(!data)return;
   var vendas=DB.get('vendas').filter(function(v){
-    return v.data.startsWith(data) && (tipo==='vista'?v.forma!=='fiado':v.forma==='fiado');
+    return localDateKey(v.data)===data && (tipo==='vista'?v.forma!=='fiado':v.forma==='fiado');
   });
   var titulo=tipo==='vista'?'🛍️ Vendas à Vista — '+data:'💳 Crediário — '+data;
   var rows=vendas.map(function(v){

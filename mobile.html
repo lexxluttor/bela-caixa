@@ -261,15 +261,24 @@ const App = {
 };
 
 function uid(prefix){ return (prefix||'id') + '_' + Math.random().toString(36).slice(2,10) + '_' + Date.now().toString(36); }
-function nowIso(){ var n=new Date(); return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString(); }
-function hojeISO(){ var n=new Date(); return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10); }
+function nowIso(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')+'T'+String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'); }
+function hojeISO(){ var n=new Date(); return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0'); }
 function ensureRow(prefix, obj){
   const stamp = nowIso();
-  const copy = Object.assign({}, obj);
+  const copy = Object.assign({}, obj || {});
   if(!copy.id) copy.id = uid(prefix);
   if(!copy.createdAt) copy.createdAt = copy.data || stamp;
-  copy.updatedAt = stamp;
+  if(!copy.updatedAt) copy.updatedAt = copy.createdAt || stamp;
+  if(!copy.data) copy.data = copy.createdAt || stamp;
   return copy;
+}
+function markUpdated(row){
+  const prefix=((row && row.id) ? String(row.id).split('_')[0] : 'row') || 'row';
+  const out=ensureRow(prefix, row || {});
+  const stamp=nowIso();
+  out.updatedAt=stamp;
+  if(!out.data) out.data=out.createdAt || stamp;
+  return out;
 }
 function blindAll(){
   ['clientes','produtos','vendas','creditos','pagamentos'].forEach((k,idx)=>{
@@ -381,7 +390,7 @@ function salvarClienteVenda(){
     return;
   }
 
-  const cli = ensureRow('cli', {nome, tel, cpf, end, obs});
+  const cli = markUpdated({id:null, nome, tel, cpf, end, obs});
   list.push(cli); DB.set('clientes', list);
   App.vendaCliente = cli;
   document.getElementById('v-cli-busca').value = cli.nome || nome;
@@ -492,7 +501,7 @@ function vendaFinalizar(forma){
   const itens = App.carrinho.map(i=>({pid:i.pid, desc:i.desc, preco:i.preco, qty:i.qty}));
 
   const vendas = DB.get('vendas');
-  const venda = ensureRow('ven', {
+  const venda = markUpdated({
     data: stamp,
     cid: App.vendaCliente ? App.vendaCliente.id : null,
     cliNome: App.vendaCliente ? App.vendaCliente.nome : 'Balcão',
@@ -505,7 +514,7 @@ function vendaFinalizar(forma){
 
   if(forma === 'fiado' && App.vendaCliente){
     const creditos = DB.get('creditos');
-    creditos.push(ensureRow('cre', {
+    creditos.push(markUpdated({
       vid:venda.id,
       cid:App.vendaCliente.id,
       cliNome:App.vendaCliente.nome,
@@ -605,7 +614,7 @@ function confirmarRecebimento(){
   const obs = document.getElementById('r-obs').value.trim();
 
   const pagamentos = DB.get('pagamentos');
-  pagamentos.push(ensureRow('pag', {
+  pagamentos.push(markUpdated({
     cid:App.recebCliente.id,
     cliNome:App.recebCliente.nome,
     data: stamp,
