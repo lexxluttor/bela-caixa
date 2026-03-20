@@ -250,7 +250,7 @@
 <script>
 const DB = {
   get(k){ try{ return JSON.parse(localStorage.getItem('bm_' + k) || '[]'); } catch(e){ return []; } },
-  set(k,v){ localStorage.setItem('bm_' + k, JSON.stringify(v)); }
+  set(k,v){ localStorage.setItem('bm_' + k, JSON.stringify(v)); try{ if(typeof scheduleSync==='function') scheduleSync(); }catch(e){} }
 };
 const App = {
   vendaCliente:null,
@@ -261,7 +261,8 @@ const App = {
 };
 
 function uid(prefix){ return (prefix||'id') + '_' + Math.random().toString(36).slice(2,10) + '_' + Date.now().toString(36); }
-function nowIso(){ return new Date().toISOString(); }
+function nowIso(){ var n=new Date(); return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString(); }
+function hojeISO(){ var n=new Date(); return new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10); }
 function ensureRow(prefix, obj){
   const stamp = nowIso();
   const copy = Object.assign({}, obj);
@@ -282,7 +283,6 @@ blindAll();
 function toast(msg){ alert(msg); }
 function R(v){ return 'R$ ' + Number(v||0).toFixed(2).replace('.',','); }
 function FDT(v){ try{return new Date(v).toLocaleString('pt-BR')}catch(e){return ''} }
-function hojeISO(){ return new Date().toISOString().slice(0,10); }
 
 function ir(pg){
   document.querySelectorAll('.section').forEach(s => s.classList.remove('on'));

@@ -1004,7 +1004,7 @@ function ir(pg){
 
 // DASHBOARD
 function renderDash(){
-  var n=new Date(),hoje=n.toISOString().slice(0,10),mes=n.getMonth(),ano=n.getFullYear();
+  var n=new Date(),hoje=new Date(n.getTime()-n.getTimezoneOffset()*60000).toISOString().slice(0,10),mes=n.getMonth(),ano=n.getFullYear();
   document.getElementById('dash-dt').textContent=n.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   var vendas=DB.get('vendas'),clis=DB.get('clientes');
   var vh=vendas.filter(function(v){return v.data.startsWith(hoje);});
@@ -1342,7 +1342,7 @@ function finalizarVenda(){
   if(!cart.length){toast('⚠️ Carrinho vazio!');return;}
   if(vForma==='fiado'&&!vCli){toast('⚠️ Selecione um cliente para crediário!');return;}
   var total=cart.reduce(function(s,i){return s+i.preco*i.qty;},0);
-  var venda={id:DB.uid(),data:new Date().toISOString(),cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:JSON.parse(JSON.stringify(cart)),total:total};
+  var venda={id:DB.uid(),data:new Date(new Date().getTime()-new Date().getTimezoneOffset()*60000).toISOString(),cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:JSON.parse(JSON.stringify(cart)),total:total};
   var vendas=DB.get('vendas');vendas.push(venda);DB.set('vendas',vendas);
   if(vForma==='fiado'&&vCli){
     var crds=DB.get('creditos');
@@ -1474,7 +1474,7 @@ function confirmarPag(){
   if(!rCli){toast('⚠️ Selecione um cliente!');return;}
   var val=parseFloat(document.getElementById('r-val').value);
   if(!val||val<=0){toast('⚠️ Informe o valor!');return;}
-  var pag={id:DB.uid(),cid:rCli.id,data:new Date().toISOString(),val:val,forma:document.getElementById('r-forma').value,obs:document.getElementById('r-obs').value};
+  var pag={id:DB.uid(),cid:rCli.id,data:new Date(new Date().getTime()-new Date().getTimezoneOffset()*60000).toISOString(),val:val,forma:document.getElementById('r-forma').value,obs:document.getElementById('r-obs').value};
   var pgs=DB.get('pagamentos');pgs.push(pag);DB.set('pagamentos',pgs);
   toast('✅ Pagamento registrado!','ok');var cliComp=rCli;document.getElementById('r-obs').value='';renderRecebPainel();mostrarComp(null,cliComp,pag);
 }
@@ -1839,7 +1839,7 @@ window.addEventListener('load', function(){
 
   initDB();
   document.getElementById('logo').src='logo.png';
-  document.getElementById('cx-d').value=new Date().toISOString().slice(0,10);
+  document.getElementById('cx-d').value=new Date(new Date().getTime()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   var n=new Date();
   document.getElementById('rl-m').value=n.getMonth();
   var sa=document.getElementById('rl-a');
