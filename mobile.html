@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bela Modas Mobile</title>
+  <meta name="theme-color" content="#b14f4f" />
+  <style>
+    :root{
+      --bg:#f7f7fb; --card:#fff; --txt:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+      --red:#b14f4f; --red2:#8f3e3e; --green:#1f9d67; --blue:#3366d6; --amber:#b7791f;
+      --whats:#22c55e; --shadow:0 10px 26px rgba(0,0,0,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .top{position:sticky;top:0;z-index:30;background:linear-gradient(135deg,var(--red2),var(--red));color:#fff;padding:14px 16px 18px;border-bottom-left-radius:22px;border-bottom-right-radius:22px;box-shadow:var(--shadow)}
+    .top h1{margin:0;font-size:21px}
+    .sub{margin-top:4px;font-size:12px;opacity:.92}
+    .wrap{max-width:860px;margin:0 auto;padding:14px 14px 94px}
+    .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap}
+    .btn{border:none;border-radius:14px;padding:12px 14px;font-size:14px;font-weight:800;cursor:pointer}
+    .btn-red{background:var(--red);color:#fff}.btn-line{background:#fff;border:1px solid var(--line);color:#334155}.btn-whats{background:var(--whats);color:#fff}
+    .status{font-size:12px;color:#fff;background:rgba(255,255,255,.18);padding:7px 10px;border-radius:999px}
+    .section{display:none}.section.on{display:block}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    .kpi,.card,.item{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
+    .kpi{padding:14px}.kpi .lbl{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase}.kpi .val{font-size:24px;font-weight:900;margin-top:5px}
+    .card{padding:14px;margin-top:12px}.title{font-size:18px;font-weight:900;margin:0 0 10px}.subt{font-size:12px;color:var(--muted);margin-bottom:10px}
+    .item{padding:12px;margin-top:10px}.item h4{margin:0 0 6px;font-size:15px}.muted{color:var(--muted);font-size:13px}.sep{height:1px;background:var(--line);margin:10px 0}
+    .rowline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.price{font-weight:900;color:var(--red)}
+    .pill{display:inline-block;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:800;background:#f3f4f6;color:#334155}
+    .pill.ok{background:#e8f8ef;color:#17663f}.pill.warn{background:#fff6dd;color:var(--amber)}.pill.bad{background:#fdeaea;color:#8f2d2d}
+    .bottom{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 6px 10px;z-index:40}
+    .navbtn{background:none;border:none;font-size:11px;color:#475569;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+    .navbtn.on{color:var(--red)}
+    .empty{padding:18px;text-align:center;color:var(--muted)}
+    @media (max-width:720px){.grid2,.grid3{grid-template-columns:1fr 1fr}.toolbar{align-items:stretch}.toolbar .left,.toolbar .right{display:flex;gap:10px;flex-wrap:wrap}}
+    @media (max-width:480px){.grid2,.grid3{grid-template-columns:1fr}.top h1{font-size:19px}}
+  </style>
+</head>
+<body>
+  <div class="top">
+    <h1>Bela Modas Mobile</h1>
+    <div class="sub">Modo consulta: Caixa do dia, Relatórios e Cobranças</div>
+    <div class="toolbar">
+      <div class="left">
+        <button class="btn btn-line" onclick="carregarDados(true)">🔄 Atualizar</button>
+      </div>
+      <div id="statusSync" class="status">Carregando...</div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <section id="pg-caixa" class="section on">
+      <div class="grid2">
+        <div class="kpi"><div class="lbl">Vendas do dia</div><div id="kpi-vendas" class="val">R$ 0,00</div></div>
+        <div class="kpi"><div class="lbl">Recebido no dia</div><div id="kpi-recebido" class="val">R$ 0,00</div></div>
+        <div class="kpi"><div class="lbl">Quantidade de vendas</div><div id="kpi-qtd" class="val">0</div></div>
+        <div class="kpi"><div class="lbl">Ticket médio</div><div id="kpi-ticket" class="val">R$ 0,00</div></div>
+      </div>
+
+      <div class="card">
+        <div class="title">Movimentações de hoje</div>
+        <div class="subt">Últimas vendas e recebimentos lançados no sistema principal.</div>
+        <div id="lista-caixa"></div>
+      </div>
+    </section>
+
+    <section id="pg-relatorios" class="section">
+      <div class="grid3">
+        <div class="kpi"><div class="lbl">Vendido no mês</div><div id="rel-mes" class="val">R$ 0,00</div></div>
+        <div class="kpi"><div class="lbl">Recebido no mês</div><div id="rel-receb-mes" class="val">R$ 0,00</div></div>
+        <div class="kpi"><div class="lbl">Cobranças em aberto</div><div id="rel-aberto" class="val">R$ 0,00</div></div>
+      </div>
+
+      <div class="card">
+        <div class="title">Top clientes</div>
+        <div class="subt">Baseado em vendas registradas.</div>
+        <div id="lista-top-clientes"></div>
+      </div>
+
+      <div class="card">
+        <div class="title">Produtos mais vendidos</div>
+        <div class="subt">Calculado pelos itens das vendas.</div>
+        <div id="lista-top-produtos"></div>
+      </div>
+    </section>
+
+    <section id="pg-cobrancas" class="section">
+      <div class="card">
+        <div class="title">Cobranças</div>
+        <div class="subt">Lista simples de pendências com botão para WhatsApp.</div>
+        <div id="lista-cobrancas"></div>
+      </div>
+    </section>
+  </div>
+
+  <nav class="bottom">
+    <button class="navbtn on" data-nav="caixa" onclick="ir('caixa')">💰<span>Caixa</span></button>
+    <button class="navbtn" data-nav="relatorios" onclick="ir('relatorios')">📊<span>Relatórios</span></button>
+    <button class="navbtn" data-nav="cobrancas" onclick="ir('cobrancas')">📋<span>Cobranças</span></button>
+  </nav>
+
+  <script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbzH4m2rIWkzHLf_SPldVWBk6uSbhmwWz_OLZENRr0A-9XOzCtHsU5fbLtJCm-ZKss0k/exec";
+    const AUTO_REFRESH_MS = 15 * 60 * 1000;
+    let DATA = { clientes: [], vendas: [], recebimentos: [], cobrancas: [] };
+
+    function fmtMoney(v){ return Number(v || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+    function esc(s){ return String(s == null ? '' : s).replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+    function parseDate(v){
+      if(!v) return null;
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    function localDayKey(v){
+      const d = parseDate(v);
+      if(!d) return '';
+      const y = d.getFullYear();
+      const m = String(d.getMonth()+1).padStart(2,'0');
+      const day = String(d.getDate()).padStart(2,'0');
+      return `${y}-${m}-${day}`;
+    }
+    function monthKey(v){
+      const d = parseDate(v);
+      if(!d) return '';
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    }
+    function nowDayKey(){ return localDayKey(new Date().toISOString()); }
+    function nowMonthKey(){ return monthKey(new Date().toISOString()); }
+    function sortDescByDate(list, getField){
+      return (list || []).slice().sort((a,b) => {
+        const ta = parseDate(getField(a))?.getTime() || 0;
+        const tb = parseDate(getField(b))?.getTime() || 0;
+        return tb - ta;
+      });
+    }
+    function onlyActive(rows){ return (rows || []).filter(r => !r.deletedAt); }
+    function phoneFromCliente(c){
+      return String(c?.telefone || c?.tel || '').replace(/\D/g,'');
+    }
+    function statusText(msg, err){
+      const el = document.getElementById('statusSync');
+      el.textContent = msg;
+      el.style.background = err ? 'rgba(160,25,25,.82)' : 'rgba(255,255,255,.18)';
+    }
+
+    function ir(pg){
+      ['caixa','relatorios','cobrancas'].forEach(n => {
+        document.getElementById('pg-' + n).classList.toggle('on', n === pg);
+      });
+      document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('on', b.dataset.nav === pg));
+    }
+
+    async function carregarDados(manual){
+      try{
+        statusText(manual ? 'Atualizando...' : 'Sincronizando...');
+        const r = await fetch(API_URL, { method:'GET', cache:'no-store' });
+        if(!r.ok) throw new Error('GET ' + r.status);
+        const text = await r.text();
+        let data;
+        try{ data = JSON.parse(text); }catch(e){ throw new Error('Resposta inválida do servidor'); }
+        if(data.ok === false) throw new Error(data.error || 'Erro do servidor');
+
+        DATA = {
+          clientes: onlyActive(data.clientes || []),
+          vendas: onlyActive(data.vendas || []),
+          recebimentos: onlyActive(data.recebimentos || []),
+          cobrancas: onlyActive(data.cobrancas || [])
+        };
+
+        renderCaixa();
+        renderRelatorios();
+        renderCobrancas();
+
+        const hora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+        statusText('Atualizado às ' + hora, false);
+      }catch(err){
+        console.error(err);
+        statusText('Erro ao atualizar', true);
+      }
+    }
+
+    function renderCaixa(){
+      const hoje = nowDayKey();
+      const vendasHoje = DATA.vendas.filter(v => localDayKey(v.data || v.createdAt || v.updatedAt) === hoje);
+      const recebHoje = DATA.recebimentos.filter(r => localDayKey(r.data || r.createdAt || r.updatedAt) === hoje);
+
+      const totalVendas = vendasHoje.reduce((s,v)=>s+Number(v.total||0),0);
+      const totalRecebido = recebHoje.reduce((s,r)=>s+Number(r.valor||0),0);
+      const qtd = vendasHoje.length;
+      const ticket = qtd ? totalVendas / qtd : 0;
+
+      document.getElementById('kpi-vendas').textContent = fmtMoney(totalVendas);
+      document.getElementById('kpi-recebido').textContent = fmtMoney(totalRecebido);
+      document.getElementById('kpi-qtd').textContent = String(qtd);
+      document.getElementById('kpi-ticket').textContent = fmtMoney(ticket);
+
+      const movs = [];
+      vendasHoje.forEach(v => movs.push({ tipo:'Venda', cliente:v.cliente || 'Balcão', valor:Number(v.total||0), data:v.data || v.createdAt || v.updatedAt, pill:'ok' }));
+      recebHoje.forEach(r => movs.push({ tipo:'Recebimento', cliente:resolverNomeRecebimento(r), valor:Number(r.valor||0), data:r.data || r.createdAt || r.updatedAt, pill:'warn' }));
+      const lista = sortDescByDate(movs, x => x.data).slice(0, 20);
+
+      document.getElementById('lista-caixa').innerHTML = lista.length ? lista.map(m => `
+        <div class="item">
+          <div class="rowline">
+            <div>
+              <h4>${esc(m.cliente)}</h4>
+              <div class="muted">${esc(m.tipo)} • ${formatDateTime(m.data)}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="pill ${m.pill}">${esc(m.tipo)}</div>
+              <div class="price" style="margin-top:8px">${fmtMoney(m.valor)}</div>
+            </div>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">Nenhuma movimentação hoje.</div>';
+    }
+
+    function resolverNomeRecebimento(r){
+      if(r.cliente) return r.cliente;
+      const vendaId = String(r.venda_id || '');
+      if(vendaId.startsWith('cid:')){
+        const cid = vendaId.slice(4);
+        const cli = DATA.clientes.find(c => String(c.id) === cid);
+        return cli?.nome || 'Cliente';
+      }
+      const venda = DATA.vendas.find(v => String(v.id) === vendaId);
+      return venda?.cliente || 'Cliente';
+    }
+
+    function renderRelatorios(){
+      const mes = nowMonthKey();
+      const vendasMes = DATA.vendas.filter(v => monthKey(v.data || v.createdAt || v.updatedAt) === mes);
+      const recebMes = DATA.recebimentos.filter(r => monthKey(r.data || r.createdAt || r.updatedAt) === mes);
+      const cobrAbertas = DATA.cobrancas.filter(c => String(c.status || '').toLowerCase() !== 'pago' && String(c.status || '').toLowerCase() !== 'quitado');
+
+      document.getElementById('rel-mes').textContent = fmtMoney(vendasMes.reduce((s,v)=>s+Number(v.total||0),0));
+      document.getElementById('rel-receb-mes').textContent = fmtMoney(recebMes.reduce((s,r)=>s+Number(r.valor||0),0));
+      document.getElementById('rel-aberto').textContent = fmtMoney(cobrAbertas.reduce((s,c)=>s+Number(c.valor||0),0));
+
+      const topClientesMap = new Map();
+      vendasMes.forEach(v => {
+        const nome = String(v.cliente || 'Balcão');
+        topClientesMap.set(nome, (topClientesMap.get(nome) || 0) + Number(v.total || 0));
+      });
+      const topClientes = Array.from(topClientesMap.entries()).sort((a,b)=>b[1]-a[1]).slice(0,8);
+      document.getElementById('lista-top-clientes').innerHTML = topClientes.length ? topClientes.map(([nome,total], i) => `
+        <div class="item">
+          <div class="rowline">
+            <div><h4>${i+1}. ${esc(nome)}</h4><div class="muted">Vendas no mês</div></div>
+            <div class="price">${fmtMoney(total)}</div>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">Sem vendas no mês.</div>';
+
+      const topProdutosMap = new Map();
+      vendasMes.forEach(v => {
+        const itens = safeJson(v.itens_json || '[]');
+        itens.forEach(it => {
+          const nome = String(it.desc || it.nome || 'Produto');
+          const qtd = Number(it.qtd || 1);
+          topProdutosMap.set(nome, (topProdutosMap.get(nome) || 0) + qtd);
+        });
+      });
+      const topProdutos = Array.from(topProdutosMap.entries()).sort((a,b)=>b[1]-a[1]).slice(0,8);
+      document.getElementById('lista-top-produtos').innerHTML = topProdutos.length ? topProdutos.map(([nome,qtd], i) => `
+        <div class="item">
+          <div class="rowline">
+            <div><h4>${i+1}. ${esc(nome)}</h4><div class="muted">Quantidade vendida</div></div>
+            <div class="price">${qtd}</div>
+          </div>
+        </div>
+      `).join('') : '<div class="empty">Sem itens vendidos no mês.</div>';
+    }
+
+    function renderCobrancas(){
+      const clientById = new Map(DATA.clientes.map(c => [String(c.id), c]));
+      const lista = sortDescByDate(DATA.cobrancas, c => c.vencimento || c.data || c.updatedAt).filter(c => String(c.status || '').toLowerCase() !== 'pago' && String(c.status || '').toLowerCase() !== 'quitado');
+      document.getElementById('lista-cobrancas').innerHTML = lista.length ? lista.map(c => {
+        const nome = c.cliente || c.cliNome || clientById.get(String(c.cid || ''))?.nome || 'Cliente';
+        const cli = clientById.get(String(c.cid || '')) || DATA.clientes.find(x => String(x.nome || '').toLowerCase() === String(nome).toLowerCase()) || null;
+        const tel = phoneFromCliente(cli);
+        const stat = badgeStatus(c.status);
+        return `
+          <div class="item">
+            <div class="rowline">
+              <div>
+                <h4>${esc(nome)}</h4>
+                <div class="muted">Vencimento: ${esc(formatDate(c.vencimento || c.data))}</div>
+                <div class="muted">Status: <span class="pill ${stat.cls}">${esc(stat.txt)}</span></div>
+              </div>
+              <div style="text-align:right">
+                <div class="price">${fmtMoney(c.valor)}</div>
+              </div>
+            </div>
+            <div class="sep"></div>
+            <button class="btn ${tel ? 'btn-whats' : 'btn-line'}" onclick="enviarCobranca(${jsStr(nome)}, ${jsStr(String(c.valor || 0))}, ${jsStr(tel)})">📲 Enviar cobrança</button>
+          </div>
+        `;
+      }).join('') : '<div class="empty">Nenhuma cobrança em aberto.</div>';
+    }
+
+    function badgeStatus(s){
+      const v = String(s || 'aberto').toLowerCase();
+      if(v === 'pago' || v === 'quitado') return { txt:'Pago', cls:'ok' };
+      if(v === 'vencido') return { txt:'Vencido', cls:'bad' };
+      return { txt:'Em aberto', cls:'warn' };
+    }
+
+    function formatDate(v){
+      const d = parseDate(v);
+      return d ? d.toLocaleDateString('pt-BR') : '-';
+    }
+    function formatDateTime(v){
+      const d = parseDate(v);
+      return d ? d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-';
+    }
+    function safeJson(text){
+      try{ return JSON.parse(text || '[]'); }catch(e){ return []; }
+    }
+    function jsStr(s){ return JSON.stringify(String(s == null ? '' : s)); }
+
+    function enviarCobranca(nome, valor, tel){
+      const msg = `Olá ${nome}, tudo bem?\nConsta uma cobrança pendente no valor de ${fmtMoney(valor)}.\nPor favor, entre em contato para regularização.`;
+      const url = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+    }
+
+    document.addEventListener('visibilitychange', function(){
+      if(document.visibilityState === 'visible') carregarDados(false);
+    });
+
+    carregarDados(false);
+    setInterval(() => carregarDados(false), AUTO_REFRESH_MS);
+  </script>
+</body>
+</html>
