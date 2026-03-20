@@ -2,337 +2,786 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bela Modas Mobile</title>
-  <meta name="theme-color" content="#b14f4f" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bela Modas • Mobile Consulta</title>
   <style>
     :root{
-      --bg:#f7f7fb; --card:#fff; --txt:#1f2937; --muted:#6b7280; --line:#e5e7eb;
-      --red:#b14f4f; --red2:#8f3e3e; --green:#1f9d67; --blue:#3366d6; --amber:#b7791f;
-      --whats:#22c55e; --shadow:0 10px 26px rgba(0,0,0,.08);
+      --bg:#f7f3f1;
+      --card:#ffffff;
+      --ink:#241b1a;
+      --muted:#7c6d69;
+      --brand:#b14f4f;
+      --brand-2:#8d3e3e;
+      --ok:#1f7a4d;
+      --warn:#c27a13;
+      --danger:#b42318;
+      --line:#eadfda;
+      --shadow:0 10px 24px rgba(38,22,20,.08);
+      --radius:18px;
+      --green:#3e7f57;
+      --blue:#4c79b8;
+      --red:#9e5454;
+      --gold:#8b6a2b;
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
-    .top{position:sticky;top:0;z-index:30;background:linear-gradient(135deg,var(--red2),var(--red));color:#fff;padding:14px 16px 18px;border-bottom-left-radius:22px;border-bottom-right-radius:22px;box-shadow:var(--shadow)}
-    .top h1{margin:0;font-size:21px}
-    .sub{margin-top:4px;font-size:12px;opacity:.92}
-    .wrap{max-width:860px;margin:0 auto;padding:14px 14px 94px}
-    .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-top:12px;flex-wrap:wrap}
-    .btn{border:none;border-radius:14px;padding:12px 14px;font-size:14px;font-weight:800;cursor:pointer}
-    .btn-red{background:var(--red);color:#fff}.btn-line{background:#fff;border:1px solid var(--line);color:#334155}.btn-whats{background:var(--whats);color:#fff}
-    .status{font-size:12px;color:#fff;background:rgba(255,255,255,.18);padding:7px 10px;border-radius:999px}
-    .section{display:none}.section.on{display:block}
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-    .kpi,.card,.item{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow)}
-    .kpi{padding:14px}.kpi .lbl{font-size:11px;color:var(--muted);font-weight:800;text-transform:uppercase}.kpi .val{font-size:24px;font-weight:900;margin-top:5px}
-    .card{padding:14px;margin-top:12px}.title{font-size:18px;font-weight:900;margin:0 0 10px}.subt{font-size:12px;color:var(--muted);margin-bottom:10px}
-    .item{padding:12px;margin-top:10px}.item h4{margin:0 0 6px;font-size:15px}.muted{color:var(--muted);font-size:13px}.sep{height:1px;background:var(--line);margin:10px 0}
-    .rowline{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.price{font-weight:900;color:var(--red)}
-    .pill{display:inline-block;padding:4px 9px;border-radius:999px;font-size:12px;font-weight:800;background:#f3f4f6;color:#334155}
-    .pill.ok{background:#e8f8ef;color:#17663f}.pill.warn{background:#fff6dd;color:var(--amber)}.pill.bad{background:#fdeaea;color:#8f2d2d}
-    .bottom{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 6px 10px;z-index:40}
-    .navbtn{background:none;border:none;font-size:11px;color:#475569;font-weight:800;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
-    .navbtn.on{color:var(--red)}
-    .empty{padding:18px;text-align:center;color:var(--muted)}
-    @media (max-width:720px){.grid2,.grid3{grid-template-columns:1fr 1fr}.toolbar{align-items:stretch}.toolbar .left,.toolbar .right{display:flex;gap:10px;flex-wrap:wrap}}
-    @media (max-width:480px){.grid2,.grid3{grid-template-columns:1fr}.top h1{font-size:19px}}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#f8f4f2 0%, #f6f0ed 100%);
+      color:var(--ink);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    }
+    .app{
+      max-width:900px;
+      margin:0 auto;
+      padding:env(safe-area-inset-top) 14px calc(24px + env(safe-area-inset-bottom));
+    }
+    .top{
+      position:sticky; top:0; z-index:20;
+      backdrop-filter: blur(10px);
+      background:rgba(248,244,242,.92);
+      padding:10px 0 12px;
+    }
+    .brand{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      margin-bottom:12px;
+    }
+    .brand h1{ margin:0; font-size:22px; line-height:1.1; }
+    .sub{ color:var(--muted); font-size:13px; margin-top:4px; }
+    .pill{
+      border:none; background:var(--brand); color:#fff; font-weight:800;
+      border-radius:999px; padding:10px 14px; box-shadow:var(--shadow); cursor:pointer;
+    }
+    .pill.secondary{
+      background:#fff; color:var(--ink); border:1px solid var(--line); box-shadow:none;
+    }
+    .tabs{
+      display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+    }
+    .tab{
+      border:none; padding:12px 10px; border-radius:14px;
+      background:#fff; color:var(--ink); font-weight:800; cursor:pointer; border:1px solid var(--line);
+    }
+    .tab.active{ background:var(--brand); color:#fff; border-color:var(--brand); }
+    .status{ margin-top:10px; font-size:12px; color:var(--muted); }
+    .view{ display:none; padding-top:14px; }
+    .view.active{ display:block; }
+
+    .toolbar{
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;
+    }
+    .field{ flex:1 1 180px; }
+    input,select{
+      width:100%;
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--ink);
+      border-radius:14px;
+      padding:12px 12px;
+      font-size:15px;
+      outline:none;
+    }
+
+    .grid{ display:grid; gap:12px; }
+    .grid.cards{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      padding:14px;
+      box-shadow:var(--shadow);
+    }
+    .metric{
+      border-left:4px solid var(--line);
+    }
+    .metric.green{ border-left-color:var(--green); }
+    .metric.blue{ border-left-color:var(--blue); }
+    .metric.red{ border-left-color:var(--red); }
+    .metric.gold{ border-left-color:var(--gold); }
+    .metric .label{
+      font-size:12px;
+      color:#5e5552;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      font-weight:800;
+      margin-bottom:8px;
+    }
+    .metric .value{
+      font-size:22px;
+      font-weight:900;
+      margin-bottom:6px;
+    }
+    .metric .subline{
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .row{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .muted{ color:var(--muted); }
+    .small{ font-size:12px; }
+    .list{ display:grid; gap:10px; }
+    .item{
+      background:#fff;
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:12px;
+    }
+    .highlight{ color:var(--brand-2); font-weight:900; }
+    .empty{ text-align:center; color:var(--muted); padding:20px 10px; }
+
+    .table-wrap{
+      overflow:auto;
+      border:1px solid var(--line);
+      border-radius:14px;
+    }
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+      min-width:520px;
+    }
+    th,td{
+      padding:12px 10px;
+      border-bottom:1px solid #efe5e1;
+      text-align:left;
+      font-size:14px;
+    }
+    th{
+      color:#6c625e;
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.04em;
+      background:#faf6f4;
+    }
+    td.num{ text-align:right; font-weight:700; }
+    tr:last-child td{ border-bottom:none; }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      font-weight:800;
+      background:#f1e8e5;
+      color:#6e4f49;
+    }
+    .badge.ok{ background:#e7f6ee; color:var(--ok); }
+    .badge.warn{ background:#fff4df; color:var(--warn); }
+    .badge.danger{ background:#fdebea; color:var(--danger); }
+
+    .actions{ display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .btn{
+      border:none;
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      font-weight:800;
+      background:var(--brand);
+      color:#fff;
+    }
+    .btn.light{
+      background:#fff;
+      color:var(--ink);
+      border:1px solid var(--line);
+    }
+
+    @media (min-width:760px){
+      .grid.cards{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+    }
   </style>
 </head>
 <body>
-  <div class="top">
-    <h1>Bela Modas Mobile</h1>
-    <div class="sub">Modo consulta: Caixa do dia, Relatórios e Cobranças</div>
-    <div class="toolbar">
-      <div class="left">
-        <button class="btn btn-line" onclick="carregarDados(true)">🔄 Atualizar</button>
+  <div class="app">
+    <div class="top">
+      <div class="brand">
+        <div>
+          <h1>Bela Modas</h1>
+          <div class="sub">Mobile consulta</div>
+        </div>
+        <button class="pill" id="btnAtualizarTop">Atualizar</button>
       </div>
-      <div id="statusSync" class="status">Carregando...</div>
+
+      <div class="tabs">
+        <button class="tab active" data-view="caixaView">Caixa</button>
+        <button class="tab" data-view="relatoriosView">Relatórios</button>
+        <button class="tab" data-view="cobrancasView">Cobranças</button>
+      </div>
+
+      <div class="status" id="statusSync">Carregando...</div>
     </div>
+
+    <section class="view active" id="caixaView">
+      <div class="card">
+        <h2 style="margin:0 0 10px">Caixa do dia</h2>
+        <div class="toolbar">
+          <div class="field"><input type="date" id="caixaData" /></div>
+          <button class="pill secondary" id="btnHoje">Hoje</button>
+          <button class="pill" id="btnConsultarCaixa">Consultar</button>
+        </div>
+      </div>
+
+      <div class="grid cards" id="caixaCards"></div>
+
+      <div class="card">
+        <h3 style="margin:0 0 10px">Por forma de pagamento</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Forma</th>
+                <th class="num">Vendas</th>
+                <th class="num">Recebimentos</th>
+                <th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody id="caixaTabelaForma"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row">
+          <h3 style="margin:0">Movimentações</h3>
+          <div class="small muted" id="movResumo"></div>
+        </div>
+        <div class="list" id="listaMovimentacoes" style="margin-top:10px"></div>
+      </div>
+    </section>
+
+    <section class="view" id="relatoriosView">
+      <div class="grid cards" id="relatorioCards"></div>
+
+      <div class="card">
+        <h3 style="margin:0 0 10px">Top clientes do mês</h3>
+        <div class="list" id="topClientes"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 10px">Produtos mais vendidos do mês</h3>
+        <div class="list" id="topProdutos"></div>
+      </div>
+    </section>
+
+    <section class="view" id="cobrancasView">
+      <div class="card">
+        <h2 style="margin:0 0 10px">Cobranças</h2>
+        <div class="toolbar">
+          <div class="field"><input type="search" id="buscaCobranca" placeholder="Buscar cliente..." /></div>
+          <div class="field">
+            <select id="filtroCobranca">
+              <option value="todas">Todas</option>
+              <option value="vencidas">Vencidas</option>
+              <option value="hoje">Vencem hoje</option>
+              <option value="proximas">Próximas</option>
+              <option value="abertas">Somente abertas</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid cards" id="cobrancaCards"></div>
+
+      <div class="card">
+        <h3 style="margin:0 0 10px">Lista de devedores</h3>
+        <div class="list" id="listaCobrancas"></div>
+      </div>
+    </section>
   </div>
-
-  <div class="wrap">
-    <section id="pg-caixa" class="section on">
-      <div class="grid2">
-        <div class="kpi"><div class="lbl">Vendas do dia</div><div id="kpi-vendas" class="val">R$ 0,00</div></div>
-        <div class="kpi"><div class="lbl">Recebido no dia</div><div id="kpi-recebido" class="val">R$ 0,00</div></div>
-        <div class="kpi"><div class="lbl">Quantidade de vendas</div><div id="kpi-qtd" class="val">0</div></div>
-        <div class="kpi"><div class="lbl">Ticket médio</div><div id="kpi-ticket" class="val">R$ 0,00</div></div>
-      </div>
-
-      <div class="card">
-        <div class="title">Movimentações de hoje</div>
-        <div class="subt">Últimas vendas e recebimentos lançados no sistema principal.</div>
-        <div id="lista-caixa"></div>
-      </div>
-    </section>
-
-    <section id="pg-relatorios" class="section">
-      <div class="grid3">
-        <div class="kpi"><div class="lbl">Vendido no mês</div><div id="rel-mes" class="val">R$ 0,00</div></div>
-        <div class="kpi"><div class="lbl">Recebido no mês</div><div id="rel-receb-mes" class="val">R$ 0,00</div></div>
-        <div class="kpi"><div class="lbl">Cobranças em aberto</div><div id="rel-aberto" class="val">R$ 0,00</div></div>
-      </div>
-
-      <div class="card">
-        <div class="title">Top clientes</div>
-        <div class="subt">Baseado em vendas registradas.</div>
-        <div id="lista-top-clientes"></div>
-      </div>
-
-      <div class="card">
-        <div class="title">Produtos mais vendidos</div>
-        <div class="subt">Calculado pelos itens das vendas.</div>
-        <div id="lista-top-produtos"></div>
-      </div>
-    </section>
-
-    <section id="pg-cobrancas" class="section">
-      <div class="card">
-        <div class="title">Cobranças</div>
-        <div class="subt">Lista simples de pendências com botão para WhatsApp.</div>
-        <div id="lista-cobrancas"></div>
-      </div>
-    </section>
-  </div>
-
-  <nav class="bottom">
-    <button class="navbtn on" data-nav="caixa" onclick="ir('caixa')">💰<span>Caixa</span></button>
-    <button class="navbtn" data-nav="relatorios" onclick="ir('relatorios')">📊<span>Relatórios</span></button>
-    <button class="navbtn" data-nav="cobrancas" onclick="ir('cobrancas')">📋<span>Cobranças</span></button>
-  </nav>
 
   <script>
     const API_URL = "https://script.google.com/macros/s/AKfycbzH4m2rIWkzHLf_SPldVWBk6uSbhmwWz_OLZENRr0A-9XOzCtHsU5fbLtJCm-ZKss0k/exec";
-    const AUTO_REFRESH_MS = 15 * 60 * 1000;
-    let DATA = { clientes: [], vendas: [], recebimentos: [], cobrancas: [] };
+    const REFRESH_MS = 15 * 60 * 1000;
 
-    function fmtMoney(v){ return Number(v || 0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
-    function esc(s){ return String(s == null ? '' : s).replace(/[&<>\"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
-    function parseDate(v){
-      if(!v) return null;
-      const d = new Date(v);
-      return isNaN(d.getTime()) ? null : d;
+    let DATA = { clientes: [], produtos: [], vendas: [], recebimentos: [], cobrancas: [] };
+
+    function pad2(n){ return String(n).padStart(2,'0'); }
+    function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()); }
+    function brMoney(v){ return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+    function escapeHtml(str){ return String(str==null?'':str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;"); }
+    function safeJson(text, fallback){ try{return JSON.parse(text);}catch(e){return fallback;} }
+    function rowStamp(row){ return new Date(row.updatedAt||row.data||row.createdAt||0).getTime()||0; }
+    function activeRows(rows){ return (rows||[]).filter(r => !r.deletedAt); }
+
+    function ymdFromAny(v){
+      if(!v) return '';
+      const s = String(v).trim();
+      if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+        const [dd,mm,yy] = s.split('/');
+        return `${yy}-${mm}-${dd}`;
+      }
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate());
+      return '';
     }
-    function localDayKey(v){
-      const d = parseDate(v);
-      if(!d) return '';
-      const y = d.getFullYear();
-      const m = String(d.getMonth()+1).padStart(2,'0');
-      const day = String(d.getDate()).padStart(2,'0');
-      return `${y}-${m}-${day}`;
+    function hmFromAny(v){
+      if(!v) return '';
+      const s = String(v).trim();
+      const m = s.match(/T(\d{2}):(\d{2})/);
+      if (m) return `${m[1]}:${m[2]}`;
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+      return '';
     }
-    function monthKey(v){
-      const d = parseDate(v);
-      if(!d) return '';
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    }
-    function nowDayKey(){ return localDayKey(new Date().toISOString()); }
-    function nowMonthKey(){ return monthKey(new Date().toISOString()); }
-    function sortDescByDate(list, getField){
-      return (list || []).slice().sort((a,b) => {
-        const ta = parseDate(getField(a))?.getTime() || 0;
-        const tb = parseDate(getField(b))?.getTime() || 0;
-        return tb - ta;
-      });
-    }
-    function onlyActive(rows){ return (rows || []).filter(r => !r.deletedAt); }
-    function phoneFromCliente(c){
-      return String(c?.telefone || c?.tel || '').replace(/\D/g,'');
-    }
-    function statusText(msg, err){
+    function openStatuses(text, isError){
       const el = document.getElementById('statusSync');
-      el.textContent = msg;
-      el.style.background = err ? 'rgba(160,25,25,.82)' : 'rgba(255,255,255,.18)';
+      const time = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+      el.textContent = `${text} • ${time}`;
+      el.style.color = isError ? '#b42318' : '#7c6d69';
     }
 
-    function ir(pg){
-      ['caixa','relatorios','cobrancas'].forEach(n => {
-        document.getElementById('pg-' + n).classList.toggle('on', n === pg);
-      });
-      document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('on', b.dataset.nav === pg));
+    function cardMetric(label, value, subline, color){
+      return `
+        <div class="card metric ${color||''}">
+          <div class="label">${escapeHtml(label)}</div>
+          <div class="value">${escapeHtml(value)}</div>
+          <div class="subline">${escapeHtml(subline||'')}</div>
+        </div>
+      `;
     }
 
-    async function carregarDados(manual){
+    async function carregarDados(){
+      openStatuses('Atualizando...', false);
       try{
-        statusText(manual ? 'Atualizando...' : 'Sincronizando...');
-        const r = await fetch(API_URL, { method:'GET', cache:'no-store' });
-        if(!r.ok) throw new Error('GET ' + r.status);
-        const text = await r.text();
-        let data;
-        try{ data = JSON.parse(text); }catch(e){ throw new Error('Resposta inválida do servidor'); }
-        if(data.ok === false) throw new Error(data.error || 'Erro do servidor');
+        const res = await fetch(API_URL, { method:'GET', cache:'no-store' });
+        if(!res.ok) throw new Error('Falha ao buscar dados');
+        const text = await res.text();
+        const raw = safeJson(text, null);
+        if(!raw) throw new Error('Resposta inválida do servidor');
+        if(raw.ok === false) throw new Error(raw.error || 'Erro retornado pelo servidor');
 
-        DATA = {
-          clientes: onlyActive(data.clientes || []),
-          vendas: onlyActive(data.vendas || []),
-          recebimentos: onlyActive(data.recebimentos || []),
-          cobrancas: onlyActive(data.cobrancas || [])
-        };
+        DATA.clientes = activeRows(raw.clientes || []);
+        DATA.produtos = activeRows(raw.produtos || []);
+        DATA.vendas = activeRows(raw.vendas || []);
+        DATA.recebimentos = activeRows(raw.recebimentos || []);
+        DATA.cobrancas = activeRows(raw.cobrancas || []);
 
-        renderCaixa();
-        renderRelatorios();
-        renderCobrancas();
-
-        const hora = new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
-        statusText('Atualizado às ' + hora, false);
+        renderTudo();
+        openStatuses('Atualizado com sucesso', false);
       }catch(err){
         console.error(err);
-        statusText('Erro ao atualizar', true);
+        renderTudo();
+        openStatuses('Não foi possível atualizar agora', true);
       }
+    }
+
+    function isCrediarioVenda(v){
+      const forma = String(v.forma_pagamento || v.forma || '').toLowerCase();
+      return forma.includes('cred') || forma.includes('fiado');
+    }
+    function isVistaVenda(v){
+      return !isCrediarioVenda(v);
+    }
+
+    function buildCaixa(dateStr){
+      const vendasDia = DATA.vendas.filter(v => ymdFromAny(v.data || v.createdAt || v.updatedAt) === dateStr);
+      const recebDia = DATA.recebimentos.filter(r => ymdFromAny(r.data || r.createdAt || r.updatedAt) === dateStr);
+
+      const vendasVista = vendasDia.filter(isVistaVenda);
+      const novasCred = vendasDia.filter(isCrediarioVenda);
+
+      const totalVendasVista = vendasVista.reduce((s,v) => s + Number(v.total || 0), 0);
+      const totalRecebCred = recebDia.reduce((s,r) => s + Number(r.valor || 0), 0);
+      const totalNovoCred = novasCred.reduce((s,v) => s + Number(v.total || 0), 0);
+      const totalCaixa = totalVendasVista + totalRecebCred;
+
+      const formas = {};
+      const ensureForma = (name) => {
+        if (!formas[name]) formas[name] = { nome:name, vendas:0, recebimentos:0 };
+        return formas[name];
+      };
+
+      vendasDia.forEach(v => {
+        let forma = String(v.forma_pagamento || v.forma || '').trim() || 'Não informado';
+        if (isCrediarioVenda(v)) forma = 'Crediário (novo)';
+        const item = ensureForma(forma);
+        item.vendas += Number(v.total || 0);
+      });
+
+      recebDia.forEach(r => {
+        const forma = String(r.forma_pagamento || '').trim() || 'Recebimento';
+        const item = ensureForma(forma);
+        item.recebimentos += Number(r.valor || 0);
+      });
+
+      const movs = [];
+      vendasDia.forEach(v => {
+        movs.push({
+          tipo:'Venda',
+          nome:v.cliente || 'Balcão',
+          hora:hmFromAny(v.data || v.createdAt || v.updatedAt) || '--:--',
+          forma:String(v.forma_pagamento || v.forma || '-'),
+          valor:Number(v.total || 0),
+          stamp:rowStamp(v),
+          detalheItens: (() => {
+            const itens = safeJson(v.itens_json || '[]', []);
+            if (!Array.isArray(itens) || !itens.length) return '';
+            return itens.map(i => `${i.qtd || 1}x ${i.desc || i.nome || 'Item'}`).slice(0,3).join(', ');
+          })()
+        });
+      });
+      recebDia.forEach(r => {
+        movs.push({
+          tipo:'Recebimento',
+          nome:resolveClienteDeRecebimento(r),
+          hora:hmFromAny(r.data || r.createdAt || r.updatedAt) || '--:--',
+          forma:String(r.forma_pagamento || 'Recebimento'),
+          valor:Number(r.valor || 0),
+          stamp:rowStamp(r),
+          detalheItens:r.obs || ''
+        });
+      });
+      movs.sort((a,b) => b.stamp - a.stamp);
+
+      return { vendasDia, recebDia, vendasVista, novasCred, totalVendasVista, totalRecebCred, totalNovoCred, totalCaixa, formas, movs };
     }
 
     function renderCaixa(){
-      const hoje = nowDayKey();
-      const vendasHoje = DATA.vendas.filter(v => localDayKey(v.data || v.createdAt || v.updatedAt) === hoje);
-      const recebHoje = DATA.recebimentos.filter(r => localDayKey(r.data || r.createdAt || r.updatedAt) === hoje);
+      const dateStr = document.getElementById('caixaData').value || todayStr();
+      const c = buildCaixa(dateStr);
 
-      const totalVendas = vendasHoje.reduce((s,v)=>s+Number(v.total||0),0);
-      const totalRecebido = recebHoje.reduce((s,r)=>s+Number(r.valor||0),0);
-      const qtd = vendasHoje.length;
-      const ticket = qtd ? totalVendas / qtd : 0;
+      document.getElementById('caixaCards').innerHTML = [
+        cardMetric('Vendas vista', brMoney(c.totalVendasVista), `${c.vendasVista.length} venda(s)`, 'green'),
+        cardMetric('Receb. crediário', brMoney(c.totalRecebCred), `${c.recebDia.length} recebimento(s)`, 'blue'),
+        cardMetric('Novo crediário', brMoney(c.totalNovoCred), `${c.novasCred.length} venda(s)`, 'red'),
+        cardMetric('Total caixa', brMoney(c.totalCaixa), 'Vista + recebimentos', 'gold')
+      ].join('');
 
-      document.getElementById('kpi-vendas').textContent = fmtMoney(totalVendas);
-      document.getElementById('kpi-recebido').textContent = fmtMoney(totalRecebido);
-      document.getElementById('kpi-qtd').textContent = String(qtd);
-      document.getElementById('kpi-ticket').textContent = fmtMoney(ticket);
+      const ordem = Object.values(c.formas).sort((a,b) => (b.vendas + b.recebimentos) - (a.vendas + a.recebimentos));
+      document.getElementById('caixaTabelaForma').innerHTML = ordem.length
+        ? ordem.map(f => `
+          <tr>
+            <td>${escapeHtml(f.nome)}</td>
+            <td class="num">${escapeHtml(brMoney(f.vendas))}</td>
+            <td class="num">${escapeHtml(brMoney(f.recebimentos))}</td>
+            <td class="num">${escapeHtml(brMoney(f.vendas + f.recebimentos))}</td>
+          </tr>
+        `).join('') + `
+          <tr>
+            <td><strong>TOTAL</strong></td>
+            <td class="num"><strong>${escapeHtml(brMoney(ordem.reduce((s,f)=>s+f.vendas,0)))}</strong></td>
+            <td class="num"><strong>${escapeHtml(brMoney(ordem.reduce((s,f)=>s+f.recebimentos,0)))}</strong></td>
+            <td class="num"><strong>${escapeHtml(brMoney(ordem.reduce((s,f)=>s+f.vendas+f.recebimentos,0)))}</strong></td>
+          </tr>
+        `
+        : '<tr><td colspan="4" class="muted">Sem movimentações para esta data.</td></tr>';
 
-      const movs = [];
-      vendasHoje.forEach(v => movs.push({ tipo:'Venda', cliente:v.cliente || 'Balcão', valor:Number(v.total||0), data:v.data || v.createdAt || v.updatedAt, pill:'ok' }));
-      recebHoje.forEach(r => movs.push({ tipo:'Recebimento', cliente:resolverNomeRecebimento(r), valor:Number(r.valor||0), data:r.data || r.createdAt || r.updatedAt, pill:'warn' }));
-      const lista = sortDescByDate(movs, x => x.data).slice(0, 20);
-
-      document.getElementById('lista-caixa').innerHTML = lista.length ? lista.map(m => `
-        <div class="item">
-          <div class="rowline">
-            <div>
-              <h4>${esc(m.cliente)}</h4>
-              <div class="muted">${esc(m.tipo)} • ${formatDateTime(m.data)}</div>
+      document.getElementById('movResumo').textContent = `${c.movs.length} movimentação(ões)`;
+      document.getElementById('listaMovimentacoes').innerHTML = c.movs.length
+        ? c.movs.map(m => `
+          <div class="item">
+            <div class="row">
+              <div>
+                <div><strong>${escapeHtml(m.tipo)} — ${escapeHtml(m.nome)}</strong></div>
+                <div class="small muted">${escapeHtml(m.hora)} • ${escapeHtml(m.forma)}</div>
+              </div>
+              <div class="highlight">${escapeHtml(brMoney(m.valor))}</div>
             </div>
-            <div style="text-align:right">
-              <div class="pill ${m.pill}">${esc(m.tipo)}</div>
-              <div class="price" style="margin-top:8px">${fmtMoney(m.valor)}</div>
-            </div>
+            ${m.detalheItens ? `<div class="small muted" style="margin-top:8px">${escapeHtml(m.detalheItens)}</div>` : ''}
           </div>
-        </div>
-      `).join('') : '<div class="empty">Nenhuma movimentação hoje.</div>';
+        `).join('')
+        : '<div class="empty">Nenhuma movimentação encontrada para esta data.</div>';
     }
 
-    function resolverNomeRecebimento(r){
-      if(r.cliente) return r.cliente;
+    function resolveClienteDeRecebimento(r){
       const vendaId = String(r.venda_id || '');
-      if(vendaId.startsWith('cid:')){
+      if (vendaId.startsWith('cid:')) {
         const cid = vendaId.slice(4);
         const cli = DATA.clientes.find(c => String(c.id) === cid);
-        return cli?.nome || 'Cliente';
+        return cli ? cli.nome : 'Cliente';
       }
       const venda = DATA.vendas.find(v => String(v.id) === vendaId);
-      return venda?.cliente || 'Cliente';
+      if (venda) return venda.cliente || 'Cliente';
+      if (r.cid) {
+        const cli = DATA.clientes.find(c => String(c.id) === String(r.cid));
+        if (cli) return cli.nome;
+      }
+      return 'Cliente';
     }
 
     function renderRelatorios(){
-      const mes = nowMonthKey();
-      const vendasMes = DATA.vendas.filter(v => monthKey(v.data || v.createdAt || v.updatedAt) === mes);
-      const recebMes = DATA.recebimentos.filter(r => monthKey(r.data || r.createdAt || r.updatedAt) === mes);
-      const cobrAbertas = DATA.cobrancas.filter(c => String(c.status || '').toLowerCase() !== 'pago' && String(c.status || '').toLowerCase() !== 'quitado');
+      const hoje = todayStr();
+      const mes = hoje.slice(0,7);
 
-      document.getElementById('rel-mes').textContent = fmtMoney(vendasMes.reduce((s,v)=>s+Number(v.total||0),0));
-      document.getElementById('rel-receb-mes').textContent = fmtMoney(recebMes.reduce((s,r)=>s+Number(r.valor||0),0));
-      document.getElementById('rel-aberto').textContent = fmtMoney(cobrAbertas.reduce((s,c)=>s+Number(c.valor||0),0));
+      const vendasHoje = DATA.vendas.filter(v => ymdFromAny(v.data || v.createdAt || v.updatedAt) === hoje);
+      const vendasMes = DATA.vendas.filter(v => ymdFromAny(v.data || v.createdAt || v.updatedAt).startsWith(mes));
+      const recebimentosMes = DATA.recebimentos.filter(r => ymdFromAny(r.data || r.createdAt || r.updatedAt).startsWith(mes));
+      const totalHoje = vendasHoje.reduce((s,v)=>s+Number(v.total||0),0);
+      const totalMes = vendasMes.reduce((s,v)=>s+Number(v.total||0),0);
+      const recebidoMes = recebimentosMes.reduce((s,r)=>s+Number(r.valor||0),0);
+      const ticketMes = vendasMes.length ? totalMes / vendasMes.length : 0;
 
-      const topClientesMap = new Map();
+      document.getElementById('relatorioCards').innerHTML = [
+        cardMetric('Vendas hoje', brMoney(totalHoje), `${vendasHoje.length} venda(s)`, 'green'),
+        cardMetric('Vendas do mês', brMoney(totalMes), `${vendasMes.length} venda(s)`, 'blue'),
+        cardMetric('Recebido no mês', brMoney(recebidoMes), `${recebimentosMes.length} recebimento(s)`, 'gold'),
+        cardMetric('Ticket médio mês', brMoney(ticketMes), 'Média por venda', 'red')
+      ].join('');
+
+      const topClientes = new Map();
       vendasMes.forEach(v => {
         const nome = String(v.cliente || 'Balcão');
-        topClientesMap.set(nome, (topClientesMap.get(nome) || 0) + Number(v.total || 0));
+        topClientes.set(nome, (topClientes.get(nome) || 0) + Number(v.total || 0));
       });
-      const topClientes = Array.from(topClientesMap.entries()).sort((a,b)=>b[1]-a[1]).slice(0,8);
-      document.getElementById('lista-top-clientes').innerHTML = topClientes.length ? topClientes.map(([nome,total], i) => `
-        <div class="item">
-          <div class="rowline">
-            <div><h4>${i+1}. ${esc(nome)}</h4><div class="muted">Vendas no mês</div></div>
-            <div class="price">${fmtMoney(total)}</div>
+      const topClientesList = [...topClientes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
+      document.getElementById('topClientes').innerHTML = topClientesList.length
+        ? topClientesList.map(([nome,valor], idx) => `
+          <div class="item">
+            <div class="row">
+              <div><strong>${idx+1}. ${escapeHtml(nome)}</strong></div>
+              <div class="highlight">${escapeHtml(brMoney(valor))}</div>
+            </div>
           </div>
-        </div>
-      `).join('') : '<div class="empty">Sem vendas no mês.</div>';
+        `).join('')
+        : '<div class="empty">Sem dados suficientes no mês atual.</div>';
 
-      const topProdutosMap = new Map();
+      const topProdutos = new Map();
       vendasMes.forEach(v => {
-        const itens = safeJson(v.itens_json || '[]');
-        itens.forEach(it => {
-          const nome = String(it.desc || it.nome || 'Produto');
-          const qtd = Number(it.qtd || 1);
-          topProdutosMap.set(nome, (topProdutosMap.get(nome) || 0) + qtd);
+        const itens = safeJson(v.itens_json || '[]', []);
+        if (!Array.isArray(itens)) return;
+        itens.forEach(i => {
+          const nome = String(i.desc || i.nome || 'Produto');
+          const qtd = Number(i.qtd || 1);
+          topProdutos.set(nome, (topProdutos.get(nome) || 0) + qtd);
         });
       });
-      const topProdutos = Array.from(topProdutosMap.entries()).sort((a,b)=>b[1]-a[1]).slice(0,8);
-      document.getElementById('lista-top-produtos').innerHTML = topProdutos.length ? topProdutos.map(([nome,qtd], i) => `
-        <div class="item">
-          <div class="rowline">
-            <div><h4>${i+1}. ${esc(nome)}</h4><div class="muted">Quantidade vendida</div></div>
-            <div class="price">${qtd}</div>
-          </div>
-        </div>
-      `).join('') : '<div class="empty">Sem itens vendidos no mês.</div>';
-    }
-
-    function renderCobrancas(){
-      const clientById = new Map(DATA.clientes.map(c => [String(c.id), c]));
-      const lista = sortDescByDate(DATA.cobrancas, c => c.vencimento || c.data || c.updatedAt).filter(c => String(c.status || '').toLowerCase() !== 'pago' && String(c.status || '').toLowerCase() !== 'quitado');
-      document.getElementById('lista-cobrancas').innerHTML = lista.length ? lista.map(c => {
-        const nome = c.cliente || c.cliNome || clientById.get(String(c.cid || ''))?.nome || 'Cliente';
-        const cli = clientById.get(String(c.cid || '')) || DATA.clientes.find(x => String(x.nome || '').toLowerCase() === String(nome).toLowerCase()) || null;
-        const tel = phoneFromCliente(cli);
-        const stat = badgeStatus(c.status);
-        return `
+      const topProdutosList = [...topProdutos.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
+      document.getElementById('topProdutos').innerHTML = topProdutosList.length
+        ? topProdutosList.map(([nome,qtd], idx) => `
           <div class="item">
-            <div class="rowline">
-              <div>
-                <h4>${esc(nome)}</h4>
-                <div class="muted">Vencimento: ${esc(formatDate(c.vencimento || c.data))}</div>
-                <div class="muted">Status: <span class="pill ${stat.cls}">${esc(stat.txt)}</span></div>
-              </div>
-              <div style="text-align:right">
-                <div class="price">${fmtMoney(c.valor)}</div>
-              </div>
+            <div class="row">
+              <div><strong>${idx+1}. ${escapeHtml(nome)}</strong></div>
+              <div class="highlight">${qtd} un.</div>
             </div>
-            <div class="sep"></div>
-            <button class="btn ${tel ? 'btn-whats' : 'btn-line'}" onclick="enviarCobranca(${jsStr(nome)}, ${jsStr(String(c.valor || 0))}, ${jsStr(tel)})">📲 Enviar cobrança</button>
           </div>
-        `;
-      }).join('') : '<div class="empty">Nenhuma cobrança em aberto.</div>';
+        `).join('')
+        : '<div class="empty">Sem itens vendidos suficientes no mês atual.</div>';
     }
 
-    function badgeStatus(s){
-      const v = String(s || 'aberto').toLowerCase();
-      if(v === 'pago' || v === 'quitado') return { txt:'Pago', cls:'ok' };
-      if(v === 'vencido') return { txt:'Vencido', cls:'bad' };
-      return { txt:'Em aberto', cls:'warn' };
+    function formatBrDate(ymd){
+      if (!ymd || !/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return '';
+      const [y,m,d] = ymd.split('-');
+      return `${d}/${m}/${y}`;
     }
-
-    function formatDate(v){
-      const d = parseDate(v);
-      return d ? d.toLocaleDateString('pt-BR') : '-';
+    function resolveTelefoneCliente(nome, cid){
+      const byId = DATA.clientes.find(c => String(c.id || '') === String(cid || ''));
+      const raw = byId ? (byId.telefone || byId.tel || '') : '';
+      if (raw) return String(raw).replace(/\D/g,'');
+      const byName = DATA.clientes.find(c => String(c.nome || '').toLowerCase() === String(nome || '').toLowerCase());
+      const raw2 = byName ? (byName.telefone || byName.tel || '') : '';
+      return raw2 ? String(raw2).replace(/\D/g,'') : '';
     }
-    function formatDateTime(v){
-      const d = parseDate(v);
-      return d ? d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-';
+    function montarMensagem(nome, valor, vencimento, tom){
+      const dataTxt = formatBrDate(vencimento) || 'sem data definida';
+      if (tom === 'leve') {
+        return `Olá ${nome}, tudo bem? Passando para lembrar sobre o valor pendente de ${valor}, com vencimento em ${dataTxt}. Qualquer dúvida, me chame.`;
+      }
+      return `Olá ${nome}. Identificamos um pagamento pendente no valor de ${valor}, com vencimento em ${dataTxt}. Pedimos, por gentileza, a regularização. Obrigado.`;
     }
-    function safeJson(text){
-      try{ return JSON.parse(text || '[]'); }catch(e){ return []; }
-    }
-    function jsStr(s){ return JSON.stringify(String(s == null ? '' : s)); }
-
-    function enviarCobranca(nome, valor, tel){
-      const msg = `Olá ${nome}, tudo bem?\nConsta uma cobrança pendente no valor de ${fmtMoney(valor)}.\nPor favor, entre em contato para regularização.`;
+    function enviarWhatsapp(tel, msg){
       const url = tel ? `https://wa.me/${tel}?text=${encodeURIComponent(msg)}` : `https://wa.me/?text=${encodeURIComponent(msg)}`;
       window.open(url, '_blank');
     }
+    async function copiarMensagem(msg){
+      try{
+        await navigator.clipboard.writeText(msg);
+        openStatuses('Mensagem copiada', false);
+      }catch(e){
+        openStatuses('Não foi possível copiar', true);
+      }
+    }
 
-    document.addEventListener('visibilitychange', function(){
-      if(document.visibilityState === 'visible') carregarDados(false);
-    });
+    function buildDebtEntries(){
+      const map = new Map();
+      const keyOf = (cid, nome) => `${cid || ''}||${String(nome || '').trim().toLowerCase()}`;
 
-    carregarDados(false);
-    setInterval(() => carregarDados(false), AUTO_REFRESH_MS);
+      // 1) cobranças explícitas abertas
+      const explicitByVid = new Set();
+      DATA.cobrancas.forEach(c => {
+        const st = String(c.status || 'aberto').toLowerCase();
+        if (st === 'pago') return;
+        const valor = Number(c.valor || 0);
+        if (valor <= 0) return;
+        const nome = c.cliente || resolveNomeClientePorCid(c.cid) || 'Cliente';
+        const key = keyOf(c.cid, nome);
+        if (!map.has(key)) {
+          map.set(key, { cid:String(c.cid || ''), nome, telefone:resolveTelefoneCliente(nome, c.cid), total:0, vencimento:'', itens:[] });
+        }
+        const row = map.get(key);
+        row.total += valor;
+        const vcto = ymdFromAny(c.vencimento || c.data || '');
+        if (vcto && (!row.vencimento || vcto < row.vencimento)) row.vencimento = vcto;
+        row.itens.push({ origem:'cobranca', descricao:c.descricao || 'Cobrança', valor });
+        if (c.vid) explicitByVid.add(String(c.vid));
+      });
+
+      // 2) vendas em crediário que não viraram cobrança explícita
+      const pagamentosPorVenda = new Map();
+      const pagamentosPorCid = new Map();
+      DATA.recebimentos.forEach(r => {
+        const valor = Number(r.valor || 0);
+        if (valor <= 0) return;
+        const vid = String(r.venda_id || '');
+        if (vid && !vid.startsWith('cid:')) {
+          pagamentosPorVenda.set(vid, (pagamentosPorVenda.get(vid) || 0) + valor);
+        }
+        let cid = '';
+        if (vid.startsWith('cid:')) cid = vid.slice(4);
+        if (!cid && r.cid) cid = String(r.cid);
+        if (cid) pagamentosPorCid.set(cid, (pagamentosPorCid.get(cid) || 0) + valor);
+      });
+
+      DATA.vendas.filter(isCrediarioVenda).forEach(v => {
+        const vid = String(v.id || '');
+        if (vid && explicitByVid.has(vid)) return;
+        const nome = v.cliente || 'Cliente';
+        const cid = String(v.cid || '');
+        let saldo = Number(v.total || 0);
+
+        if (vid && pagamentosPorVenda.has(vid)) {
+          saldo -= pagamentosPorVenda.get(vid);
+        } else if (cid && pagamentosPorCid.has(cid)) {
+          // fallback quando recebimento não referencia a venda
+          saldo -= pagamentosPorCid.get(cid);
+        }
+
+        if (saldo <= 0.009) return;
+
+        const key = keyOf(cid, nome);
+        if (!map.has(key)) {
+          map.set(key, { cid, nome, telefone:resolveTelefoneCliente(nome, cid), total:0, vencimento:'', itens:[] });
+        }
+        const row = map.get(key);
+        row.total += saldo;
+        const baseData = ymdFromAny(v.data || v.createdAt || v.updatedAt || '');
+        if (baseData && (!row.vencimento || baseData < row.vencimento)) row.vencimento = baseData;
+        row.itens.push({ origem:'venda', descricao:'Venda no crediário', valor:saldo, vid });
+      });
+
+      return [...map.values()].filter(x => x.total > 0.009);
+    }
+
+    function resolveNomeClientePorCid(cid){
+      if (!cid) return '';
+      const cli = DATA.clientes.find(c => String(c.id || '') === String(cid));
+      return cli ? (cli.nome || '') : '';
+    }
+
+    function statusDebt(row){
+      const hoje = todayStr();
+      const v = row.vencimento || '';
+      if (v && v < hoje) return { text:'Vencida', cls:'danger' };
+      if (v && v === hoje) return { text:'Vence hoje', cls:'warn' };
+      return { text:'Em aberto', cls:'' };
+    }
+
+    function renderCobrancas(){
+      const busca = document.getElementById('buscaCobranca').value.trim().toLowerCase();
+      const filtro = document.getElementById('filtroCobranca').value;
+      const hoje = todayStr();
+
+      let rows = buildDebtEntries();
+
+      rows = rows.filter(r => !busca || String(r.nome || '').toLowerCase().includes(busca));
+
+      rows = rows.filter(r => {
+        const v = r.vencimento || '';
+        if (filtro === 'vencidas') return v && v < hoje;
+        if (filtro === 'hoje') return v === hoje;
+        if (filtro === 'proximas') return v && v > hoje;
+        if (filtro === 'abertas') return true;
+        return true;
+      });
+
+      rows.sort((a,b) => {
+        const av = a.vencimento || '9999-99-99';
+        const bv = b.vencimento || '9999-99-99';
+        return av.localeCompare(bv) || b.total - a.total;
+      });
+
+      const totalAberto = rows.reduce((s,r)=>s+r.total,0);
+      const vencidas = rows.filter(r => r.vencimento && r.vencimento < hoje).length;
+
+      document.getElementById('cobrancaCards').innerHTML = [
+        cardMetric('Qtd. listada', String(rows.length), 'Devedores encontrados', 'blue'),
+        cardMetric('Em aberto', brMoney(totalAberto), 'Total pendente', 'red'),
+        cardMetric('Vencidas', String(vencidas), 'Já passaram do prazo', 'gold'),
+        cardMetric('Clientes', String(new Set(rows.map(r => r.nome)).size), 'Nomes distintos', 'green')
+      ].join('');
+
+      document.getElementById('listaCobrancas').innerHTML = rows.length
+        ? rows.map(r => {
+            const st = statusDebt(r);
+            const valor = brMoney(r.total);
+            const msgLeve = montarMensagem(r.nome, valor, r.vencimento, 'leve');
+            const msgNormal = montarMensagem(r.nome, valor, r.vencimento, 'normal');
+            const detalhe = r.itens.slice(0,3).map(i => `${i.descricao}: ${brMoney(i.valor)}`).join(' • ');
+            return `
+              <div class="item">
+                <div class="row">
+                  <div>
+                    <div><strong>${escapeHtml(r.nome)}</strong></div>
+                    <div class="small muted">Vencimento: ${escapeHtml(formatBrDate(r.vencimento) || '-')}</div>
+                  </div>
+                  <div style="text-align:right">
+                    <div class="highlight">${escapeHtml(valor)}</div>
+                    <div class="badge ${st.cls}">${escapeHtml(st.text)}</div>
+                  </div>
+                </div>
+                ${detalhe ? `<div class="small muted" style="margin-top:8px">${escapeHtml(detalhe)}</div>` : ''}
+                <div class="actions">
+                  <button class="btn" onclick='enviarWhatsapp(${JSON.stringify(r.telefone || "")}, ${JSON.stringify(msgNormal)})'>Enviar cobrança</button>
+                  <button class="btn light" onclick='copiarMensagem(${JSON.stringify(msgLeve)})'>Copiar leve</button>
+                  <button class="btn light" onclick='copiarMensagem(${JSON.stringify(msgNormal)})'>Copiar normal</button>
+                </div>
+              </div>
+            `;
+          }).join('')
+        : '<div class="empty">Nenhum devedor encontrado com os filtros atuais.</div>';
+    }
+
+    function renderTudo(){
+      renderCaixa();
+      renderRelatorios();
+      renderCobrancas();
+    }
+
+    function bindEvents(){
+      document.querySelectorAll('.tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+          btn.classList.add('active');
+          document.getElementById(btn.dataset.view).classList.add('active');
+        });
+      });
+
+      document.getElementById('btnAtualizarTop').addEventListener('click', carregarDados);
+      document.getElementById('btnConsultarCaixa').addEventListener('click', renderCaixa);
+      document.getElementById('btnHoje').addEventListener('click', () => {
+        document.getElementById('caixaData').value = todayStr();
+        renderCaixa();
+      });
+      document.getElementById('buscaCobranca').addEventListener('input', renderCobrancas);
+      document.getElementById('filtroCobranca').addEventListener('change', renderCobrancas);
+      document.getElementById('caixaData').addEventListener('change', renderCaixa);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') carregarDados();
+      });
+      window.addEventListener('focus', carregarDados);
+    }
+
+    function init(){
+      document.getElementById('caixaData').value = todayStr();
+      bindEvents();
+      renderTudo();
+      carregarDados();
+      setInterval(carregarDados, REFRESH_MS);
+    }
+
+    init();
   </script>
 </body>
 </html>
