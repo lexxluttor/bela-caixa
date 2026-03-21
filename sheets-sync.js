@@ -1,7 +1,7 @@
 /*!
  * Bela Modas Sheets Sync — modo seguro
  * Desktop escreve / mobile consulta
- * Objetivo: nunca sobrescrever o local com remoto antigo
+ * Sem widget flutuante na tela
  */
 (function () {
   "use strict";
@@ -244,59 +244,6 @@
     });
   }
 
-  function setStatus(text, isError){
-    let el = document.getElementById("belaSheetsSyncStatus");
-
-    if(!el){
-      el = document.createElement("div");
-      el.id = "belaSheetsSyncStatus";
-      el.style.cssText = [
-        "position:fixed",
-        "right:16px",
-        "top:96px",
-        "z-index:99999",
-        "padding:7px 10px",
-        "border-radius:999px",
-        "color:#fff",
-        "font-size:12px",
-        "box-shadow:0 8px 18px rgba(0,0,0,.18)",
-        "transition:background .3s"
-      ].join(";");
-      document.body.appendChild(el);
-    }
-
-    el.style.background = isError ? "rgba(180,30,30,.92)" : "rgba(17,24,39,.88)";
-    el.textContent = text;
-  }
-
-  function installButton(){
-    if(document.getElementById("belaSheetsSyncButton")) return;
-
-    const btn = document.createElement("button");
-    btn.id = "belaSheetsSyncButton";
-    btn.textContent = "⟳ Sincronizar";
-    btn.style.cssText = [
-      "position:fixed",
-      "right:16px",
-      "top:140px",
-      "z-index:99999",
-      "border:none",
-      "border-radius:14px",
-      "padding:8px 11px",
-      "font-weight:800",
-      "cursor:pointer",
-      "box-shadow:0 10px 24px rgba(0,0,0,.12)",
-      "background:#b14f4f",
-      "color:#fff"
-    ].join(";");
-
-    btn.onclick = function(){
-      syncNow(true);
-    };
-
-    document.body.appendChild(btn);
-  }
-
   let debounceTimer = null;
   let syncing = false;
   let patchDone = false;
@@ -311,7 +258,6 @@
     const pagamentos = readLocal("pagamentos");
     const creditos = readLocal("creditos");
 
-    // modo seguro: só empurra local para remoto usando upsert
     await postSheet({ action: "upsert", sheet: "clientes", rows: serializeClients(clientes) });
     await postSheet({ action: "upsert", sheet: "produtos", rows: serializeProducts(produtos) });
     await postSheet({ action: "upsert", sheet: "vendas", rows: serializeVendas(vendas) });
@@ -326,12 +272,9 @@
     syncing = true;
 
     try{
-      setStatus("☁ Sincronizando...");
       await pushLocalToRemote();
-      setStatus("✓ Sincronizado " + new Date().toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" }));
     }catch(err){
       console.error("Erro ao sincronizar:", err);
-      setStatus("✗ Erro na sincronização", true);
       if(force) throw err;
     }finally{
       syncing = false;
@@ -357,12 +300,9 @@
   }
 
   function start(){
-    installButton();
     patchStorage();
 
-    // não faz pull remoto ao iniciar
-    setStatus("✓ Pronto");
-
+    // sem pull remoto ao iniciar
     window.addEventListener("focus", function(){});
     document.addEventListener("visibilitychange", function(){});
 
