@@ -36,8 +36,6 @@
     .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.btn{border:none;border-radius:12px;padding:10px 12px;cursor:pointer;font-weight:800;background:var(--brand);color:#fff}
     .btn.light{background:#fff;color:var(--ink);border:1px solid var(--line)}
     .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
-    .linha{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.06)}
-    .linha:last-child{border-bottom:none}
     .fbtn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:10px 12px;font-weight:800;cursor:pointer}
     .fbtn.active{background:var(--brand);color:#fff;border-color:var(--brand)}
     @media (min-width:760px){.grid.cards{grid-template-columns:repeat(4,minmax(0,1fr))}}
@@ -304,23 +302,40 @@ function renderRelatorios(){
   });
 
   detalhe.innerHTML=`
-    <h3 style="margin:0 0 10px">Detalhamento do mês</h3>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-      <div style="background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px;">
-        <div style="font-weight:800;margin-bottom:8px;color:#555;">D. venda à vista</div>
-        <div class="linha"><span>Pix</span><strong class="highlight">${brMoney(porVista.pix)}</strong></div>
-        <div class="linha"><span>Dinheiro</span><strong class="highlight">${brMoney(porVista.dinheiro)}</strong></div>
-        <div class="linha"><span>Cartão crédito</span><strong class="highlight">${brMoney(porVista.cartaoCredito)}</strong></div>
-        <div class="linha"><span>Cartão débito</span><strong class="highlight">${brMoney(porVista.cartaoDebito)}</strong></div>
-        <div class="linha"><span><strong>Total</strong></span><strong class="highlight">${brMoney(porVista.pix + porVista.dinheiro + porVista.cartaoCredito + porVista.cartaoDebito)}</strong></div>
+    <div style="display:grid;grid-template-columns:1fr;gap:12px;">
+      <div>
+        <h3 style="margin:0 0 10px">Detalhamento à vista do mês</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Forma</th><th class="num">Valor</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Pix</td><td class="num">${brMoney(porVista.pix)}</td></tr>
+              <tr><td>Dinheiro</td><td class="num">${brMoney(porVista.dinheiro)}</td></tr>
+              <tr><td>Cartão crédito</td><td class="num">${brMoney(porVista.cartaoCredito)}</td></tr>
+              <tr><td>Cartão débito</td><td class="num">${brMoney(porVista.cartaoDebito)}</td></tr>
+              <tr><td><strong>Total</strong></td><td class="num"><strong>${brMoney(porVista.pix + porVista.dinheiro + porVista.cartaoCredito + porVista.cartaoDebito)}</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div style="background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px;">
-        <div style="font-weight:800;margin-bottom:8px;color:#555;">D. recebimento</div>
-        <div class="linha"><span>Pix</span><strong class="highlight">${brMoney(porReceb.pix)}</strong></div>
-        <div class="linha"><span>Dinheiro</span><strong class="highlight">${brMoney(porReceb.dinheiro)}</strong></div>
-        <div class="linha"><span>Cartão crédito</span><strong class="highlight">${brMoney(porReceb.cartaoCredito)}</strong></div>
-        <div class="linha"><span>Cartão débito</span><strong class="highlight">${brMoney(porReceb.cartaoDebito)}</strong></div>
-        <div class="linha"><span><strong>Total</strong></span><strong class="highlight">${brMoney(porReceb.pix + porReceb.dinheiro + porReceb.cartaoCredito + porReceb.cartaoDebito)}</strong></div>
+      <div>
+        <h3 style="margin:0 0 10px">Detalhamento de recebimentos do mês</h3>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Forma</th><th class="num">Valor</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Pix</td><td class="num">${brMoney(porReceb.pix)}</td></tr>
+              <tr><td>Dinheiro</td><td class="num">${brMoney(porReceb.dinheiro)}</td></tr>
+              <tr><td>Cartão crédito</td><td class="num">${brMoney(porReceb.cartaoCredito)}</td></tr>
+              <tr><td>Cartão débito</td><td class="num">${brMoney(porReceb.cartaoDebito)}</td></tr>
+              <tr><td><strong>Total</strong></td><td class="num"><strong>${brMoney(porReceb.pix + porReceb.dinheiro + porReceb.cartaoCredito + porReceb.cartaoDebito)}</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   `;
@@ -405,7 +420,7 @@ function buildDebtEntries(){
     }
   });
 
-  const rows = [];
+  const rawRows = [];
   salesCred.forEach(v=>{
     const vid=String(v.id||'');
     const cid=String(v.cid||'');
@@ -421,7 +436,7 @@ function buildDebtEntries(){
     const proximoVencimento = ultimoPagamento ? addMonthsKeepDay(ultimoPagamento, 1) : addMonthsKeepDay(dataCompra, 1);
     const diasParaFiltro = diffDays(dataCompra, todayStr());
 
-    rows.push({
+    rawRows.push({
       vid, cid, nome,
       telefone: resolveTelefoneCliente(nome, cid),
       valorOriginal: Number(v.total||0),
@@ -430,23 +445,24 @@ function buildDebtEntries(){
       dataCompra,
       ultimoPagamento,
       proximoVencimento,
-      diasBaseCompra: diasParaFiltro
+      diasBaseCompra: diasParaFiltro,
+      origem: 'venda'
     });
   });
 
-  // mesclar cobranças explícitas que não tenham venda vinculada ativa
   DATA.cobrancas.forEach(c=>{
     const st=String(c.status||'aberto').toLowerCase();
     if(st==='pago') return;
     const valor=Number(c.valor||0);
     if(valor<=0) return;
     const vid=String(c.vid||'');
-    if(vid && rows.some(r=>r.vid===vid)) return;
+    if(vid && rawRows.some(r=>r.vid===vid)) return;
     const cid=String(c.cid||'');
     const nome=c.cliente || resolveNomeClientePorCid(cid) || 'Cliente';
     const dataBase=ymdFromAny(c.data||c.createdAt||c.updatedAt);
     const proximoVencimento=ymdFromAny(c.vencimento||'') || addMonthsKeepDay(dataBase,1);
-    rows.push({
+
+    rawRows.push({
       vid, cid, nome,
       telefone: resolveTelefoneCliente(nome,cid),
       valorOriginal: valor,
@@ -455,11 +471,46 @@ function buildDebtEntries(){
       dataCompra: dataBase,
       ultimoPagamento: '',
       proximoVencimento,
-      diasBaseCompra: diffDays(dataBase, todayStr())
+      diasBaseCompra: diffDays(dataBase, todayStr()),
+      origem: 'cobranca'
     });
   });
 
-  return rows;
+  const grouped = new Map();
+  rawRows.forEach(r=>{
+    const key = String(r.cid || '').trim() ? 'cid:' + String(r.cid).trim() : 'nome:' + String(r.nome || '').trim().toLowerCase();
+    if(!grouped.has(key)){
+      grouped.set(key, {
+        cid: r.cid,
+        nome: r.nome,
+        telefone: r.telefone,
+        valorOriginal: 0,
+        totalPago: 0,
+        saldo: 0,
+        dataCompra: r.dataCompra || '',
+        ultimoPagamento: r.ultimoPagamento || '',
+        proximoVencimento: r.proximoVencimento || '',
+        diasBaseCompra: r.diasBaseCompra || 0,
+        compras: 0,
+        vids: []
+      });
+    }
+
+    const g = grouped.get(key);
+    g.valorOriginal += Number(r.valorOriginal || 0);
+    g.totalPago += Number(r.totalPago || 0);
+    g.saldo += Number(r.saldo || 0);
+    g.compras += 1;
+    if(r.vid) g.vids.push(r.vid);
+
+    if(r.dataCompra && (!g.dataCompra || r.dataCompra < g.dataCompra)) g.dataCompra = r.dataCompra;
+    if(r.ultimoPagamento && (!g.ultimoPagamento || r.ultimoPagamento > g.ultimoPagamento)) g.ultimoPagamento = r.ultimoPagamento;
+    if(r.proximoVencimento && (!g.proximoVencimento || r.proximoVencimento < g.proximoVencimento)) g.proximoVencimento = r.proximoVencimento;
+    if(Number(r.diasBaseCompra || 0) > Number(g.diasBaseCompra || 0)) g.diasBaseCompra = Number(r.diasBaseCompra || 0);
+    if(!g.telefone && r.telefone) g.telefone = r.telefone;
+  });
+
+  return [...grouped.values()].filter(r => Number(r.saldo || 0) > 0.009);
 }
 
 function filterDebts(rows){
@@ -497,7 +548,7 @@ function renderCobrancas(){
         const msgLeve=montarMensagem(r.nome, valor, r.proximoVencimento, 'leve');
         const msgNormal=montarMensagem(r.nome, valor, r.proximoVencimento, 'normal');
         const detalhe = [
-          `Compra: ${formatBrDate(r.dataCompra)||'-'}`,
+          `Compra inicial: ${formatBrDate(r.dataCompra)||'-'}`,
           `Pago: ${brMoney(r.totalPago)}`,
           `Últ. pagamento: ${formatBrDate(r.ultimoPagamento)||'-'}`
         ].join(' • ');
@@ -513,7 +564,7 @@ function renderCobrancas(){
             </div>
           </div>
           <div class="small muted" style="margin-top:8px">${escapeHtml(detalhe)}</div>
-          <div class="small muted" style="margin-top:6px">Saldo restante de ${escapeHtml(brMoney(r.valorOriginal))} após pagamentos.</div>
+          <div class="small muted" style="margin-top:6px">${r.compras} compra(s) em aberto • Saldo restante de ${escapeHtml(brMoney(r.saldo))}.</div>
           <div class="actions">
             <button class="btn" onclick='enviarWhatsapp(${JSON.stringify(r.telefone||"")}, ${JSON.stringify(msgNormal)})'>Enviar cobrança</button>
             <button class="btn light" onclick='copiarMensagem(${JSON.stringify(msgLeve)})'>Copiar leve</button>
