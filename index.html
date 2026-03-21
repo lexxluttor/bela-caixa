@@ -918,7 +918,7 @@ function syncNow(){
 function syncDown(){
   try{
     if(window.BelaSheetsSync && typeof window.BelaSheetsSync.syncNow==='function'){
-      setSS('sync','Sincronizando...');
+      setSS('sync','Carregando...');
       return window.BelaSheetsSync.syncNow();
     }
   }catch(e){}
@@ -962,65 +962,15 @@ function todayLocalISO(){
 function FD(d){return new Date(d).toLocaleDateString('pt-BR');}
 function FDT(d){return new Date(d).toLocaleString('pt-BR');}
 function FF(f){return{dinheiro:'💵 Dinheiro',pix:'📱 PIX',credito:'💳 Crédito',debito:'💳 Débito',fiado:'📋 Crediário'}[f]||f;}
-function vendasIdsSet(){
-  return new Set((DB.get('vendas')||[]).map(function(v){ return String(v.id||''); }));
-}
-function creditosValidos(){
-  var ids=vendasIdsSet();
-  return (DB.get('creditos')||[]).filter(function(c){
-    if(c && c.deletedAt) return false;
-    if(!c) return false;
-    if(!c.vid) return true;
-    return ids.has(String(c.vid));
-  });
-}
-function pagamentosValidos(){
-  var ids=vendasIdsSet();
-  return (DB.get('pagamentos')||[]).filter(function(p){
-    if(!p || p.deletedAt) return false;
-    var vid=String(p.vid || p.venda_id || '');
-    if(!vid) return true;
-    if(vid.indexOf('cid:')===0) return true;
-    return ids.has(vid);
-  });
-}
-function limparDebitosOrfaos(){
-  try{
-    var ids=vendasIdsSet();
-    var cr=(DB.get('creditos')||[]).filter(function(c){
-      if(!c || c.deletedAt) return false;
-      if(!c.vid) return true;
-      return ids.has(String(c.vid));
-    });
-    DB.set('creditos', cr);
-
-    if(Array.isArray(DB.get('fiados'))){
-      DB.set('fiados', (DB.get('fiados')||[]).filter(function(f){
-        if(!f || f.deletedAt) return false;
-        if(!f.vid) return true;
-        return ids.has(String(f.vid));
-      }));
-    }
-
-    var pg=(DB.get('pagamentos')||[]).filter(function(p){
-      if(!p || p.deletedAt) return false;
-      var vid=String(p.vid || p.venda_id || '');
-      if(!vid) return true;
-      if(vid.indexOf('cid:')===0) return true;
-      return ids.has(vid);
-    });
-    DB.set('pagamentos', pg);
-  }catch(e){}
-}
 function mcpf(el){var v=el.value.replace(/\D/g,'').substr(0,11);v=v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');el.value=v;}
 function saldo(cid){
-  var tf=creditosValidos().filter(function(f){return f.cid===cid;}).reduce(function(s,f){return s+Number(f.val||0);},0);
-  var tp=pagamentosValidos().filter(function(p){return p.cid===cid;}).reduce(function(s,p){return s+Number(p.val||0);},0);
-  return{tf:tf,tp:tp,sd:Math.max(0, tf-tp)};
+  var tf=DB.get('creditos').filter(function(f){return f.cid===cid;}).reduce(function(s,f){return s+f.val;},0);
+  var tp=DB.get('pagamentos').filter(function(p){return p.cid===cid;}).reduce(function(s,p){return s+p.val;},0);
+  return{tf:tf,tp:tp,sd:tf-tp};
 }
 function diasSemPag(cid){
-  var pgs=pagamentosValidos().filter(function(p){return p.cid===cid;});
-  var crds=creditosValidos().filter(function(f){return f.cid===cid;});
+  var pgs=DB.get('pagamentos').filter(function(p){return p.cid===cid;});
+  var crds=DB.get('creditos').filter(function(f){return f.cid===cid;});
   if(!crds.length)return 0;
   if(!pgs.length){
     var prim=new Date(Math.min.apply(null,crds.map(function(f){return new Date(f.data);})));
@@ -1554,7 +1504,7 @@ function renderRecebPainel(){
   document.getElementById('r-saldo').textContent=R(s.sd);
   document.getElementById('r-tf').textContent=R(s.tf);document.getElementById('r-tp').textContent=R(s.tp);
   document.getElementById('r-val').value='';
-  var crds=creditosValidos().filter(function(f){return f.cid===rCli.id;});
+  var crds=DB.get('creditos').filter(function(f){return f.cid===rCli.id;});
   document.getElementById('r-tb').innerHTML=crds.map(function(f){
     return '<tr><td>'+FD(f.data)+'</td><td>'+f.desc+'</td><td class="txt-r">'+R(f.val)+'</td></tr>';
   }).join('')||'<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem crediário</td></tr>';
@@ -1938,7 +1888,7 @@ function renderRel(){
 window.addEventListener('load', function(){
   carregarTema();
 
-  initDB(); limparDebitosOrfaos();
+  initDB();
   document.getElementById('logo').src='logo.png';
   document.getElementById('cx-d').value=todayLocalISO();
   var n=new Date();
@@ -2394,30 +2344,19 @@ function pedirSenhaCancelar(){
 function cancelarVenda(vid){
   var vendas=DB.get('vendas');
   var v=vendas.find(function(x){return x.id===vid;});
-  if(!v){toast('Venda não encontrada!');return;}
-  if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?
-Esta ação não pode ser desfeita!')){return;}
-
+  if(!v){toast('⚠️ Venda não encontrada!');return;}
+  if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?\nEsta ação não pode ser desfeita!')){return;}
+  // Remover venda
   DB.set('vendas', vendas.filter(function(x){return x.id!==vid;}));
-
-  DB.set('creditos', (DB.get('creditos')||[]).filter(function(c){ return String(c.vid||'')!==String(vid); }));
-  if(Array.isArray(DB.get('fiados'))){
-    DB.set('fiados', (DB.get('fiados')||[]).filter(function(f){ return String(f.vid||'')!==String(vid); }));
+  // Remover fiados associados
+  if(v.forma==='fiado'){
+    var fiados=DB.get('fiados').filter(function(f){return f.vid!==vid;});
+    DB.set('fiados',fiados);
   }
-  DB.set('pagamentos', (DB.get('pagamentos')||[]).filter(function(p){
-    var pvid=String(p.vid || p.venda_id || '');
-    return pvid!==String(vid);
-  }));
-
-  limparDebitosOrfaos();
-  toast('✅ Venda cancelada!','ok');
-  try{fecharModalVdet();}catch(e){}
-  try{renderCaixa();}catch(e){}
-  try{renderCrediario();}catch(e){}
-  try{renderRecebPainel();}catch(e){}
-  try{renderCobranca();}catch(e){}
-  try{renderVendas();}catch(e){}
-  try{renderDash();}catch(e){}
+  fMd('mo-vdet');
+  renderVendas();
+  renderDash();
+  toast('🚫 Venda cancelada!','ok');
 }
 
 function printVdet(){
@@ -2543,7 +2482,22 @@ function verVendasCaixa(tipo){
 }
 
 function pedirSenhaECancelar(vid){
-  pedirSenha(function(){ cancelarVenda(vid); });
+  pedirSenha(function(){
+    var vendas=DB.get('vendas');
+    var v=vendas.find(function(x){return x.id===vid;});
+    if(!v){toast('⚠️ Venda não encontrada!');return;}
+    if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?\nEsta ação não pode ser desfeita!')){return;}
+    DB.set('vendas',vendas.filter(function(x){return x.id!==vid;}));
+    if(v.forma==='fiado'){
+      DB.set('fiados',DB.get('fiados').filter(function(f){return f.vid!==vid;}));
+    }
+    // Fechar modais abertos
+    fMd('mo-cx-vendas');
+    fMd('mo-vdet');
+    renderCaixa();
+    renderDash();
+    toast('🚫 Venda cancelada!','ok');
+  });
 }
 
 
