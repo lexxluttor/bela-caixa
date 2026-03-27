@@ -987,6 +987,42 @@ function FDT(d){
   return x ? x.toLocaleString('pt-BR') : '';
 }
 function FF(f){return{dinheiro:'💵 Dinheiro',pix:'📱 PIX',credito:'💳 Crédito',debito:'💳 Débito',fiado:'📋 Crediário'}[f]||f;}
+function ajustarEstoqueVenda(itens, modo){
+  modo = (modo === 'somar') ? 'somar' : 'subtrair';
+  var produtos = DB.get('produtos') || [];
+  var alterou = false;
+
+  (itens || []).forEach(function(it){
+    if(!it) return;
+
+    var pid = it.pid || it.produto_id || it.idProduto || it.id;
+    if(!pid) return;
+
+    var qtd = Number(it.qtd || it.qty || it.quantidade || 0);
+    if(!isFinite(qtd) || qtd <= 0) return;
+
+    var p = produtos.find(function(x){
+      return String(x.id) === String(pid);
+    });
+    if(!p) return;
+
+    var estoqueAtual = Number(
+      p.estq != null ? p.estq : (p.estoque != null ? p.estoque : 0)
+    );
+    if(!isFinite(estoqueAtual)) estoqueAtual = 0;
+
+    if(modo === 'subtrair'){
+      p.estq = Math.max(0, estoqueAtual - qtd);
+    }else{
+      p.estq = estoqueAtual + qtd;
+    }
+    alterou = true;
+  });
+
+  if(alterou){
+    DB.set('produtos', produtos);
+  }
+}
 function vendasIdsSet(){
   return new Set((DB.get('vendas')||[]).map(function(v){ return String(v.id||''); }));
 }
@@ -1463,6 +1499,9 @@ function finalizarVenda(){
   var desconto=getCartDiscount();
   var total=getCartTotal();
   var stamp=nowLocalISO(); var venda={id:DB.uid(),data:stamp,createdAt:stamp,updatedAt:stamp,deletedAt:'',cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:JSON.parse(JSON.stringify(cart)),subtotal:subtotal,desconto:desconto,total:total};
+
+  ajustarEstoqueVenda(venda.itens, 'subtrair');
+
   var vendas=DB.get('vendas');vendas.push(venda);DB.set('vendas',vendas);
   if(vForma==='fiado'&&vCli){
     var crds=DB.get('creditos');
@@ -1479,6 +1518,8 @@ function finalizarVenda(){
   document.getElementById('v-preco').value='';
   document.getElementById('v-qty').value='1';
   renderCart();
+  try{renderProds();}catch(e){}
+  try{renderPGrid();}catch(e){}
   toast('✅ Venda finalizada! '+totalFmt+' — '+cliNome,'ok');
   setTimeout(function(){mostrarComp(vendaComp,cliComp,null);},400);
 }
@@ -2417,6 +2458,8 @@ function cancelarVenda(vid){
   if(!v){toast('⚠️ Venda não encontrada!');return;}
   if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?\nEsta ação não pode ser desfeita!')){return;}
 
+  ajustarEstoqueVenda(v.itens || [], 'somar');
+
   DB.set('vendas', vendas.filter(function(x){return x.id!==vid;}));
   DB.set('creditos', (DB.get('creditos')||[]).filter(function(c){ return String(c.vid||'')!==String(vid); }));
   if(Array.isArray(DB.get('fiados'))){
@@ -2430,6 +2473,8 @@ function cancelarVenda(vid){
   limparDebitosOrfaos();
 
   fMd('mo-vdet');
+  try{renderProds();}catch(e){}
+  try{renderPGrid();}catch(e){}
   try{renderCaixa();}catch(e){}
   try{renderCrediario();}catch(e){}
   try{renderRecebPainel();}catch(e){}

@@ -367,13 +367,74 @@ function resolveTelefoneCliente(nome,cid){
   const byName=DATA.clientes.find(c=>String(c.nome||'').toLowerCase()===String(nome||'').toLowerCase()); const raw2=byName?(byName.telefone||byName.tel||''):'';
   return raw2?String(raw2).replace(/\D/g,''):'';
 }
-function montarMensagem(nome,valor,vencimento,tom){
-  const dataTxt=formatBrDate(vencimento)||'sem data definida';
-  if(tom==='leve') return `Olá ${nome}, tudo bem? Passando para lembrar sobre o valor pendente de ${valor}, com vencimento em ${dataTxt}. Qualquer dúvida, me chame.`;
-  return `Olá ${nome}. Identificamos um pagamento pendente no valor de ${valor}, com vencimento em ${dataTxt}. Pedimos, por gentileza, a regularização. Obrigado.`;
+function mensagemCobrancaOpcao1(){
+  return `Olá, tudo bem? 😊
+
+Passando para lembrar que há um valor em aberto referente à sua compra na Bela Modas.
+
+Me chama que te envio o valor e a Chave Pix 🔑
+
+Se já realizou o pagamento, pode desconsiderar esta mensagem.
+Qualquer dúvida estou à disposição 💖
+
+Obrigado`;
 }
-function enviarWhatsapp(tel,msg){ const url=tel?`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`:`https://wa.me/?text=${encodeURIComponent(msg)}`; window.open(url,'_blank'); }
-async function copiarMensagem(msg){ try{ await navigator.clipboard.writeText(msg); openStatuses('Mensagem copiada',false);}catch(e){ openStatuses('Não foi possível copiar',true);} }
+function mensagemCobrancaOpcao2(){
+  return `Olá 😊 tudo bem?
+
+Verifiquei que ainda consta um valor pendente da sua compra na Bela Modas.
+
+Caso precise, podemos combinar uma nova data ou forma de pagamento 👍
+
+Me avise para que possamos organizar da melhor forma.`;
+}
+function mensagemCobrancaOpcao3(){
+  return `Olá, tudo bem?
+
+Estamos tentando contato sobre o pagamento pendente da sua compra na Bela Modas.
+
+Precisamos regularizar esse valor. Caso não consiga pagar agora, podemos verificar uma solução juntos.
+
+Aguardamos seu retorno.`;
+}
+function isoNow(){
+  const d=new Date();
+  return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+'T'+pad2(d.getHours())+':'+pad2(d.getMinutes())+':'+pad2(d.getSeconds());
+}
+function readCobrancaLog(){ return safeJson(localStorage.getItem('bm_cobranca_log')||'[]',[]); }
+function writeCobrancaLog(list){ localStorage.setItem('bm_cobranca_log', JSON.stringify(list||[])); }
+function registrarCobrancaAuto(payload){
+  const logs=readCobrancaLog();
+  logs.unshift({
+    cliente:String(payload.nome||''),
+    cid:String(payload.cid||''),
+    telefone:String(payload.telefone||''),
+    valor:Number(payload.valor||0),
+    data:isoNow(),
+    tipo:String(payload.tipo||''),
+    vencimento:String(payload.vencimento||''),
+    saldo:Number(payload.valor||0)
+  });
+  writeCobrancaLog(logs.slice(0,1000));
+}
+function enviarCobrancaWhatsapp(row,tipo){
+  const tel=String((row&&row.telefone)||'').replace(/\D/g,'');
+  let msg='';
+  if(tipo==='opcao1') msg=mensagemCobrancaOpcao1();
+  else if(tipo==='opcao2') msg=mensagemCobrancaOpcao2();
+  else msg=mensagemCobrancaOpcao3();
+  registrarCobrancaAuto({
+    nome:row&&row.nome,
+    cid:row&&row.cid,
+    telefone:tel,
+    valor:row&&row.saldo,
+    vencimento:row&&row.proximoVencimento,
+    tipo
+  });
+  const url=tel?`https://wa.me/${tel}?text=${encodeURIComponent(msg)}`:`https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(url,'_blank');
+  openStatuses(`Cobrança ${tipo.replace('opcao','Opção ')} registrada`,false);
+}
 
 function addMonthsKeepDay(ymd, months){
   if(!ymd) return '';
@@ -551,8 +612,6 @@ function renderCobrancas(){
     ? rows.map(r=>{
         const st=statusDebtByDue(r.proximoVencimento);
         const valor=brMoney(r.saldo);
-        const msgLeve=montarMensagem(r.nome, valor, r.proximoVencimento, 'leve');
-        const msgNormal=montarMensagem(r.nome, valor, r.proximoVencimento, 'normal');
         const detalhe = [
           `Compra inicial: ${formatBrDate(r.dataCompra)||'-'}`,
           `Pago: ${brMoney(r.totalPago)}`,
@@ -572,9 +631,9 @@ function renderCobrancas(){
           <div class="small muted" style="margin-top:8px">${escapeHtml(detalhe)}</div>
           <div class="small muted" style="margin-top:6px">${r.compras} compra(s) em aberto • Saldo restante de ${escapeHtml(brMoney(r.saldo))}.</div>
           <div class="actions">
-            <button class="btn" onclick='enviarWhatsapp(${JSON.stringify(r.telefone||"")}, ${JSON.stringify(msgNormal)})'>Enviar cobrança</button>
-            <button class="btn light" onclick='copiarMensagem(${JSON.stringify(msgLeve)})'>Copiar leve</button>
-            <button class="btn light" onclick='copiarMensagem(${JSON.stringify(msgNormal)})'>Copiar normal</button>
+            <button class="btn" onclick='enviarCobrancaWhatsapp(${JSON.stringify({nome:r.nome,cid:r.cid,telefone:r.telefone,saldo:r.saldo,proximoVencimento:r.proximoVencimento})}, "opcao1")'>Opção 1</button>
+            <button class="btn light" onclick='enviarCobrancaWhatsapp(${JSON.stringify({nome:r.nome,cid:r.cid,telefone:r.telefone,saldo:r.saldo,proximoVencimento:r.proximoVencimento})}, "opcao2")'>Opção 2</button>
+            <button class="btn light" onclick='enviarCobrancaWhatsapp(${JSON.stringify({nome:r.nome,cid:r.cid,telefone:r.telefone,saldo:r.saldo,proximoVencimento:r.proximoVencimento})}, "opcao3")'>Opção 3</button>
           </div>
         </div>`;
       }).join('')
