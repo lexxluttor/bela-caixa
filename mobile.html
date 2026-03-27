@@ -31,6 +31,14 @@
     .row{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.muted{color:var(--muted)}.small{font-size:12px}
     .list{display:grid;gap:10px}.item{background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px}.highlight{color:var(--brand-2);font-weight:900}.empty{text-align:center;color:var(--muted);padding:20px 10px}
     .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px} table{width:100%;border-collapse:collapse;background:#fff;min-width:520px} th,td{padding:12px 10px;border-bottom:1px solid #efe5e1;text-align:left;font-size:14px} th{color:#6c625e;font-size:12px;text-transform:uppercase;letter-spacing:.04em;background:#faf6f4} td.num{text-align:right;font-weight:700} tr:last-child td{border-bottom:none}
+    .detail-month-grid{display:grid;grid-template-columns:1fr;gap:12px}
+    .detail-month-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px}
+    .detail-month-title{font-size:15px;font-weight:800;margin-bottom:8px;color:var(--ink)}
+    .detail-month-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #efe5e1}
+    .detail-month-row:last-child{border-bottom:none}
+    .detail-month-label{color:#5f5651}
+    .detail-month-value{font-weight:800;color:var(--brand-2);text-align:right}
+    @media (min-width:720px){.detail-month-grid{grid-template-columns:1fr 1fr}}
     .badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:800;background:#f1e8e5;color:#6e4f49}
     .badge.ok{background:#e7f6ee;color:var(--ok)} .badge.warn{background:#fff4df;color:var(--warn)} .badge.danger{background:#fdebea;color:var(--danger)}
     .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.btn{border:none;border-radius:12px;padding:10px 12px;cursor:pointer;font-weight:800;background:var(--brand);color:#fff}
@@ -112,25 +120,40 @@ function todayStr(){const d=new Date();return d.getFullYear()+'-'+pad2(d.getMont
 function brMoney(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
 function escapeHtml(str){return String(str==null?'':str).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;")}
 function safeJson(text,fallback){try{return JSON.parse(text)}catch(e){return fallback}}
-function rowStamp(row){return new Date(row.updatedAt||row.data||row.createdAt||0).getTime()||0}
+function parseAnyDate(v){
+  if(!v) return null;
+  if(v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  const s=String(v).trim();
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m){
+    const d=new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), 0, 0, 0);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if(m){
+    const d=new Date(Number(m[1]), Number(m[2])-1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]||0));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/);
+  if(m){
+    const d=new Date(Number(m[3]), Number(m[2])-1, Number(m[1]), Number(m[4]||0), Number(m[5]||0), Number(m[6]||0));
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d=new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function rowStamp(row){
+  const d=parseAnyDate(row.updatedAt||row.data||row.createdAt||0);
+  return d ? d.getTime() : 0;
+}
 function activeRows(rows){return (rows||[]).filter(r=>!r.deletedAt)}
 function ymdFromAny(v){
-  if(!v) return '';
-  const s=String(v).trim();
-  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
-  if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)){const [dd,mm,yy]=s.split('/');return `${yy}-${mm}-${dd}`;}
-  const d=new Date(s);
-  if(!isNaN(d.getTime())) return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate());
-  return '';
+  const d=parseAnyDate(v);
+  return d ? d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) : '';
 }
 function hmFromAny(v){
-  if(!v) return '';
-  const s=String(v).trim();
-  const m=s.match(/T(\d{2}):(\d{2})/);
-  if(m) return `${m[1]}:${m[2]}`;
-  const d=new Date(s);
-  if(!isNaN(d.getTime())) return pad2(d.getHours())+':'+pad2(d.getMinutes());
-  return '';
+  const d=parseAnyDate(v);
+  return d ? pad2(d.getHours())+':'+pad2(d.getMinutes()) : '';
 }
 function openStatuses(text,isError){
   const el=document.getElementById('statusSync');
@@ -302,40 +325,23 @@ function renderRelatorios(){
   });
 
   detalhe.innerHTML=`
-    <div style="display:grid;grid-template-columns:1fr;gap:12px;">
-      <div>
-        <h3 style="margin:0 0 10px">Detalhamento à vista do mês</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Forma</th><th class="num">Valor</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>Pix</td><td class="num">${brMoney(porVista.pix)}</td></tr>
-              <tr><td>Dinheiro</td><td class="num">${brMoney(porVista.dinheiro)}</td></tr>
-              <tr><td>Cartão crédito</td><td class="num">${brMoney(porVista.cartaoCredito)}</td></tr>
-              <tr><td>Cartão débito</td><td class="num">${brMoney(porVista.cartaoDebito)}</td></tr>
-              <tr><td><strong>Total</strong></td><td class="num"><strong>${brMoney(porVista.pix + porVista.dinheiro + porVista.cartaoCredito + porVista.cartaoDebito)}</strong></td></tr>
-            </tbody>
-          </table>
-        </div>
+    <h3 style="margin:0 0 12px">Detalhamento do mês</h3>
+    <div class="detail-month-grid">
+      <div class="detail-month-card">
+        <div class="detail-month-title">D. venda à vista</div>
+        <div class="detail-month-row"><span class="detail-month-label">Pix</span><span class="detail-month-value">${brMoney(porVista.pix)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label">Dinheiro</span><span class="detail-month-value">${brMoney(porVista.dinheiro)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label">Cartão crédito</span><span class="detail-month-value">${brMoney(porVista.cartaoCredito)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label">Cartão débito</span><span class="detail-month-value">${brMoney(porVista.cartaoDebito)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label"><strong>Total</strong></span><span class="detail-month-value"><strong>${brMoney(porVista.pix + porVista.dinheiro + porVista.cartaoCredito + porVista.cartaoDebito)}</strong></span></div>
       </div>
-      <div>
-        <h3 style="margin:0 0 10px">Detalhamento de recebimentos do mês</h3>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Forma</th><th class="num">Valor</th></tr>
-            </thead>
-            <tbody>
-              <tr><td>Pix</td><td class="num">${brMoney(porReceb.pix)}</td></tr>
-              <tr><td>Dinheiro</td><td class="num">${brMoney(porReceb.dinheiro)}</td></tr>
-              <tr><td>Cartão crédito</td><td class="num">${brMoney(porReceb.cartaoCredito)}</td></tr>
-              <tr><td>Cartão débito</td><td class="num">${brMoney(porReceb.cartaoDebito)}</td></tr>
-              <tr><td><strong>Total</strong></td><td class="num"><strong>${brMoney(porReceb.pix + porReceb.dinheiro + porReceb.cartaoCredito + porReceb.cartaoDebito)}</strong></td></tr>
-            </tbody>
-          </table>
-        </div>
+      <div class="detail-month-card">
+        <div class="detail-month-title">D. recebimento</div>
+        <div class="detail-month-row"><span class="detail-month-label">Pix</span><span class="detail-month-value">${brMoney(porReceb.pix)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label">Dinheiro</span><span class="detail-month-value">${brMoney(porReceb.dinheiro)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label">Cartão crédito</span><span class="detail-month-value">${brMoney(porReceb.cartaoCredito)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label">Cartão débito</span><span class="detail-month-value">${brMoney(porReceb.cartaoDebito)}</span></div>
+        <div class="detail-month-row"><span class="detail-month-label"><strong>Total</strong></span><span class="detail-month-value"><strong>${brMoney(porReceb.pix + porReceb.dinheiro + porReceb.cartaoCredito + porReceb.cartaoDebito)}</strong></span></div>
       </div>
     </div>
   `;
