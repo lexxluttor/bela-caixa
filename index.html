@@ -126,8 +126,9 @@ tr:hover td{background:var(--s2);}
 .sg{padding:9px 12px;background:var(--s2);border-radius:7px;cursor:pointer;margin-top:4px;font-size:13px;border:1px solid var(--bdr);transition:border-color .15s;}
 .sg:hover{border-color:var(--red);}
 .csel{padding:10px;background:var(--s2);border-radius:8px;border:1px solid var(--red);margin-top:8px;}
-.v-sug{position:relative}
-.v-sug-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 10px 22px rgba(0,0,0,.12);max-height:220px;overflow:auto;z-index:40}
+.v-sug{position:relative;z-index:120}
+.v-sug-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 10px 22px rgba(0,0,0,.12);max-height:220px;overflow:auto;z-index:9999}
+#venda-cat-card,#venda-cat-card .vtab-panel.on,.vl,.cbox,.cl{overflow:visible !important}
 .v-sug-item{padding:10px 12px;border-bottom:1px solid var(--bdr);cursor:pointer}
 .v-sug-item:last-child{border-bottom:none}
 .v-sug-item:hover{background:var(--s2)}
@@ -140,8 +141,10 @@ tr:hover td{background:var(--s2);}
 .imp-note{font-size:12px;color:var(--txt2);line-height:1.45}
 .imp-head{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
 .imp-list{max-height:320px;overflow:auto;border:1px solid var(--bdr);border-radius:10px;background:var(--s1)}
-.imp-row{display:grid;grid-template-columns:1.4fr .55fr .65fr .55fr;padding:10px 12px;border-bottom:1px solid var(--bdr);gap:10px;align-items:center;font-size:12px}
+.imp-row{display:grid;grid-template-columns:1.35fr .45fr .6fr .7fr .55fr;padding:10px 12px;border-bottom:1px solid var(--bdr);gap:10px;align-items:center;font-size:12px}
 .imp-row.head{font-size:11px;font-weight:800;text-transform:uppercase;color:var(--txt2);background:var(--s2);position:sticky;top:0}
+.imp-preco-input{width:100%;padding:7px 8px;border:1px solid var(--bdr);border-radius:8px;background:#fff;font-size:12px}
+.imp-preco-input:focus{outline:none;border-color:var(--red);box-shadow:0 0 0 2px var(--glow)}
 .imp-row:last-child{border-bottom:none}
 .imp-prod{font-weight:800}
 .imp-sub{font-size:11px;color:var(--txt2);margin-top:2px}
@@ -879,7 +882,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
         <div class="imp-box"><div class="tm">Nota / Emissão</div><div id="ix-nota" style="font-weight:800;margin-top:4px;">—</div></div>
       </div>
       <div class="imp-list" id="ix-lista">
-        <div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Ação</div></div>
+        <div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Ação</div></div>
         <div class="imp-row"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>
       </div>
     </div>
@@ -1509,7 +1512,7 @@ function limparImportacaoXML(){
   var f=document.getElementById('ix-forn'); if(f) f.textContent='—';
   var n=document.getElementById('ix-nota'); if(n) n.textContent='—';
   var l=document.getElementById('ix-lista');
-  if(l) l.innerHTML='<div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Ação</div></div><div class="imp-row"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>';
+  if(l) l.innerHTML='<div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Ação</div></div><div class="imp-row"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>';
 }
 function txt(node, tag){
   var el = node.getElementsByTagName(tag)[0];
@@ -1563,6 +1566,9 @@ function lerArquivoXML(ev){
         var existente = (DB.get('produtos')||[]).find(function(p){
           return (ean && String(p.ean||'')===String(ean)) || (cod && String(p.cod||'')===String(cod));
         });
+        var precoVenda = existente
+          ? Number(existente.preco || 0)
+          : Number(custo || 0);
         return {
           cod: cod || ('REF'+Math.random().toString(36).slice(2,7).toUpperCase()),
           nome: nome.trim(),
@@ -1571,6 +1577,7 @@ function lerArquivoXML(ev){
           ncm: ncm,
           qtd: q,
           custo: custo,
+          precoVenda: precoVenda,
           cat: existente ? (existente.cat||catByNCM(ncm)) : catByNCM(ncm),
           desc2: [info.cor ? ('Cor: '+info.cor) : '', info.tam ? ('Tam: '+info.tam) : ''].filter(Boolean).join(' · '),
           existenteId: existente ? existente.id : ''
@@ -1606,15 +1613,22 @@ function renderPreviewImportacaoXML(){
   document.getElementById('ix-forn').textContent = importacaoXMLAtual.fornecedor + (importacaoXMLAtual.cnpj ? ' · ' + importacaoXMLAtual.cnpj : '');
   document.getElementById('ix-nota').textContent = 'NF ' + (importacaoXMLAtual.numero||'—') + ' · Série ' + (importacaoXMLAtual.serie||'—') + (importacaoXMLAtual.emissao ? ' · ' + FD(importacaoXMLAtual.emissao) : '');
 
-  box.innerHTML = '<div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Ação</div></div>' + importacaoXMLAtual.itens.map(function(it){
+  box.innerHTML = '<div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Ação</div></div>' + importacaoXMLAtual.itens.map(function(it, idx){
     return '<div class="imp-row">'+
       '<div><div class="imp-prod">'+it.nome+'</div><div class="imp-sub">'+it.cod+(it.ncm?' · NCM '+it.ncm:'')+(it.ean?' · EAN '+it.ean:'')+'</div></div>'+
       '<div>'+it.qtd+'</div>'+
       '<div>'+R(it.custo)+'</div>'+
+      '<div><input class="imp-preco-input" type="number" step="0.01" min="0" value="'+Number(it.precoVenda||0).toFixed(2)+'" onchange="alterarPrecoVendaXML('+idx+', this.value)"></div>'+
       '<div>'+(it.existenteId?'Somar estoque':'Criar produto')+'</div>'+
     '</div>';
   }).join('');
 }
+function alterarPrecoVendaXML(idx, valor){
+  if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[idx]) return;
+  var n = Number(valor || 0);
+  importacaoXMLAtual.itens[idx].precoVenda = isFinite(n) ? n : 0;
+}
+
 function confirmarImportacaoXML(){
   if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens.length){
     toast('⚠️ Carregue um XML primeiro!','warn');
@@ -1631,10 +1645,11 @@ function confirmarImportacaoXML(){
     if(idx >= 0){
       var p = produtos[idx];
       p.estq = Number(p.estq||0) + Number(it.qtd||0);
-      if(!p.custo && it.custo) p.custo = it.custo;
-      if(!p.ncm && it.ncm) p.ncm = it.ncm;
-      if(!p.ean && it.ean) p.ean = it.ean;
-      if(!p.desc2 && it.desc2) p.desc2 = it.desc2;
+      if(it.custo) p.custo = it.custo;
+      if(it.ncm) p.ncm = it.ncm;
+      if(it.ean) p.ean = it.ean;
+      if(it.desc2) p.desc2 = it.desc2;
+      if(Number(it.precoVenda||0) > 0) p.preco = Number(it.precoVenda||0);
       p.updatedAt = agora;
       produtos[idx] = p;
     }else{
@@ -1643,7 +1658,7 @@ function confirmarImportacaoXML(){
         cod: it.cod,
         nome: it.nome,
         cat: it.cat || 'Outros',
-        preco: Number(it.custo||0),
+        preco: Number(it.precoVenda||it.custo||0),
         estq: Number(it.qtd||0),
         desc2: it.desc2 || '',
         custo: Number(it.custo||0),
