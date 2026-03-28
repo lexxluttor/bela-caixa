@@ -127,7 +127,7 @@ tr:hover td{background:var(--s2);}
 .sg:hover{border-color:var(--red);}
 .csel{padding:10px;background:var(--s2);border-radius:8px;border:1px solid var(--red);margin-top:8px;}
 .v-sug{position:relative;z-index:120}
-.v-sug-list{position:absolute;left:0;right:0;top:100%;margin-top:4px;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 10px 22px rgba(0,0,0,.12);max-height:220px;overflow:auto;z-index:9999}
+.v-sug-list{position:fixed;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;box-shadow:0 10px 22px rgba(0,0,0,.12);max-height:220px;overflow:auto;z-index:99999}
 #venda-cat-card,#venda-cat-card .vtab-panel.on,.vl,.cbox,.cl{overflow:visible !important}
 .v-sug-item{padding:10px 12px;border-bottom:1px solid var(--bdr);cursor:pointer}
 .v-sug-item:last-child{border-bottom:none}
@@ -1457,6 +1457,15 @@ function addProd(pid){
   else cart.push({id:DB.uid(),pid:pid,desc:p.nome,preco:p.preco,qty:1});
   renderCart();toast(p.nome+' adicionado!','ok');
 }
+function posSugProdutoManual(){
+  var inp=document.getElementById('v-desc');
+  var sg=document.getElementById('v-desc-sg');
+  if(!inp||!sg) return;
+  var r=inp.getBoundingClientRect();
+  sg.style.left = r.left + 'px';
+  sg.style.top = (r.bottom + 4) + 'px';
+  sg.style.width = r.width + 'px';
+}
 function limparBuscaProdutoManual(){
   var sg=document.getElementById('v-desc-sg');
   if(sg){sg.innerHTML='';sg.style.display='none';}
@@ -1492,13 +1501,17 @@ function buscarProdutoManual(){
       '<div class="v-sug-meta"><span>'+(p.cod||'')+'</span><span>'+R(Number(p.preco||0))+'</span><span class="v-sug-estq '+cls+'">Estoque: '+estq+'</span></div>'+
     '</div>';
   }).join('');
+  posSugProdutoManual();
   sg.style.display='block';
 }
 document.addEventListener('click',function(ev){
   var box=document.querySelector('.v-sug');
+  var sg=document.getElementById('v-desc-sg');
   if(!box) return;
-  if(!box.contains(ev.target)) limparBuscaProdutoManual();
+  if(!box.contains(ev.target) && !(sg && sg.contains(ev.target))) limparBuscaProdutoManual();
 });
+window.addEventListener('resize', posSugProdutoManual);
+window.addEventListener('scroll', posSugProdutoManual, true);
 var importacaoXMLAtual=null;
 
 function abrirImportaXML(){
