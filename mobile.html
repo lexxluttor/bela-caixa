@@ -17,7 +17,18 @@
     .brand h1{margin:0;font-size:22px;line-height:1.1}.sub{color:var(--muted);font-size:13px;margin-top:4px}
     .pill{border:none;background:var(--brand);color:#fff;font-weight:800;border-radius:999px;padding:10px 14px;box-shadow:var(--shadow);cursor:pointer}
     .pill.secondary{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none}
-    .tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+    .tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+    .scanner-modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:18px;z-index:60}
+    .scanner-modal.active{display:flex}
+    .scanner-card{width:min(100%,520px);background:#fff;border-radius:22px;box-shadow:var(--shadow);padding:16px;border:1px solid var(--line)}
+    .scanner-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+    .scanner-video-wrap{position:relative;border-radius:18px;overflow:hidden;background:#111;aspect-ratio:3/4;display:flex;align-items:center;justify-content:center}
+    .scanner-video{width:100%;height:100%;object-fit:cover;background:#111}
+    .scanner-frame{position:absolute;inset:16% 10%;border:2px solid rgba(255,255,255,.9);border-radius:18px;box-shadow:0 0 0 9999px rgba(0,0,0,.18) inset;pointer-events:none}
+    .scanner-note{font-size:12px;color:var(--muted);margin-top:10px;line-height:1.45}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    .result-box{margin-top:10px;padding:12px;border-radius:14px;border:1px solid var(--line);background:#faf6f4}
+    @media (max-width:760px){.tabs{grid-template-columns:repeat(2,1fr)}}
     .tab{border:none;padding:12px 10px;border-radius:14px;background:#fff;color:var(--ink);font-weight:800;cursor:pointer;border:1px solid var(--line)}
     .tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}
     .status{margin-top:10px;font-size:12px;color:var(--muted)} .view{display:none;padding-top:14px}.view.active{display:block}
@@ -60,6 +71,8 @@
       <button class="tab active" data-view="caixaView">Caixa</button>
       <button class="tab" data-view="relatoriosView">Relatórios</button>
       <button class="tab" data-view="cobrancasView">Cobranças</button>
+      <button class="tab" data-view="clientesView">Clientes</button>
+      <button class="tab" data-view="produtosView">Produtos</button>
     </div>
     <div class="status" id="statusSync">Carregando...</div>
   </div>
@@ -107,6 +120,53 @@
     <div class="grid cards" id="cobrancaCards"></div>
     <div class="card"><h3 style="margin:0 0 10px">Lista de devedores</h3><div class="list" id="listaCobrancas"></div></div>
   </section>
+
+  <section class="view" id="clientesView">
+    <div class="card">
+      <h2 style="margin:0 0 10px">Consulta de clientes</h2>
+      <div class="toolbar">
+        <div class="field"><input type="search" id="buscaClienteMobile" placeholder="Buscar por nome, telefone ou CPF..." /></div>
+      </div>
+    </div>
+    <div class="grid cards" id="clientesCards"></div>
+    <div class="card"><h3 style="margin:0 0 10px">Lista de clientes</h3><div class="list" id="listaClientesMobile"></div></div>
+  </section>
+
+  <section class="view" id="produtosView">
+    <div class="card">
+      <h2 style="margin:0 0 10px">Consulta de produtos</h2>
+      <div class="toolbar">
+        <div class="field"><input type="search" id="buscaProdutoMobile" placeholder="Buscar por nome, código, EAN ou categoria..." /></div>
+        <button class="pill secondary" id="btnScannerProduto" type="button">Ler código</button>
+      </div>
+      <div class="small muted">Você pode pesquisar digitando ou usar a câmera do celular para ler o código de barras.</div>
+      <div class="result-box" id="scannerStatusBox" style="display:none"></div>
+    </div>
+    <div class="grid cards" id="produtosCards"></div>
+    <div class="card"><h3 style="margin:0 0 10px">Lista de produtos</h3><div class="list" id="listaProdutosMobile"></div></div>
+  </section>
+</div>
+
+<div class="scanner-modal" id="scannerModal" aria-hidden="true">
+  <div class="scanner-card">
+    <div class="scanner-head">
+      <div>
+        <h3 style="margin:0">Leitor de código de barras</h3>
+        <div class="small muted">Aponte a câmera para o código do produto.</div>
+      </div>
+      <button class="pill secondary" id="btnFecharScanner" type="button">Fechar</button>
+    </div>
+    <div class="scanner-video-wrap">
+      <video id="scannerVideo" class="scanner-video" playsinline muted></video>
+      <div class="scanner-frame"></div>
+    </div>
+    <div class="scanner-note" id="scannerNote">Preparando câmera...</div>
+    <div class="toolbar" style="margin-top:10px">
+      <div class="field"><input type="search" id="codigoManualScanner" class="mono" placeholder="Ou digite o código manualmente" inputmode="numeric" /></div>
+      <button class="pill" id="btnAplicarCodigoManual" type="button">Buscar</button>
+    </div>
+    <input type="file" id="scannerFileInput" accept="image/*" capture="environment" style="display:none" />
+  </div>
 </div>
 
 <script>
@@ -287,7 +347,7 @@ function renderRelatorios(){
   const totalCredMes=vendasCredMes.reduce((s,v)=>s+Number(v.total||0),0);
   const recebidoMes=recebimentosMes.reduce((s,r)=>s+Number(r.valor||0),0);
   const totalMes=totalVistaMes + totalCredMes;
-  const ticketMes=vendasMes.length?totalMes/vendasMes.length:0;
+  const entradasMes=totalVistaMes + recebidoMes;
 
   const porVista={pix:0,dinheiro:0,cartaoCredito:0,cartaoDebito:0};
   vendasVistaMes.forEach(v=>{
@@ -303,7 +363,7 @@ function renderRelatorios(){
     cardMetric('À vista no mês',brMoney(totalVistaMes),`${vendasVistaMes.length} venda(s)`,'green'),
     cardMetric('Crediário no mês',brMoney(totalCredMes),`${vendasCredMes.length} venda(s)`,'blue'),
     cardMetric('Recebido no mês',brMoney(recebidoMes),`${recebimentosMes.length} recebimento(s)`,'gold'),
-    cardMetric('Ticket médio mês',brMoney(ticketMes),'Média por venda','red')
+    cardMetric('Entradas no mês',brMoney(entradasMes),'Venda à vista + recebimentos','red')
   ].join('');
 
   const relatorioCards=document.getElementById('relatorioCards');
@@ -640,7 +700,256 @@ function renderCobrancas(){
     : '<div class="empty">Nenhum devedor encontrado com os filtros atuais.</div>';
 }
 
-function renderTudo(){ renderCaixa(); renderRelatorios(); renderCobrancas(); }
+
+let SCANNER_STATE={stream:null,interval:null,active:false,lastCode:''};
+
+function onlyActive(rows){ return (rows||[]).filter(r=>!r.deletedAt); }
+function normText(v){ return String(v||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim(); }
+function digitsOnly(v){ return String(v||'').replace(/\D+/g,''); }
+function productStockValue(p){ return Number(p.estoque!=null ? p.estoque : (p.estq!=null ? p.estq : 0)); }
+
+function setScannerStatus(html){
+  const box=document.getElementById('scannerStatusBox');
+  if(!box) return;
+  if(!html){
+    box.style.display='none';
+    box.innerHTML='';
+    return;
+  }
+  box.style.display='block';
+  box.innerHTML=html;
+}
+
+function findProductByCode(code){
+  const raw=String(code||'').trim();
+  const digits=digitsOnly(raw);
+  return onlyActive(DATA.produtos).find(p=>{
+    const codRaw=String(p.cod||'').trim();
+    const eanRaw=String(p.ean||'').trim();
+    const codDigits=digitsOnly(codRaw);
+    const eanDigits=digitsOnly(eanRaw);
+    return (raw && (codRaw===raw || eanRaw===raw)) || (digits && (codDigits===digits || eanDigits===digits));
+  }) || null;
+}
+
+function applyProductSearch(code){
+  const value=String(code||'').trim();
+  const input=document.getElementById('buscaProdutoMobile');
+  if(input) input.value=value;
+  const found=findProductByCode(value);
+  if(found){
+    setScannerStatus(
+      `<div><strong>Produto encontrado:</strong> ${escapeHtml(found.nome||'Sem nome')}</div>`+
+      `<div class="small muted" style="margin-top:6px">Código: <span class="mono">${escapeHtml(found.cod||'-')}</span> • EAN: <span class="mono">${escapeHtml(found.ean||'-')}</span></div>`+
+      `<div class="small muted" style="margin-top:6px">Preço: ${escapeHtml(brMoney(found.preco||0))} • Estoque: ${escapeHtml(String(productStockValue(found)))}</div>`
+    );
+  }else if(value){
+    setScannerStatus(`<div><strong>Código lido:</strong> <span class="mono">${escapeHtml(value)}</span></div><div class="small muted" style="margin-top:6px">Nenhum produto encontrado com esse código.</div>`);
+  }else{
+    setScannerStatus('');
+  }
+  renderProdutos();
+}
+
+function renderClientes(){
+  const q=normText(document.getElementById('buscaClienteMobile')?.value);
+  let rows=onlyActive(DATA.clientes);
+  if(q){
+    rows=rows.filter(c=>{
+      const nome=normText(c.nome);
+      const tel=digitsOnly(c.telefone||c.tel);
+      const cpf=digitsOnly(c.cpf);
+      const qDigits=digitsOnly(q);
+      return nome.includes(q) || (qDigits && tel.includes(qDigits)) || (qDigits && cpf.includes(qDigits));
+    });
+  }
+  rows.sort((a,b)=>normText(a.nome).localeCompare(normText(b.nome),'pt-BR'));
+
+  document.getElementById('clientesCards').innerHTML = rows.length ? [
+    cardMetric('Clientes', String(rows.length), q ? 'Resultado da busca' : 'Cadastros ativos', 'blue'),
+    cardMetric('Com telefone', String(rows.filter(c=>String(c.telefone||c.tel||'').trim()).length), 'Contato preenchido', 'green'),
+    cardMetric('Com CPF', String(rows.filter(c=>String(c.cpf||'').trim()).length), 'Documento preenchido', 'gold'),
+    cardMetric('Com observação', String(rows.filter(c=>String(c.obs||'').trim()).length), 'Observações salvas', 'red')
+  ].join('') : '<div class="empty">Nenhum cliente encontrado.</div>';
+
+  document.getElementById('listaClientesMobile').innerHTML = rows.length ? rows.map(c=>{
+    const nome=c.nome||'Sem nome';
+    const tel=c.telefone||c.tel||'-';
+    const cpf=c.cpf||'-';
+    const endereco=c.endereco||c.end||'-';
+    const obs=c.obs||'';
+    return `<div class="item">
+      <div class="row">
+        <div>
+          <div><strong>${escapeHtml(nome)}</strong></div>
+          <div class="small muted">Telefone: ${escapeHtml(tel)}</div>
+        </div>
+        <div class="small muted">${escapeHtml(cpf)}</div>
+      </div>
+      <div class="small muted" style="margin-top:8px">Endereço: ${escapeHtml(endereco)}</div>
+      ${obs?`<div class="small muted" style="margin-top:6px">Obs: ${escapeHtml(obs)}</div>`:''}
+    </div>`;
+  }).join('') : '<div class="empty">Nenhum cliente encontrado.</div>';
+}
+
+function renderProdutos(){
+  const q=normText(document.getElementById('buscaProdutoMobile')?.value);
+  const qDigits=digitsOnly(q);
+  let rows=onlyActive(DATA.produtos);
+  if(q){
+    rows=rows.filter(p=>{
+      const nome=normText(p.nome);
+      const cod=normText(p.cod);
+      const ean=normText(p.ean);
+      const cat=normText(p.cat);
+      return nome.includes(q) || cod.includes(q) || ean.includes(q) || cat.includes(q) ||
+        (qDigits && digitsOnly(p.cod).includes(qDigits)) || (qDigits && digitsOnly(p.ean).includes(qDigits));
+    });
+  }
+  rows.sort((a,b)=>normText(a.nome).localeCompare(normText(b.nome),'pt-BR'));
+
+  document.getElementById('produtosCards').innerHTML = rows.length ? rows.slice(0,8).map(p=>{
+    const estq=productStockValue(p);
+    const color=estq<=0?'red':(estq<=3?'gold':'green');
+    return `<div class="card metric ${color}">
+      <div class="label">${escapeHtml(p.cat||'Produto')}</div>
+      <div class="value" style="font-size:18px">${escapeHtml(p.nome||'Sem nome')}</div>
+      <div class="subline">Preço: ${escapeHtml(brMoney(p.preco||0))}</div>
+      <div class="subline">Estoque: ${escapeHtml(String(estq))}</div>
+    </div>`;
+  }).join('') : '<div class="empty">Nenhum produto encontrado.</div>';
+
+  document.getElementById('listaProdutosMobile').innerHTML = rows.length ? rows.map(p=>{
+    const estq=productStockValue(p);
+    return `<div class="item">
+      <div class="row">
+        <div>
+          <div><strong>${escapeHtml(p.nome||'Sem nome')}</strong></div>
+          <div class="small muted">Código: <span class="mono">${escapeHtml(p.cod||'-')}</span> • EAN: <span class="mono">${escapeHtml(p.ean||'-')}</span></div>
+        </div>
+        <div style="text-align:right">
+          <div class="highlight">${escapeHtml(brMoney(p.preco||0))}</div>
+          <div class="small muted">Estoque: ${escapeHtml(String(estq))}</div>
+        </div>
+      </div>
+      <div class="small muted" style="margin-top:8px">Categoria: ${escapeHtml(p.cat||'-')}</div>
+      ${p.desc2?`<div class="small muted" style="margin-top:6px">${escapeHtml(p.desc2)}</div>`:''}
+    </div>`;
+  }).join('') : '<div class="empty">Nenhum produto encontrado.</div>';
+}
+
+function openScannerFileFallback(message){
+  const note=document.getElementById('scannerNote');
+  const input=document.getElementById('scannerFileInput');
+  if(note && message) note.textContent=message;
+  if(input){
+    input.value='';
+    input.click();
+  }
+}
+
+async function tryDecodeImageBitmap(bitmap){
+  if(!('BarcodeDetector' in window) || !bitmap) return '';
+  try{
+    const detector=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','upc_a','upc_e']});
+    const codes=await detector.detect(bitmap);
+    return codes && codes.length ? String(codes[0].rawValue||'').trim() : '';
+  }catch(e){
+    return '';
+  }
+}
+
+async function startScanner(){
+  const modal=document.getElementById('scannerModal');
+  const video=document.getElementById('scannerVideo');
+  const note=document.getElementById('scannerNote');
+  const isSecureLike=(window.isSecureContext || location.protocol==='file:' || location.protocol==='content:');
+  if(!modal || !video){
+    setScannerStatus('<div class="small muted">Leitor indisponível nesta tela.</div>');
+    return;
+  }
+  stopScanner();
+  modal.classList.add('active');
+  modal.setAttribute('aria-hidden','false');
+  note.textContent='Abrindo câmera...';
+
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !isSecureLike){
+    note.textContent='A câmera direta não está disponível aqui. Vamos tentar abrir a câmera do celular por foto.';
+    openScannerFileFallback(note.textContent);
+    return;
+  }
+
+  try{
+    let stream=null;
+    const attempts=[
+      {video:{facingMode:{exact:'environment'}},audio:false},
+      {video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false},
+      {video:true,audio:false}
+    ];
+    for(const constraints of attempts){
+      try{
+        stream=await navigator.mediaDevices.getUserMedia(constraints);
+        if(stream) break;
+      }catch(err){}
+    }
+    if(!stream) throw new Error('camera_unavailable');
+
+    SCANNER_STATE.stream=stream;
+    SCANNER_STATE.active=true;
+    video.srcObject=stream;
+    await video.play().catch(()=>{});
+
+    if('BarcodeDetector' in window){
+      const detector=new BarcodeDetector({formats:['ean_13','ean_8','code_128','code_39','upc_a','upc_e']});
+      note.textContent='Aponte para o código de barras.';
+      SCANNER_STATE.interval=setInterval(async ()=>{
+        if(!SCANNER_STATE.active || video.readyState < 2) return;
+        try{
+          const codes=await detector.detect(video);
+          if(codes && codes.length){
+            const value=String(codes[0].rawValue||'').trim();
+            if(value && value!==SCANNER_STATE.lastCode){
+              SCANNER_STATE.lastCode=value;
+              applyProductSearch(value);
+              stopScanner();
+            }
+          }
+        }catch(e){}
+      }, 450);
+    }else{
+      note.textContent='Seu navegador não faz leitura automática ao vivo. Toque em Buscar por foto ou digite o código abaixo.';
+      openScannerFileFallback('Abra a câmera do celular para fotografar o código de barras.');
+    }
+  }catch(err){
+    console.error(err);
+    note.textContent='Não foi possível abrir a câmera direta. Vamos tentar pela câmera de foto do celular.';
+    openScannerFileFallback(note.textContent);
+  }
+}
+
+function stopScanner(){
+  const modal=document.getElementById('scannerModal');
+  const video=document.getElementById('scannerVideo');
+  const note=document.getElementById('scannerNote');
+  if(SCANNER_STATE.interval){
+    clearInterval(SCANNER_STATE.interval);
+    SCANNER_STATE.interval=null;
+  }
+  if(SCANNER_STATE.stream){
+    SCANNER_STATE.stream.getTracks().forEach(t=>t.stop());
+    SCANNER_STATE.stream=null;
+  }
+  SCANNER_STATE.active=false;
+  SCANNER_STATE.lastCode='';
+  if(video) video.srcObject=null;
+  if(modal){
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden','true');
+  }
+  if(note) note.textContent='Preparando câmera...';
+}
+
+function renderTudo(){ renderCaixa(); renderRelatorios(); renderCobrancas(); renderClientes(); renderProdutos(); }
 
 function bindEvents(){
   document.querySelectorAll('.tab').forEach(btn=>{
@@ -663,8 +972,14 @@ function bindEvents(){
   document.getElementById('btnConsultarCaixa').addEventListener('click', renderCaixa);
   document.getElementById('btnHoje').addEventListener('click', ()=>{ document.getElementById('caixaData').value=todayStr(); renderCaixa(); });
   document.getElementById('buscaCobranca').addEventListener('input', renderCobrancas);
+  document.getElementById('buscaClienteMobile').addEventListener('input', renderClientes);
+  document.getElementById('buscaProdutoMobile').addEventListener('input', e=>applyProductSearch(e.target.value));
+  document.getElementById('btnScannerProduto').addEventListener('click', startScanner);
+  document.getElementById('btnFecharScanner').addEventListener('click', stopScanner);
+  document.getElementById('btnAplicarCodigoManual').addEventListener('click', ()=>{ applyProductSearch(document.getElementById('codigoManualScanner').value); stopScanner(); });
+  document.getElementById('codigoManualScanner').addEventListener('keydown', e=>{ if(e.key==='Enter'){ applyProductSearch(e.target.value); stopScanner(); }});
   document.getElementById('caixaData').addEventListener('change', renderCaixa);
-  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') carregarDados(); });
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') carregarDados(); else stopScanner(); });
   window.addEventListener('focus', carregarDados);
 }
 function init(){

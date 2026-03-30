@@ -558,7 +558,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
     </div>
     <div class="card">
       <div class="tw" style="max-height:calc(100vh - 240px);overflow-y:auto;"><table>
-        <thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Endereço</th><th>Saldo Crediário</th><th>Ações</th></tr></thead>
+        <thead><tr><th>Nome</th><th>CPF</th><th>Telefone</th><th>Endereço</th><th>Limite</th><th>Saldo Crediário</th><th>Ações</th></tr></thead>
         <tbody id="c-tb"></tbody>
       </table></div>
     </div>
@@ -679,7 +679,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
             <th>Data</th><th>Cliente</th><th>Itens</th>
             <th>Forma</th><th>Total</th><th>Ação</th>
           </tr></thead>
-          <tbody id="vs-tb"><tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Carregando...</td></tr></tbody>
+          <tbody id="vs-tb"><tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt2);">Carregando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -824,6 +824,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
         <div class="fg gc"><label class="fl">Nome Completo *</label><input class="fi" id="cli-nome" placeholder="Ex: Maria da Silva"></div>
         <div class="fg"><label class="fl">CPF</label><input class="fi" id="cli-cpf" placeholder="000.000.000-00" oninput="mcpf(this)"></div>
         <div class="fg"><label class="fl">Telefone / WhatsApp</label><input class="fi" id="cli-tel" placeholder="(31) 99999-9999"></div>
+        <div class="fg"><label class="fl">Limite de Crédito</label><input class="fi" id="cli-limite" placeholder="Ex: 500,00" inputmode="decimal" onblur="this.value=fmtLimiteInput(this.value)"></div>
         <div class="fg gc"><label class="fl">Endereço</label><input class="fi" id="cli-end" placeholder="Rua, número, bairro, cidade"></div>
         <div class="fg gc"><label class="fl">Observações</label><input class="fi" id="cli-obs" placeholder="Informações adicionais..."></div>
       </div>
@@ -831,6 +832,30 @@ td{padding:8px 9px !important;font-size:12px !important;}
     <div class="mf">
       <button class="btn bh" onclick="fMd('mo-cli')">Cancelar</button>
       <button class="btn br" onclick="salvarCli()">💾 Salvar Cliente</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL ALERTA LIMITE CLIENTE -->
+<div class="ov" id="mo-limite-cli">
+  <div class="md" style="max-width:520px;">
+    <div class="mh"><div class="mht">⚠️ Alerta de Limite</div><button class="mx" onclick="cancelarAlertaLimiteCliente()">✕</button></div>
+    <div class="mb">
+      <div id="limite-card" style="border-radius:14px;padding:16px;border:1px solid var(--bdr);">
+        <div id="limite-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;">Limite</div>
+        <div id="limite-msg" style="font-size:18px;font-weight:800;line-height:1.45;">Mensagem</div>
+        <div class="g2" style="margin-top:14px;">
+          <div class="imp-box"><div class="fl">Cliente</div><div id="limite-cliente" style="font-weight:800;font-size:15px;">—</div></div>
+          <div class="imp-box"><div class="fl">Limite</div><div id="limite-valor" style="font-weight:800;font-size:15px;">R$ 0,00</div></div>
+          <div class="imp-box"><div class="fl">Em aberto</div><div id="limite-saldo" style="font-weight:800;font-size:15px;">R$ 0,00</div></div>
+          <div class="imp-box"><div class="fl">Faltam / Excedeu</div><div id="limite-restante" style="font-weight:800;font-size:15px;">R$ 0,00</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" onclick="cancelarAlertaLimiteCliente()">Cancelar</button>
+      <button class="btn br" onclick="continuarAlertaLimiteCliente()">Continuar</button>
     </div>
   </div>
 </div>
@@ -1172,6 +1197,78 @@ function limparDebitosOrfaos(){
   }catch(e){}
 }
 function mcpf(el){var v=el.value.replace(/\D/g,'').substr(0,11);v=v.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');el.value=v;}
+function dinheiroNum(v){
+  if(v==null||v==='') return 0;
+  if(typeof v==='number') return isFinite(v)?v:0;
+  var s=String(v).trim();
+  if(!s) return 0;
+  s=s.replace(/\s+/g,'');
+  if(s.indexOf(',')>=0) s=s.replace(/\./g,'').replace(',', '.');
+  else s=s.replace(/,/g,'');
+  var n=parseFloat(s.replace(/[^0-9.-]/g,''));
+  return isFinite(n)?n:0;
+}
+function fmtLimiteInput(v){
+  var n=dinheiroNum(v);
+  if(!n) return '';
+  return n.toFixed(2).replace('.',',');
+}
+function limiteClienteValor(cli){
+  return dinheiroNum(cli&&((cli.limite_credito!=null&&cli.limite_credito!=='')?cli.limite_credito:cli.limite));
+}
+var _limiteCliPendente=null;
+function dadosLimiteCliente(cli){
+  var limite=limiteClienteValor(cli);
+  var emAberto=saldo(cli.id).sd;
+  var faixa=limite*0.2;
+  var faltam=Math.max(0, limite-emAberto);
+  return {cliente:cli,limite:limite,emAberto:emAberto,faixa:faixa,faltam:faltam,excedeu:limite>0&&emAberto>limite,alerta:limite>0&&emAberto<=limite&&faltam<=faixa};
+}
+function verificarLimiteClienteVenda(cli){
+  var info=dadosLimiteCliente(cli);
+  if(!info.limite) return;
+  if(!info.excedeu && !info.alerta) return;
+  _limiteCliPendente=cli;
+  var card=document.getElementById('limite-card');
+  var badge=document.getElementById('limite-badge');
+  var msg=document.getElementById('limite-msg');
+  var cliente=document.getElementById('limite-cliente');
+  var valor=document.getElementById('limite-valor');
+  var saldoEl=document.getElementById('limite-saldo');
+  var restante=document.getElementById('limite-restante');
+  cliente.textContent=cli.nome||'Cliente';
+  valor.textContent=R(info.limite);
+  saldoEl.textContent=R(info.emAberto);
+  if(info.excedeu){
+    card.style.background='rgba(192,57,43,.10)';
+    card.style.borderColor='rgba(192,57,43,.35)';
+    badge.style.background='rgba(192,57,43,.15)';
+    badge.style.color='var(--red)';
+    badge.textContent='Limite ultrapassado';
+    msg.textContent='Cliente já ultrapassou o limite de compras. Deseja continuar?';
+    restante.textContent='Excedeu '+R(info.emAberto-info.limite);
+    restante.style.color='var(--red2)';
+  }else{
+    card.style.background='rgba(184,134,11,.10)';
+    card.style.borderColor='rgba(184,134,11,.35)';
+    badge.style.background='rgba(184,134,11,.15)';
+    badge.style.color='var(--gold)';
+    badge.textContent='Próximo do limite';
+    msg.textContent='Faltam '+R(info.faltam)+' para atingir o limite. Deseja continuar?';
+    restante.textContent='Faltam '+R(info.faltam);
+    restante.style.color='var(--gold)';
+  }
+  abrirMd('mo-limite-cli');
+}
+function continuarAlertaLimiteCliente(){
+  _limiteCliPendente=null;
+  fMd('mo-limite-cli');
+}
+function cancelarAlertaLimiteCliente(){
+  _limiteCliPendente=null;
+  fMd('mo-limite-cli');
+  remCli();
+}
 function saldo(cid){
   var tf=creditosValidos().filter(function(f){return f.cid===cid;}).reduce(function(s,f){return s+Number(f.val||0);},0);
   var tp=pagamentosValidos().filter(function(p){return p.cid===cid;}).reduce(function(s,p){return s+Number(p.val||0);},0);
@@ -1278,6 +1375,7 @@ function renderClis(){
       '<td>'+(c.cpf||'—')+'</td>'+
       '<td>'+(c.tel||'—')+'</td>'+
       '<td style="font-size:13px;">'+(c.end||'—')+'</td>'+
+      '<td><b style="color:'+(limiteClienteValor(c)>0.01?'var(--gold)':'var(--txt2)')+'">'+(limiteClienteValor(c)>0.01?R(limiteClienteValor(c)):'—')+'</b></td>'+
       '<td><b style="color:'+(sd>0.01?'var(--red2)':'var(--green)')+'">'+R(sd)+'</b></td>'+
       '<td><span style="display:flex;gap:5px;flex-wrap:wrap;">'+
         '<button class="btn br xs" onclick="irCliVenda(\''+cid+'\')" title="Nova Venda" style="padding:5px 9px;font-size:12px;">🛒 Venda</button>'+
@@ -1294,7 +1392,7 @@ function irCliVenda(cid){
   var c=DB.get('clientes').find(function(x){return x.id===cid;});
   if(!c)return;
   ir('venda');
-  setTimeout(function(){selecionarVCli(c);},150);
+  setTimeout(function(){selecionarVCli(c.id);},150);
 }
 function irCliReceb(cid){
   ir('receb');
@@ -1307,8 +1405,8 @@ function abrirMdCli(id,ctx){
   document.getElementById('cli-id').value=id||'';
   if(id){var c=DB.get('clientes').find(function(x){return x.id===id;});
     document.getElementById('cli-nome').value=c.nome||'';document.getElementById('cli-cpf').value=c.cpf||'';
-    document.getElementById('cli-tel').value=c.tel||'';document.getElementById('cli-end').value=c.end||'';document.getElementById('cli-obs').value=c.obs||'';
-  }else{['cli-nome','cli-cpf','cli-tel','cli-end','cli-obs'].forEach(function(i){document.getElementById(i).value='';});}
+    document.getElementById('cli-tel').value=c.tel||'';document.getElementById('cli-limite').value=fmtLimiteInput(c.limite_credito!=null?c.limite_credito:c.limite);document.getElementById('cli-end').value=c.end||'';document.getElementById('cli-obs').value=c.obs||'';
+  }else{['cli-nome','cli-cpf','cli-tel','cli-limite','cli-end','cli-obs'].forEach(function(i){document.getElementById(i).value='';});}
   abrirMd('mo-cli');
 }
 function salvarCli(){
@@ -1316,7 +1414,7 @@ function salvarCli(){
   if(!nome){toast('⚠️ Nome obrigatório!');return;}
   var id=document.getElementById('cli-id').value||DB.uid();
   var list=DB.get('clientes');
-  var obj={id:id,nome:nome,cpf:document.getElementById('cli-cpf').value,tel:document.getElementById('cli-tel').value,end:document.getElementById('cli-end').value,obs:document.getElementById('cli-obs').value};
+  var obj={id:id,nome:nome,cpf:document.getElementById('cli-cpf').value,tel:document.getElementById('cli-tel').value,limite_credito:dinheiroNum(document.getElementById('cli-limite').value),end:document.getElementById('cli-end').value,obs:document.getElementById('cli-obs').value};
   var idx=list.findIndex(function(c){return c.id===id;});
   if(idx>=0)list[idx]=obj;else list.push(obj);
   DB.set('clientes',list);fMd('mo-cli');
@@ -1726,6 +1824,7 @@ function selecionarVCli(cid){
     row.innerHTML='<input class="fi" id="v-sc" value="'+c.nome+(c.tel?' · '+c.tel:'')+'" readonly style="flex:1;color:var(--red2);font-weight:800;">'+
     '<button class="btn bh sm" onclick="remCli()">✕ Remover</button>';
   }
+  verificarLimiteClienteVenda(c);
 }
 function remCli(){
   vCli=null;
