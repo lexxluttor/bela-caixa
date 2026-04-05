@@ -338,56 +338,6 @@ td{padding:8px 9px !important;font-size:12px !important;}
   margin-bottom:8px;
 }
 
-.r-pay-actions{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  align-items:center;
-  margin-top:8px;
-}
-.r-pay-actions .btn{
-  min-width:220px;
-  justify-content:center;
-}
-
-.mov-split{
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:10px;
-  min-height:0;
-  flex:1;
-}
-.mov-col{
-  min-width:0;
-  display:flex;
-  flex-direction:column;
-  background:var(--s2);
-  border:1px solid var(--bdr);
-  border-radius:10px;
-  overflow:hidden;
-}
-.mov-head{
-  padding:10px 12px;
-  font-size:12px;
-  font-weight:800;
-  color:var(--red2);
-  border-bottom:1px solid var(--bdr);
-  background:rgba(255,255,255,.35);
-}
-.mov-col .tw{
-  flex:1;
-  min-height:0;
-  overflow:auto;
-  background:var(--s1);
-}
-.mov-col td:last-child,
-.mov-col th:last-child{
-  text-align:right;
-}
-@media (max-width: 1280px){
-  .mov-split{grid-template-columns:1fr;}
-}
-
 
 
 /* ETIQUETAS */
@@ -575,25 +525,14 @@ td{padding:8px 9px !important;font-size:12px !important;}
         </div>
       </div>
       <div class="card">
-        <div class="ct">📑 Movimentação do Cliente</div>
-        <div class="mov-split">
-          <div class="mov-col">
-            <div class="mov-head">🛍️ Compras</div>
-            <div class="tw"><table>
-              <thead><tr><th>Data</th><th>Valor</th></tr></thead>
-              <tbody id="r-mov-compras"></tbody>
-            </table></div>
-          </div>
-          <div class="mov-col">
-            <div class="mov-head">💵 Recebimentos</div>
-            <div class="tw"><table>
-              <thead><tr><th>Data</th><th>Valor</th></tr></thead>
-              <tbody id="r-mov-receb"></tbody>
-            </table></div>
-          </div>
-        </div>
+        <div class="ct">📋 Movimentação do Cliente</div>
+        <div class="tw"><table>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
+          <tbody id="r-tb"></tbody>
+        </table></div>
       </div>
       <div class="card">
+        <div class="ct">💵 Registrar Pagamento</div>
         <div class="g2">
           <div class="fg"><label class="fl">Valor Pago (R$)</label><input class="fi" id="r-val" type="number" step="0.01" min="0.01" placeholder="0,00"></div>
           <div class="fg"><label class="fl">Forma de Pagamento</label>
@@ -605,12 +544,10 @@ td{padding:8px 9px !important;font-size:12px !important;}
             </select>
           </div>
           <div class="fg gc"><label class="fl">Observação</label><input class="fi" id="r-obs" placeholder="Opcional..."></div>
-          <div class="fg gc">
-            <div class="fr r-pay-actions">
-              <button class="btn bg2" onclick="confirmarPag()">✅ Confirmar Pagamento</button>
-              <button class="btn bb" onclick="wppExtrato()">📲 Enviar Extrato WPP</button>
-            </div>
-          </div>
+        </div>
+        <div class="fr">
+          <button class="btn bg2" onclick="confirmarPag()">✅ Confirmar Pagamento</button>
+          <button class="btn bb sm" onclick="wppExtrato()">📱 Enviar Extrato WPP</button>
         </div>
       </div>
     </div>
@@ -2739,38 +2676,55 @@ function selecionarRCli(cid){
   var c=DB.get('clientes').find(function(x){return x.id===cid;});if(!c)return;
   rCli=c;document.getElementById('r-sc').value=c.nome;document.getElementById('r-sg').innerHTML='';renderRecebPainel();
 }
-function renderMovimentacaoClienteReceb(){
-  if(!rCli)return;
-  var compras=(DB.get('creditos')||[])
-    .filter(function(f){return !f.deletedAt && f.cid===rCli.id;})
-    .sort(function(a,b){return new Date(b.data||b.createdAt||0)-new Date(a.data||a.createdAt||0);});
-  var recebs=(DB.get('pagamentos')||[])
-    .filter(function(p){return !p.deletedAt && p.cid===rCli.id;})
-    .sort(function(a,b){return new Date(b.data||b.createdAt||0)-new Date(a.data||a.createdAt||0);});
-
-  var tbC=document.getElementById('r-mov-compras');
-  var tbR=document.getElementById('r-mov-receb');
-  if(tbC){
-    tbC.innerHTML=compras.map(function(f){
-      return '<tr><td>'+FD(f.data)+'</td><td class="txt-r">'+R(f.val||0)+'</td></tr>';
-    }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--txt2);">Sem compras</td></tr>';
-  }
-  if(tbR){
-    tbR.innerHTML=recebs.map(function(p){
-      return '<tr><td>'+FD(p.data)+'</td><td class="txt-g">'+R(p.val||p.valor||0)+'</td></tr>';
-    }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--txt2);">Sem recebimentos</td></tr>';
-  }
-}
-
 function renderRecebPainel(){
   if(!rCli)return;
   var s=saldo(rCli.id);
   document.getElementById('r-nome').textContent=rCli.nome;
   document.getElementById('r-info').textContent=(rCli.cpf||'')+(rCli.tel?' · '+rCli.tel:'');
   document.getElementById('r-saldo').textContent=R(s.sd);
-  document.getElementById('r-tf').textContent=R(s.tf);document.getElementById('r-tp').textContent=R(s.tp);
-  var rv=document.getElementById('r-val'); if(rv) rv.value='';
-  renderMovimentacaoClienteReceb();
+  document.getElementById('r-tf').textContent=R(s.tf);
+  document.getElementById('r-tp').textContent=R(s.tp);
+  document.getElementById('r-val').value='';
+
+  var movimentos=[];
+
+  creditosValidos().filter(function(f){
+    return f.cid===rCli.id;
+  }).forEach(function(f){
+    movimentos.push({
+      tipo:'Compra',
+      data:f.data || f.createdAt || '',
+      descricao:f.desc || 'Compra no crediário',
+      valor:Number(f.val||0),
+      classe:'txt-r'
+    });
+  });
+
+  DB.get('pagamentos').filter(function(p){
+    return p && p.deletedAt!== '1' && p.cid===rCli.id;
+  }).forEach(function(p){
+    var forma = p.forma ? (' • ' + String(p.forma).toUpperCase()) : '';
+    movimentos.push({
+      tipo:'Recebimento',
+      data:p.data || p.createdAt || '',
+      descricao:'Pagamento'+forma,
+      valor:Number(p.val||p.valor||0),
+      classe:'txt-g'
+    });
+  });
+
+  movimentos.sort(function(a,b){
+    return new Date(b.data||0).getTime() - new Date(a.data||0).getTime();
+  });
+
+  document.getElementById('r-tb').innerHTML=movimentos.map(function(m){
+    return '<tr>'+
+      '<td>'+FD(m.data)+'</td>'+
+      '<td><b>'+m.tipo+'</b><br><span class="tm">'+m.descricao+'</span></td>'+
+      '<td class="'+m.classe+'">'+R(m.valor)+'</td>'+
+      '</tr>';
+  }).join('') || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem movimentação</td></tr>';
+
   document.getElementById('r-painel').style.display='block';
 }
 
