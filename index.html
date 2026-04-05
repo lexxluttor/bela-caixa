@@ -947,6 +947,30 @@ td{padding:8px 9px !important;font-size:12px !important;}
   </div>
 </div>
 
+
+<!-- MODAL ALERTA ATRASO CLIENTE -->
+<div class="ov" id="mo-atraso-cli">
+  <div class="md" style="max-width:520px;">
+    <div class="mh"><div class="mht">⚠️ Cliente em atraso</div><button class="mx" onclick="cancelarAlertaAtrasoCliente()">✕</button></div>
+    <div class="mb">
+      <div id="atraso-card" style="border-radius:14px;padding:16px;border:1px solid rgba(192,57,43,.35);background:rgba(192,57,43,.10);">
+        <div id="atraso-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;background:rgba(192,57,43,.15);color:var(--red);">Atraso superior a 30 dias</div>
+        <div id="atraso-msg" style="font-size:18px;font-weight:800;line-height:1.45;">Cliente com mais de 30 dias sem pagamento. Deseja continuar?</div>
+        <div class="g2" style="margin-top:14px;">
+          <div class="imp-box"><div class="fl">Cliente</div><div id="atraso-cliente" style="font-weight:800;font-size:15px;">—</div></div>
+          <div class="imp-box"><div class="fl">Último pagamento</div><div id="atraso-data" style="font-weight:800;font-size:15px;">—</div></div>
+          <div class="imp-box"><div class="fl">Dias sem pagamento</div><div id="atraso-dias" style="font-weight:900;font-size:18px;color:var(--red2);">—</div></div>
+          <div class="imp-box"><div class="fl">Saldo em aberto</div><div id="atraso-saldo" style="font-weight:900;font-size:18px;color:var(--red2);">R$ 0,00</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" onclick="cancelarAlertaAtrasoCliente()">Cancelar</button>
+      <button class="btn br" onclick="continuarAlertaAtrasoCliente()">Continuar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL PRODUTO -->
 <div class="ov" id="mo-prod">
   <div class="md">
@@ -4725,6 +4749,153 @@ document.addEventListener('DOMContentLoaded',function(){
     </div>
   </div>
 </div>
+
+
+<script>
+(function(){
+  var _atrasoCliPendente = null;
+
+  function toDateSafe(v){
+    var d = new Date(v || 0);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function fmtDataAtraso(v){
+    var d = toDateSafe(v);
+    return d ? FD(d.toISOString()) : '—';
+  }
+
+  function dadosAtrasoCliente(cli){
+    if(!cli || !cli.id || typeof saldo !== 'function') return null;
+
+    var saldoAberto = Number((saldo(cli.id) || {}).sd || 0);
+    if(saldoAberto <= 0) return null;
+
+    var pagamentos = (typeof pagamentosValidos === 'function' ? pagamentosValidos() : (DB.get('pagamentos')||[]))
+      .filter(function(p){
+        return p && !p.deletedAt && String(p.cid || '') === String(cli.id);
+      })
+      .sort(function(a,b){
+        return new Date(b.data || b.createdAt || 0).getTime() - new Date(a.data || a.createdAt || 0).getTime();
+      });
+
+    var creditos = (typeof creditosValidos === 'function' ? creditosValidos() : (DB.get('creditos')||[]))
+      .filter(function(c){
+        var st = String((c && c.status) || '').toLowerCase();
+        return c && !c.deletedAt && String(c.cid || '') === String(cli.id) && st !== 'pago' && st !== 'quitado' && st !== 'cancelado';
+      });
+
+    if(!creditos.length) return null;
+
+    var dataRef = '';
+    if(pagamentos.length){
+      dataRef = pagamentos[0].data || pagamentos[0].createdAt || '';
+    }else{
+      var maisAntigo = creditos.slice().sort(function(a,b){
+        return new Date(a.data || a.createdAt || 0).getTime() - new Date(b.data || b.createdAt || 0).getTime();
+      })[0];
+      dataRef = (maisAntigo && (maisAntigo.data || maisAntigo.createdAt)) || '';
+    }
+
+    var base = toDateSafe(dataRef);
+    if(!base) return null;
+
+    var hoje = new Date();
+    hoje.setHours(0,0,0,0);
+    base.setHours(0,0,0,0);
+    var dias = Math.floor((hoje.getTime() - base.getTime()) / 86400000);
+
+    if(dias <= 30) return null;
+
+    return {
+      cliente: cli,
+      dias: dias,
+      saldo: saldoAberto,
+      dataRef: dataRef
+    };
+  }
+
+  function preencherModalAtraso(info){
+    if(!info || !info.cliente) return;
+    var cli = info.cliente;
+    var elCliente = document.getElementById('atraso-cliente');
+    var elData = document.getElementById('atraso-data');
+    var elDias = document.getElementById('atraso-dias');
+    var elSaldo = document.getElementById('atraso-saldo');
+    var elMsg = document.getElementById('atraso-msg');
+    if(elCliente) elCliente.textContent = cli.nome || 'Cliente';
+    if(elData) elData.textContent = fmtDataAtraso(info.dataRef);
+    if(elDias) elDias.textContent = info.dias + ' dias';
+    if(elSaldo) elSaldo.textContent = R(info.saldo);
+    if(elMsg) elMsg.textContent = 'Cliente com mais de 30 dias sem pagamento. Deseja continuar a venda?';
+  }
+
+  window.continuarAlertaAtrasoCliente = function(){
+    _atrasoCliPendente = null;
+    if(typeof fMd === 'function') fMd('mo-atraso-cli');
+  };
+
+  window.cancelarAlertaAtrasoCliente = function(){
+    _atrasoCliPendente = null;
+    if(typeof fMd === 'function') fMd('mo-atraso-cli');
+    if(typeof remCli === 'function') remCli();
+  };
+
+  window.verificarAtrasoClienteVenda = function(cli){
+    var info = dadosAtrasoCliente(cli);
+    if(!info) return false;
+    _atrasoCliPendente = info;
+    preencherModalAtraso(info);
+    if(typeof abrirMd === 'function') abrirMd('mo-atraso-cli');
+    return true;
+  };
+
+  function tentarAbrirAtrasoDepoisDoLimite(){
+    if(!_atrasoCliPendente) return;
+    setTimeout(function(){
+      if(document.getElementById('mo-limite-cli') && document.getElementById('mo-limite-cli').classList.contains('on')) return;
+      preencherModalAtraso(_atrasoCliPendente);
+      if(typeof abrirMd === 'function') abrirMd('mo-atraso-cli');
+    }, 120);
+  }
+
+  if(typeof selecionarVCli === 'function'){
+    var _selecionarVCliOriginal = selecionarVCli;
+    window.selecionarVCli = function(cid){
+      _selecionarVCliOriginal.apply(this, arguments);
+      try{
+        var cli = (typeof vCli !== 'undefined' && vCli) ? vCli : (DB.get('clientes')||[]).find(function(x){ return String(x.id) === String(cid); });
+        var info = dadosAtrasoCliente(cli);
+        _atrasoCliPendente = info;
+        if(!info) return;
+        var limiteOn = !!(document.getElementById('mo-limite-cli') && document.getElementById('mo-limite-cli').classList.contains('on'));
+        if(limiteOn){
+          tentarAbrirAtrasoDepoisDoLimite();
+        }else{
+          preencherModalAtraso(info);
+          if(typeof abrirMd === 'function') abrirMd('mo-atraso-cli');
+        }
+      }catch(e){}
+    };
+  }
+
+  if(typeof continuarAlertaLimiteCliente === 'function'){
+    var _continuarLimiteOriginal = continuarAlertaLimiteCliente;
+    window.continuarAlertaLimiteCliente = function(){
+      _continuarLimiteOriginal.apply(this, arguments);
+      tentarAbrirAtrasoDepoisDoLimite();
+    };
+  }
+
+  if(typeof cancelarAlertaLimiteCliente === 'function'){
+    var _cancelarLimiteOriginal = cancelarAlertaLimiteCliente;
+    window.cancelarAlertaLimiteCliente = function(){
+      _atrasoCliPendente = null;
+      _cancelarLimiteOriginal.apply(this, arguments);
+    };
+  }
+})();
+</script>
 
 </body>
 </html>
