@@ -338,13 +338,54 @@ td{padding:8px 9px !important;font-size:12px !important;}
   margin-bottom:8px;
 }
 
-.mov-modal-tb td:last-child,
-.mov-modal-tb th:last-child{
+.r-pay-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top:8px;
+}
+.r-pay-actions .btn{
+  min-width:220px;
+  justify-content:center;
+}
+
+.mov-split{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  min-height:0;
+  flex:1;
+}
+.mov-col{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  background:var(--s2);
+  border:1px solid var(--bdr);
+  border-radius:10px;
+  overflow:hidden;
+}
+.mov-head{
+  padding:10px 12px;
+  font-size:12px;
+  font-weight:800;
+  color:var(--red2);
+  border-bottom:1px solid var(--bdr);
+  background:rgba(255,255,255,.35);
+}
+.mov-col .tw{
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  background:var(--s1);
+}
+.mov-col td:last-child,
+.mov-col th:last-child{
   text-align:right;
 }
-.mov-modal-tb .tm{
-  display:block;
-  margin-top:2px;
+@media (max-width: 1280px){
+  .mov-split{grid-template-columns:1fr;}
 }
 
 
@@ -534,14 +575,25 @@ td{padding:8px 9px !important;font-size:12px !important;}
         </div>
       </div>
       <div class="card">
-        <div class="ct">📋 Histórico de Crediário</div>
-        <div class="tw"><table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
-          <tbody id="r-tb"></tbody>
-        </table></div>
+        <div class="ct">📑 Movimentação do Cliente</div>
+        <div class="mov-split">
+          <div class="mov-col">
+            <div class="mov-head">🛍️ Compras</div>
+            <div class="tw"><table>
+              <thead><tr><th>Data</th><th>Valor</th></tr></thead>
+              <tbody id="r-mov-compras"></tbody>
+            </table></div>
+          </div>
+          <div class="mov-col">
+            <div class="mov-head">💵 Recebimentos</div>
+            <div class="tw"><table>
+              <thead><tr><th>Data</th><th>Valor</th></tr></thead>
+              <tbody id="r-mov-receb"></tbody>
+            </table></div>
+          </div>
+        </div>
       </div>
       <div class="card">
-        <div class="ct">💵 Registrar Pagamento</div>
         <div class="g2">
           <div class="fg"><label class="fl">Valor Pago (R$)</label><input class="fi" id="r-val" type="number" step="0.01" min="0.01" placeholder="0,00"></div>
           <div class="fg"><label class="fl">Forma de Pagamento</label>
@@ -553,11 +605,12 @@ td{padding:8px 9px !important;font-size:12px !important;}
             </select>
           </div>
           <div class="fg gc"><label class="fl">Observação</label><input class="fi" id="r-obs" placeholder="Opcional..."></div>
-        </div>
-        <div class="fr">
-          <button class="btn bg2" onclick="confirmarPag()">✅ Confirmar Pagamento</button>
-          <button class="btn bb sm" onclick="wppExtrato()">📱 Enviar Extrato WPP</button>
-          <button class="btn bh sm" onclick="abrirMovimentacoesCli()">📋 Movimentações</button>
+          <div class="fg gc">
+            <div class="fr r-pay-actions">
+              <button class="btn bg2" onclick="confirmarPag()">✅ Confirmar Pagamento</button>
+              <button class="btn bb" onclick="wppExtrato()">📲 Enviar Extrato WPP</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -943,6 +996,29 @@ td{padding:8px 9px !important;font-size:12px !important;}
     <div class="mf">
       <button class="btn bh" onclick="cancelarAlertaLimiteCliente()">Cancelar</button>
       <button class="btn br" onclick="continuarAlertaLimiteCliente()">Continuar</button>
+    </div>
+
+</div>
+
+<!-- MODAL ALERTA DE ATRASO -->
+<div class="ov" id="mo-atraso-cli">
+  <div class="md" style="max-width:520px;">
+    <div class="mh"><div class="mht">⚠️ Cliente com atraso</div><button class="mx" onclick="cancelarAlertaAtrasoCliente()">✕</button></div>
+    <div class="mb">
+      <div id="atraso-card" style="border-radius:14px;padding:16px;border:1px solid rgba(192,57,43,.35);background:rgba(192,57,43,.10);">
+        <div id="atraso-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;background:rgba(192,57,43,.15);color:var(--red);">Pagamento atrasado</div>
+        <div id="atraso-msg" style="font-size:18px;font-weight:800;line-height:1.45;">Cliente com mais de 30 dias sem pagamento. Deseja continuar?</div>
+        <div class="g2" style="margin-top:14px;">
+          <div class="imp-box"><div class="fl">Cliente</div><div id="atraso-cliente" style="font-weight:800;font-size:15px;">—</div></div>
+          <div class="imp-box"><div class="fl">Último pagamento</div><div id="atraso-data" style="font-weight:800;font-size:15px;">—</div></div>
+          <div class="imp-box"><div class="fl">Dias sem pagamento</div><div id="atraso-dias" style="font-weight:900;font-size:18px;color:var(--red2);">—</div></div>
+          <div class="imp-box"><div class="fl">Saldo em aberto</div><div id="atraso-saldo" style="font-weight:900;font-size:18px;color:var(--red2);">—</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" onclick="cancelarAlertaAtrasoCliente()">Cancelar</button>
+      <button class="btn br" onclick="continuarAlertaAtrasoCliente()">Continuar</button>
     </div>
   </div>
 </div>
@@ -1562,6 +1638,95 @@ function verificarLimiteClienteVenda(cli){
 function continuarAlertaLimiteCliente(){
   _limiteCliPendente=null;
   fMd('mo-limite-cli');
+}
+
+var _atrasoCliPendente=null;
+
+function pagamentosClienteValidos(cid){
+  return (DB.get('pagamentos')||[]).filter(function(p){
+    return p && !p.deletedAt && String(p.cid||'')===String(cid||'');
+  });
+}
+
+function creditosClienteEmAberto(cid){
+  return (DB.get('creditos')||[]).filter(function(c){
+    var st=String(c && (c.status||'aberto') || '').toLowerCase();
+    return c && !c.deletedAt && String(c.cid||'')===String(cid||'') && st!=='pago' && st!=='quitado' && st!=='cancelado';
+  });
+}
+
+function toDateSafe(v){
+  var d = new Date(v||0);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function diasEntreHoje(data){
+  var d = toDateSafe(data);
+  if(!d) return 0;
+  var hoje = new Date();
+  hoje.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  return Math.floor((hoje.getTime()-d.getTime())/86400000);
+}
+
+function dadosAtrasoCliente(cli){
+  if(!cli || !cli.id) return null;
+
+  var emAberto = creditosClienteEmAberto(cli.id);
+  var saldoAberto = saldo(cli.id).sd;
+
+  if(!emAberto.length || saldoAberto<=0) return null;
+
+  var pagamentos = pagamentosClienteValidos(cli.id).sort(function(a,b){
+    return new Date(b.data||b.createdAt||0).getTime() - new Date(a.data||a.createdAt||0).getTime();
+  });
+
+  var dataRef = '';
+  if(pagamentos.length){
+    dataRef = pagamentos[0].data || pagamentos[0].createdAt || '';
+  }else{
+    var maisAntigo = emAberto.slice().sort(function(a,b){
+      return new Date(a.data||a.createdAt||0).getTime() - new Date(b.data||b.createdAt||0).getTime();
+    })[0];
+    dataRef = (maisAntigo && (maisAntigo.data || maisAntigo.createdAt)) || '';
+  }
+
+  var dias = diasEntreHoje(dataRef);
+  if(dias <= 30) return null;
+
+  return {
+    cliente: cli,
+    saldo: saldoAberto,
+    dias: dias,
+    dataRef: dataRef
+  };
+}
+
+function verificarAtrasoClienteVenda(cli){
+  var info = dadosAtrasoCliente(cli);
+  if(!info) return false;
+
+  _atrasoCliPendente = cli;
+
+  document.getElementById('atraso-cliente').textContent = cli.nome || 'Cliente';
+  document.getElementById('atraso-data').textContent = FD(info.dataRef);
+  document.getElementById('atraso-dias').textContent = info.dias + ' dias';
+  document.getElementById('atraso-saldo').textContent = R(info.saldo);
+  document.getElementById('atraso-msg').textContent = 'Cliente com mais de 30 dias sem pagamento. Deseja continuar a venda?';
+
+  abrirMd('mo-atraso-cli');
+  return true;
+}
+
+function continuarAlertaAtrasoCliente(){
+  _atrasoCliPendente=null;
+  fMd('mo-atraso-cli');
+}
+
+function cancelarAlertaAtrasoCliente(){
+  _atrasoCliPendente=null;
+  fMd('mo-atraso-cli');
+  remCli();
 }
 function cancelarAlertaLimiteCliente(){
   _limiteCliPendente=null;
@@ -2436,6 +2601,7 @@ function selecionarVCli(cid){
     '<button class="btn bh sm" onclick="remCli()">✕ Remover</button>';
   }
   verificarLimiteClienteVenda(c);
+  verificarAtrasoClienteVenda(c);
 }
 function remCli(){
   vCli=null;
@@ -2686,6 +2852,29 @@ function selecionarRCli(cid){
   var c=DB.get('clientes').find(function(x){return x.id===cid;});if(!c)return;
   rCli=c;document.getElementById('r-sc').value=c.nome;document.getElementById('r-sg').innerHTML='';renderRecebPainel();
 }
+function renderMovimentacaoClienteReceb(){
+  if(!rCli)return;
+  var compras=(DB.get('creditos')||[])
+    .filter(function(f){return !f.deletedAt && f.cid===rCli.id;})
+    .sort(function(a,b){return new Date(b.data||b.createdAt||0)-new Date(a.data||a.createdAt||0);});
+  var recebs=(DB.get('pagamentos')||[])
+    .filter(function(p){return !p.deletedAt && p.cid===rCli.id;})
+    .sort(function(a,b){return new Date(b.data||b.createdAt||0)-new Date(a.data||a.createdAt||0);});
+
+  var tbC=document.getElementById('r-mov-compras');
+  var tbR=document.getElementById('r-mov-receb');
+  if(tbC){
+    tbC.innerHTML=compras.map(function(f){
+      return '<tr><td>'+FD(f.data)+'</td><td class="txt-r">'+R(f.val||0)+'</td></tr>';
+    }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--txt2);">Sem compras</td></tr>';
+  }
+  if(tbR){
+    tbR.innerHTML=recebs.map(function(p){
+      return '<tr><td>'+FD(p.data)+'</td><td class="txt-g">'+R(p.val||p.valor||0)+'</td></tr>';
+    }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--txt2);">Sem recebimentos</td></tr>';
+  }
+}
+
 function renderRecebPainel(){
   if(!rCli)return;
   var s=saldo(rCli.id);
@@ -2693,11 +2882,8 @@ function renderRecebPainel(){
   document.getElementById('r-info').textContent=(rCli.cpf||'')+(rCli.tel?' · '+rCli.tel:'');
   document.getElementById('r-saldo').textContent=R(s.sd);
   document.getElementById('r-tf').textContent=R(s.tf);document.getElementById('r-tp').textContent=R(s.tp);
-  document.getElementById('r-val').value='';
-  var crds=creditosValidos().filter(function(f){return f.cid===rCli.id;});
-  document.getElementById('r-tb').innerHTML=crds.map(function(f){
-    return '<tr><td>'+FD(f.data)+'</td><td>'+f.desc+'</td><td class="txt-r">'+R(f.val)+'</td></tr>';
-  }).join('')||'<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem crediário</td></tr>';
+  var rv=document.getElementById('r-val'); if(rv) rv.value='';
+  renderMovimentacaoClienteReceb();
   document.getElementById('r-painel').style.display='block';
 }
 
@@ -2725,86 +2911,6 @@ function wppExtrato(){
   var msg=tpl.replace(/{nome}/g,rCli.nome).replace(/{total_cred}/g,R(s.tf)).replace(/{total_pago}/g,R(s.tp)).replace(/{saldo}/g,R(s.sd));
   window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
 }
-
-function obterMovimentacoesCli(cid){
-  var movs = [];
-
-  var creditos = creditosValidos();
-  creditos.filter(function(f){
-    return String((f && f.cid) || '') === String(cid || '');
-  }).forEach(function(f){
-    movs.push({
-      tipo:'Compra',
-      data:f.data || f.createdAt || '',
-      descricao:f.desc || f.descricao || 'Compra no crediário',
-      valor:Number(f.val || f.valor || 0),
-      classe:'txt-r'
-    });
-  });
-
-  var pagamentos = pagamentosValidos();
-  pagamentos.filter(function(p){
-    return String((p && p.cid) || '') === String(cid || '');
-  }).forEach(function(p){
-    var forma = String(p.forma || p.forma_pagamento || '').trim();
-    var obs = String(p.obs || '').trim();
-    var desc = 'Pagamento';
-    if(forma) desc += ' • ' + forma.toUpperCase();
-    if(obs) desc += ' • ' + obs;
-    movs.push({
-      tipo:'Recebimento',
-      data:p.data || p.createdAt || '',
-      descricao:desc,
-      valor:Number(p.val || p.valor || 0),
-      classe:'txt-g'
-    });
-  });
-
-  movs.sort(function(a,b){
-    var ta = (typeof toMillis_==='function') ? toMillis_(a.data || 0) : new Date(a.data || 0).getTime();
-    var tb = (typeof toMillis_==='function') ? toMillis_(b.data || 0) : new Date(b.data || 0).getTime();
-    return tb - ta;
-  });
-
-  return movs;
-}
-
-function renderMovimentacoesCliModal(){
-  var tb = document.getElementById('mov-cli-tb');
-  var titulo = document.getElementById('mov-cli-titulo');
-  if(!tb || !titulo) return;
-
-  if(!rCli){
-    titulo.textContent = 'Movimentações';
-    tb.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Selecione um cliente</td></tr>';
-    return;
-  }
-
-  titulo.textContent = 'Movimentações — ' + (rCli.nome || '');
-
-  var movs = obterMovimentacoesCli(rCli.id);
-
-  tb.innerHTML = movs.map(function(m){
-    return '<tr>' +
-      '<td>' + FD(m.data) + '</td>' +
-      '<td><b>' + m.tipo + '</b><span class="tm">' + m.descricao + '</span></td>' +
-      '<td class="' + m.classe + '">' + R(m.valor) + '</td>' +
-    '</tr>';
-  }).join('') || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem movimentação</td></tr>';
-}
-
-function abrirMovimentacoesCli(){
-  if(!rCli){
-    toast('⚠️ Selecione um cliente!');
-    return;
-  }
-  renderMovimentacoesCliModal();
-  abrirMd('mo-mov-cli');
-}
-
-
-
-
 
 function renderCobranca(){
   var dias=parseInt(document.getElementById('inad-dias').value)||30;
@@ -4703,28 +4809,5 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 
 </script>
-
-<div class="ov" id="mo-mov-cli">
-  <div class="md wide">
-    <div class="mh">
-      <div class="mht" id="mov-cli-titulo">Movimentações</div>
-      <button class="mx" onclick="fMd('mo-mov-cli')">✕</button>
-    </div>
-    <div class="mb">
-      <div class="tw">
-        <table class="mov-modal-tb">
-          <thead>
-            <tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>
-          </thead>
-          <tbody id="mov-cli-tb"></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="mf">
-      <button class="btn bh" onclick="fMd('mo-mov-cli')">Fechar</button>
-    </div>
-  </div>
-</div>
-
 </body>
 </html>
