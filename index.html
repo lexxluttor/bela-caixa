@@ -338,6 +338,15 @@ td{padding:8px 9px !important;font-size:12px !important;}
   margin-bottom:8px;
 }
 
+.mov-modal-tb td:last-child,
+.mov-modal-tb th:last-child{
+  text-align:right;
+}
+.mov-modal-tb .tm{
+  display:block;
+  margin-top:2px;
+}
+
 
 
 /* ETIQUETAS */
@@ -525,7 +534,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
         </div>
       </div>
       <div class="card">
-        <div class="ct">📋 Movimentação do Cliente</div>
+        <div class="ct">📋 Histórico de Crediário</div>
         <div class="tw"><table>
           <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
           <tbody id="r-tb"></tbody>
@@ -548,6 +557,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
         <div class="fr">
           <button class="btn bg2" onclick="confirmarPag()">✅ Confirmar Pagamento</button>
           <button class="btn bb sm" onclick="wppExtrato()">📱 Enviar Extrato WPP</button>
+          <button class="btn bh sm" onclick="abrirMovimentacoesCli()">📋 Movimentações</button>
         </div>
       </div>
     </div>
@@ -2682,49 +2692,12 @@ function renderRecebPainel(){
   document.getElementById('r-nome').textContent=rCli.nome;
   document.getElementById('r-info').textContent=(rCli.cpf||'')+(rCli.tel?' · '+rCli.tel:'');
   document.getElementById('r-saldo').textContent=R(s.sd);
-  document.getElementById('r-tf').textContent=R(s.tf);
-  document.getElementById('r-tp').textContent=R(s.tp);
+  document.getElementById('r-tf').textContent=R(s.tf);document.getElementById('r-tp').textContent=R(s.tp);
   document.getElementById('r-val').value='';
-
-  var movimentos=[];
-
-  creditosValidos().filter(function(f){
-    return String(f.cid)===String(rCli.id);
-  }).forEach(function(f){
-    movimentos.push({
-      tipo:'Compra',
-      data:f.data || f.createdAt || '',
-      descricao:f.desc || 'Compra no crediário',
-      valor:Number(f.val||0),
-      classe:'txt-r'
-    });
-  });
-
-  DB.get('pagamentos').filter(function(p){
-    return p && p.deletedAt!=='1' && String(p.cid)===String(rCli.id);
-  }).forEach(function(p){
-    var forma = p.forma ? (' • ' + String(p.forma).toUpperCase()) : '';
-    movimentos.push({
-      tipo:'Recebimento',
-      data:p.data || p.createdAt || '',
-      descricao:'Pagamento'+forma,
-      valor:Number(p.val||p.valor||0),
-      classe:'txt-g'
-    });
-  });
-
-  movimentos.sort(function(a,b){
-    return new Date(b.data||0).getTime() - new Date(a.data||0).getTime();
-  });
-
-  document.getElementById('r-tb').innerHTML = movimentos.map(function(m){
-    return '<tr>' +
-      '<td>'+FD(m.data)+'</td>' +
-      '<td><b>'+m.tipo+'</b><br><span class="tm">'+m.descricao+'</span></td>' +
-      '<td class="'+m.classe+'">'+R(m.valor)+'</td>' +
-    '</tr>';
-  }).join('') || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem movimentação</td></tr>';
-
+  var crds=creditosValidos().filter(function(f){return f.cid===rCli.id;});
+  document.getElementById('r-tb').innerHTML=crds.map(function(f){
+    return '<tr><td>'+FD(f.data)+'</td><td>'+f.desc+'</td><td class="txt-r">'+R(f.val)+'</td></tr>';
+  }).join('')||'<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem crediário</td></tr>';
   document.getElementById('r-painel').style.display='block';
 }
 
@@ -2752,6 +2725,79 @@ function wppExtrato(){
   var msg=tpl.replace(/{nome}/g,rCli.nome).replace(/{total_cred}/g,R(s.tf)).replace(/{total_pago}/g,R(s.tp)).replace(/{saldo}/g,R(s.sd));
   window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
 }
+
+function obterMovimentacoesCli(cid){
+  var movs = [];
+
+  creditosValidos().filter(function(f){
+    return String((f && f.cid) || '') === String(cid || '');
+  }).forEach(function(f){
+    movs.push({
+      tipo:'Compra',
+      data:f.data || f.createdAt || '',
+      descricao:f.desc || 'Compra no crediário',
+      valor:Number(f.val || f.valor || 0),
+      classe:'txt-r'
+    });
+  });
+
+  pagamentosValidos().filter(function(p){
+    return String((p && p.cid) || '') === String(cid || '');
+  }).forEach(function(p){
+    var forma = String(p.forma || p.forma_pagamento || '').trim();
+    var obs = String(p.obs || '').trim();
+    var desc = 'Pagamento';
+    if(forma) desc += ' • ' + forma.toUpperCase();
+    if(obs) desc += ' • ' + obs;
+    movs.push({
+      tipo:'Recebimento',
+      data:p.data || p.createdAt || '',
+      descricao:desc,
+      valor:Number(p.val || p.valor || 0),
+      classe:'txt-g'
+    });
+  });
+
+  movs.sort(function(a,b){
+    return toMillis_(b.data || 0) - toMillis_(a.data || 0);
+  });
+
+  return movs;
+}
+
+function renderMovimentacoesCliModal(){
+  var tb = document.getElementById('mov-cli-tb');
+  var titulo = document.getElementById('mov-cli-titulo');
+  if(!tb || !titulo) return;
+
+  if(!rCli){
+    titulo.textContent = 'Movimentações';
+    tb.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Selecione um cliente</td></tr>';
+    return;
+  }
+
+  titulo.textContent = 'Movimentações — ' + (rCli.nome || '');
+
+  var movs = obterMovimentacoesCli(rCli.id);
+
+  tb.innerHTML = movs.map(function(m){
+    return '<tr>'+
+      '<td>'+FD(m.data)+'</td>'+
+      '<td><b>'+m.tipo+'</b><span class="tm">'+m.descricao+'</span></td>'+
+      '<td class="'+m.classe+'">'+R(m.valor)+'</td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem movimentação</td></tr>';
+}
+
+function abrirMovimentacoesCli(){
+  if(!rCli){
+    toast('⚠️ Selecione um cliente!');
+    return;
+  }
+  renderMovimentacoesCliModal();
+  abrirMd('mo-mov-cli');
+}
+
 
 function renderCobranca(){
   var dias=parseInt(document.getElementById('inad-dias').value)||30;
@@ -4650,5 +4696,28 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 
 </script>
+
+<div class="ov" id="mo-mov-cli">
+  <div class="md wide">
+    <div class="mh">
+      <div class="mht" id="mov-cli-titulo">Movimentações</div>
+      <button class="mx" onclick="fMd('mo-mov-cli')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="tw">
+        <table class="mov-modal-tb">
+          <thead>
+            <tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>
+          </thead>
+          <tbody id="mov-cli-tb"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" onclick="fMd('mo-mov-cli')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
