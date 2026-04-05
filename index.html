@@ -338,8 +338,49 @@ td{padding:8px 9px !important;font-size:12px !important;}
   margin-bottom:8px;
 }
 
+
+
+/* MOVIMENTAÇÃO DO CLIENTE */
+#r-mov-list{max-height:220px;overflow:auto;border:1px solid var(--bdr);border-radius:10px;background:var(--s1);}
+.r-mov-row{display:grid;grid-template-columns:72px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-bottom:1px solid var(--bdr);font-size:12px;}
+.r-mov-row:last-child{border-bottom:none;}
+.r-mov-date{color:var(--txt2);font-weight:700;}
+.r-mov-type{font-weight:800;}
+.r-mov-type.compra{color:var(--txt);}
+.r-mov-type.recebimento{color:var(--green);}
+.r-mov-value{font-weight:800;color:var(--red2);}
+.r-mov-empty{text-align:center;padding:16px;color:var(--txt2);font-size:12px;}
+
+
+/* ETIQUETAS */
+.etq-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.etq-search{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;}
+.etq-search .fi{max-width:360px;min-width:220px;}
+.etq-table input.fi{padding:6px 8px !important;font-size:12px !important;}
+.etq-preview{background:#fff;border:1px dashed var(--bdr);border-radius:10px;padding:14px;display:flex;justify-content:center;align-items:center;min-height:72mm;overflow:auto;}
+.etq-card{background:#fff;color:#111;border:1px solid #777;border-radius:0;padding:3mm;width:60mm;height:40mm;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;box-sizing:border-box;break-inside:avoid;page-break-inside:avoid;overflow:hidden;}
+.etq-brand{font-family:'Playfair Display',serif;font-size:9.5pt;font-weight:900;line-height:1.05;margin-bottom:1mm;}
+.etq-line{width:100%;border-top:1px solid #111;margin-bottom:2.2mm;}
+.etq-name{font-family:'Nunito',sans-serif;font-size:7.4pt;font-weight:900;line-height:1.1;min-height:8.5mm;display:flex;align-items:center;justify-content:center;max-width:100%;overflow:hidden;}
+.etq-ref{font-size:5.3pt;line-height:1.1;margin-top:.6mm;}
+.etq-price{font-family:'Nunito',sans-serif;font-size:16pt;font-weight:900;line-height:1;margin:1.8mm 0 1.2mm;}
+.etq-barcode-wrap{margin-top:auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:100%;}
+.etq-barcode{width:34mm;height:10mm;}
+.etq-code{font-size:5.7pt;letter-spacing:.5px;line-height:1;margin-top:.6mm;}
+#print-etiquetas{display:none;}
+#print-etiquetas .a4-grid{display:grid;grid-template-columns:repeat(3, 60mm);grid-auto-rows:40mm;gap:4mm;justify-content:center;padding:10mm;box-sizing:border-box;}
+@page{size:A4 portrait;margin:10mm;}
+@media print{
+  body{background:#fff !important;overflow:visible !important;}
+  .shell,#fkbar,.ov,#toast,#pz{display:none !important;}
+  #print-etiquetas{display:block !important;}
+  #print-etiquetas .a4-grid{display:grid !important;}
+  #print-etiquetas .etq-card{box-shadow:none !important;border:1px solid #777 !important;}
+}
+
 </style>
   <link rel="stylesheet" href="./app-enhancements.css">
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
 
@@ -503,6 +544,10 @@ td{padding:8px 9px !important;font-size:12px !important;}
         </table></div>
       </div>
       <div class="card">
+        <div class="ct">📑 Movimentação do Cliente</div>
+        <div id="r-mov-list"><div class="r-mov-empty">Selecione um cliente para visualizar a movimentação</div></div>
+      </div>
+      <div class="card">
         <div class="ct">💵 Registrar Pagamento</div>
         <div class="g2">
           <div class="fg"><label class="fl">Valor Pago (R$)</label><input class="fi" id="r-val" type="number" step="0.01" min="0.01" placeholder="0,00"></div>
@@ -572,6 +617,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
     <div class="fr">
       <button class="btn bb" onclick="abrirImportaXML()">📥 Importar XML</button>
       <button class="btn bh" onclick="abrirImportaFoto()">📷 Foto / PDF</button>
+      <button class="btn bb" onclick="abrirModalEtiquetas()">🏷️ Etiquetas</button>
       <button class="btn br" onclick="abrirMdProd(null)">➕ Novo Produto</button>
     </div>
   </div>
@@ -814,6 +860,53 @@ td{padding:8px 9px !important;font-size:12px !important;}
 </div>
 </div></div>
 
+
+<div class="ov" id="mo-etq">
+  <div class="md wide">
+    <div class="mh"><div class="mht">🏷️ Imprimir Etiquetas</div><button class="mx" onclick="fMd('mo-etq')">✕</button></div>
+    <div class="mb">
+      <div class="etq-actions" style="margin-bottom:10px;">
+        <div class="etq-search">
+          <input id="etq-busca" class="fi" placeholder="Digite o nome, ref ou código de barras do produto" oninput="buscarEtiquetasPorNome(this.value)">
+          <button class="btn bh sm" onclick="limparEtiquetas()">Limpar</button>
+        </div>
+        <span class="tm">A4 • etiqueta fixa 6x4 cm • escolha vários produtos e ajuste a quantidade por item</span>
+      </div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="fs" style="margin-bottom:8px;gap:10px;flex-wrap:wrap;">
+          <div class="ct" style="margin-bottom:0;">Resultados da busca</div>
+          <button class="btn bb sm" onclick="adicionarSelecionados()">Adicionar selecionados</button>
+        </div>
+        <div class="tw etq-table" style="max-height:240px;overflow:auto;">
+          <table>
+            <thead><tr><th style="width:50px;">Sel.</th><th>Produto</th><th>Ref</th><th>Preço</th><th style="width:120px;">Qtd.</th></tr></thead>
+            <tbody id="etq-busca-tb"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:10px;">
+        <div class="ct">Produtos selecionados</div>
+        <div class="tw etq-table" style="max-height:240px;overflow:auto;">
+          <table>
+            <thead><tr><th>Produto</th><th>Ref</th><th>Preço</th><th>Qtd. etiquetas</th><th>Ação</th></tr></thead>
+            <tbody id="etq-tb"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card" style="margin-bottom:0;">
+        <div class="ct">Prévia</div>
+        <div class="etq-preview" id="etq-preview"></div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" onclick="fMd('mo-etq')">Cancelar</button>
+      <button class="btn br" onclick="imprimirEtiquetasA4()">🖨️ Imprimir A4</button>
+    </div>
+  </div>
+</div>
+
+<div id="print-etiquetas"></div>
+
 <!-- MODAL CLIENTE -->
 <div class="ov" id="mo-cli">
   <div class="md">
@@ -869,17 +962,47 @@ td{padding:8px 9px !important;font-size:12px !important;}
       <div class="g2">
         <div class="fg"><label class="fl">Código / Ref *</label><input class="fi" id="prod-cod" placeholder="Ex: VF001"></div>
         <div class="fg"><label class="fl">Categoria</label>
-          <select class="fi" id="prod-cat">
-            <option>Vestidos</option><option>Blusas</option><option>Calças</option><option>Saias</option>
-            <option>Acessórios</option><option>Calçados</option><option>Lingerie</option><option>Outros</option>
-          </select>
+          <select class="fi" id="prod-cat"></select>
         </div>
-        <div class="fg gc"><label class="fl">Nome do Produto *</label><input class="fi" id="prod-nome" placeholder="Ex: Vestido Floral Rosa"></div>
+        <div class="fg gc"><label class="fl">Nome do Produto *</label><input class="fi" id="prod-nome" placeholder="Ex: Camisa Polo Masculina"></div>
         <div class="fg"><label class="fl">Preço de Venda (R$) *</label><input class="fi" id="prod-preco" type="number" step="0.01" min="0.01" placeholder="0,00"></div>
         <div class="fg"><label class="fl">Estoque</label><input class="fi" id="prod-estq" type="number" min="0" value="0"></div>
         <div class="fg"><label class="fl">Custo Compra (R$)</label><input class="fi" id="prod-custo" type="number" step="0.01" min="0" placeholder="0,00"></div>
         <div class="fg"><label class="fl">Código de Barras</label><input class="fi" id="prod-ean" placeholder="EAN"></div>
         <div class="fg"><label class="fl">NCM</label><input class="fi" id="prod-ncm" placeholder="NCM"></div>
+        <div class="fg gc" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn bh sm" onclick="aplicarPadraoFiscal()">Aplicar padrão fiscal</button>
+          <button type="button" class="btn bb sm" onclick="entradaManualSemXML()">Entrada manual s/ XML</button>
+        </div>
+        <div class="fg"><label class="fl">Origem</label>
+          <select class="fi" id="prod-origem">
+            <option value="0">0 - Nacional</option>
+            <option value="1">1 - Estrangeira importação direta</option>
+            <option value="2">2 - Estrangeira adquirida no mercado interno</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Unidade</label>
+          <select class="fi" id="prod-unidade">
+            <option value="UN">UN</option>
+            <option value="PAR">PAR</option>
+            <option value="PC">PC</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">CSOSN</label><input class="fi" id="prod-csosn" value="102" placeholder="102"></div>
+        <div class="fg"><label class="fl">CFOP</label><input class="fi" id="prod-cfop" value="5102" placeholder="5102"></div>
+        <div class="fg"><label class="fl">Escala</label>
+          <select class="fi" id="prod-escala">
+            <option value="S">S</option>
+            <option value="N">N</option>
+          </select>
+        </div>
+        <div class="fg"><label class="fl">Origem do estoque</label>
+          <select class="fi" id="prod-origem-estoque">
+            <option value="manual_sem_xml">Manual sem XML</option>
+            <option value="xml_nfe">Importado por XML</option>
+            <option value="saldo_inicial">Saldo inicial</option>
+          </select>
+        </div>
         <div class="fg gc"><label class="fl">Descrição / Obs</label><input class="fi" id="prod-desc2" placeholder="Tamanho, cor, material..."></div>
       </div>
     </div>
@@ -998,6 +1121,188 @@ td{padding:8px 9px !important;font-size:12px !important;}
 
 
 
+
+
+const CATEGORIAS_FISCAIS = [
+  "Tênis masculino","Tênis feminino","Chinelos","Sandálias","Botas","Sapatos","Sapatilhas",
+  "Camisa masculina","Camiseta masculina","Polo masculina","Calça masculina","Bermuda masculina","Jeans masculino","Jaqueta masculina",
+  "Blusa feminina","Camiseta feminina","Vestido","Saia","Calça feminina","Jeans feminino","Short feminino","Conjunto feminino","Jaqueta feminina",
+  "Bolsas","Mochilas","Cintos","Carteiras","Bonés",
+  "Acessórios","Outros"
+];
+
+const NCM_POR_CATEGORIA = {
+  "Tênis masculino": "64041100",
+  "Tênis feminino": "64041100",
+  "Chinelos": "64029990",
+  "Sandálias": "64029990",
+  "Botas": "64039190",
+  "Sapatos": "64035990",
+  "Sapatilhas": "64029990",
+  "Camisa masculina": "61051000",
+  "Camiseta masculina": "61091000",
+  "Polo masculina": "61051000",
+  "Calça masculina": "62034200",
+  "Bermuda masculina": "62034300",
+  "Jeans masculino": "62034200",
+  "Jaqueta masculina": "62019300",
+  "Blusa feminina": "61062000",
+  "Camiseta feminina": "61091000",
+  "Vestido": "62044300",
+  "Saia": "62045300",
+  "Calça feminina": "62046200",
+  "Jeans feminino": "62046200",
+  "Short feminino": "62046300",
+  "Conjunto feminino": "61042300",
+  "Jaqueta feminina": "62029300",
+  "Bolsas": "42022210",
+  "Mochilas": "42029200",
+  "Cintos": "42033000",
+  "Carteiras": "42023100",
+  "Bonés": "65050000",
+  "Acessórios": "",
+  "Outros": ""
+};
+
+const REF_POR_CATEGORIA = {
+  "Tênis masculino": "TENM",
+  "Tênis feminino": "TENF",
+  "Chinelos": "CHI",
+  "Sandálias": "SAN",
+  "Botas": "BOT",
+  "Sapatos": "SAP",
+  "Sapatilhas": "SAT",
+  "Camisa masculina": "CAM",
+  "Camiseta masculina": "CMM",
+  "Polo masculina": "POL",
+  "Calça masculina": "CALM",
+  "Bermuda masculina": "BERM",
+  "Jeans masculino": "JEM",
+  "Jaqueta masculina": "JAM",
+  "Blusa feminina": "BLU",
+  "Camiseta feminina": "CMF",
+  "Vestido": "VES",
+  "Saia": "SAI",
+  "Calça feminina": "CALF",
+  "Jeans feminino": "JEF",
+  "Short feminino": "SHO",
+  "Conjunto feminino": "CON",
+  "Jaqueta feminina": "JAF",
+  "Bolsas": "BOL",
+  "Mochilas": "MOC",
+  "Cintos": "CIN",
+  "Carteiras": "CAR",
+  "Bonés": "BON",
+  "Acessórios": "ACE",
+  "Outros": "PRO"
+};
+
+
+function categoriaEhCalcado(cat){
+  return ["Tênis masculino","Tênis feminino","Chinelos","Sandálias","Botas","Sapatos","Sapatilhas"].indexOf(cat) >= 0;
+}
+
+function sugerirCategoriaPorNome(nome){
+  var n = String(nome||'').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g,'')
+    .replace(/\s+/g,' ').trim();
+  if(!n) return '';
+
+  if(n.includes('tenis feminino')) return 'Tênis feminino';
+  if(n.includes('tenis masculino')) return 'Tênis masculino';
+  if(n.includes('chinelo')) return 'Chinelos';
+  if(n.includes('sandalia')) return 'Sandálias';
+  if(n.includes('bota')) return 'Botas';
+  if(n.includes('sapato')) return 'Sapatos';
+  if(n.includes('sapatilha')) return 'Sapatilhas';
+  if(n.includes('bolsa')) return 'Bolsas';
+  if(n.includes('mochila')) return 'Mochilas';
+  if(n.includes('cinto')) return 'Cintos';
+  if(n.includes('carteira')) return 'Carteiras';
+  if(n.includes('bone')) return 'Bonés';
+  if(n.includes('vestido')) return 'Vestido';
+  if(n.includes('saia')) return 'Saia';
+  if(n.includes('blusa')) return 'Blusa feminina';
+  if(n.includes('camisa')) return 'Camisa masculina';
+  if(n.includes('polo')) return 'Polo masculina';
+  if(n.includes('camiseta feminina') || n.includes('baby look')) return 'Camiseta feminina';
+  if(n.includes('camiseta masculina')) return 'Camiseta masculina';
+  if(n.includes('jaqueta feminina')) return 'Jaqueta feminina';
+  if(n.includes('jaqueta masculina')) return 'Jaqueta masculina';
+  if(n.includes('bermuda')) return 'Bermuda masculina';
+  if(n.includes('short')) return 'Short feminino';
+  if(n.includes('calca feminina') || n.includes('legging')) return 'Calça feminina';
+  if(n.includes('calca masculina')) return 'Calça masculina';
+  if(n.includes('jeans')) return 'Jeans feminino';
+  return '';
+}
+
+function sugerirCategoriaAutomaticamente(){
+  var nomeEl = document.getElementById('prod-nome');
+  var catEl = document.getElementById('prod-cat');
+  if(!nomeEl || !catEl) return;
+  if(catEl.dataset.manualCategory === '1') return;
+  var sugerida = sugerirCategoriaPorNome(nomeEl.value);
+  if(!sugerida) return;
+  catEl.value = sugerida;
+  catEl.dataset.autoCategory = sugerida;
+  preencherNcmPorCategoria();
+  aplicarPadraoFiscal();
+}
+
+function preencherNcmPorCategoria(){
+  var catEl = document.getElementById('prod-cat');
+  var ncmEl = document.getElementById('prod-ncm');
+  if(!catEl || !ncmEl) return;
+  var ncm = NCM_POR_CATEGORIA[catEl.value] || '';
+  if(ncm) ncmEl.value = ncm;
+}
+
+function aplicarPadraoFiscal(){
+  var cat = (document.getElementById('prod-cat') || {}).value || '';
+  if(document.getElementById('prod-origem')) document.getElementById('prod-origem').value = '0';
+  if(document.getElementById('prod-unidade')) document.getElementById('prod-unidade').value = categoriaEhCalcado(cat) ? 'PAR' : 'UN';
+  if(document.getElementById('prod-csosn')) document.getElementById('prod-csosn').value = '102';
+  if(document.getElementById('prod-cfop')) document.getElementById('prod-cfop').value = '5102';
+  if(document.getElementById('prod-escala')) document.getElementById('prod-escala').value = 'S';
+  preencherNcmPorCategoria();
+}
+
+function entradaManualSemXML(){
+  aplicarPadraoFiscal();
+  if(document.getElementById('prod-origem-estoque')) document.getElementById('prod-origem-estoque').value = 'manual_sem_xml';
+}
+
+function preencherCategoriasProduto(){
+  var sel = document.getElementById('prod-cat');
+  if(!sel) return;
+  var atual = sel.value;
+  sel.innerHTML = CATEGORIAS_FISCAIS.map(function(cat){
+    return '<option value="' + cat + '">' + cat + '</option>';
+  }).join('');
+  sel.value = atual && CATEGORIAS_FISCAIS.indexOf(atual) >= 0 ? atual : 'Vestido';
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  preencherCategoriasProduto();
+  var sel = document.getElementById('prod-cat');
+  var nomeEl = document.getElementById('prod-nome');
+  if(sel){
+    sel.addEventListener('change', function(){
+      sel.dataset.manualCategory = '1';
+      preencherNcmPorCategoria();
+      aplicarPadraoFiscal();
+    });
+  }
+  if(nomeEl){
+    nomeEl.addEventListener('input', function(){
+      sugerirCategoriaAutomaticamente();
+    });
+    nomeEl.addEventListener('blur', function(){
+      sugerirCategoriaAutomaticamente();
+    });
+  }
+});
 
 var TEMAS={
   vinho:{'--bg':'#f5f0f2','--s1':'#fff','--s2':'#f0eaec','--txt':'#2c0a14','--txt2':'#7a4050','--bdr':'#d4b0b8','--red':'#9c1b3e','--red2':'#c0392b','--green':'#27ae60','--blue':'#2980b9','--gold':'#c0392b','--glow':'rgba(192,57,43,.15)','--sb-bg':'linear-gradient(180deg,#3b0a1e,#1a0509)'},
@@ -1445,6 +1750,7 @@ function renderProds(){
       '<td class="txt-go">'+R(p.preco)+'</td>'+
       '<td>'+(p.estq||0)+'</td>'+
       '<td><span style="display:flex;gap:4px;">'+
+        '<button class="btn bb xs" onclick="abrirModalEtiquetas(\''+p.id+'\')">🏷️</button>'+
         '<button class="btn bh xs" onclick="abrirMdProd(\''+p.id+'\')">✏️</button>'+
         '<button class="btn bd2 xs" onclick="delProd(\''+p.id+'\')">🗑️</button>'+
       '</span></td></tr>';
@@ -1452,47 +1758,346 @@ function renderProds(){
   document.getElementById('p-tb').innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto cadastrado</td></tr>';
 }
 function abrirMdProd(id){
+  preencherCategoriasProduto();
+  var catElCtrl = document.getElementById('prod-cat');
+  if(catElCtrl){
+    catElCtrl.dataset.manualCategory = id ? '1' : '';
+    catElCtrl.dataset.autoCategory = '';
+  }
   document.getElementById('mo-prod-t').textContent=id?'Editar Produto':'Novo Produto';
   document.getElementById('prod-id').value=id||'';
   if(id){var p=DB.get('produtos').find(function(x){return x.id===id;});
     document.getElementById('prod-cod').value=p.cod||'';document.getElementById('prod-nome').value=p.nome||'';
-    document.getElementById('prod-cat').value=p.cat||'Vestidos';document.getElementById('prod-preco').value=p.preco||'';
+    document.getElementById('prod-cat').value=p.cat||'Vestido';document.getElementById('prod-preco').value=p.preco||'';
     document.getElementById('prod-estq').value=p.estq||0;document.getElementById('prod-desc2').value=p.desc2||'';
     document.getElementById('prod-custo').value=p.custo!=null?p.custo:'';
     document.getElementById('prod-ean').value=p.ean||'';
     document.getElementById('prod-ncm').value=p.ncm||'';
-  }else{['prod-cod','prod-nome','prod-preco','prod-desc2','prod-custo','prod-ean','prod-ncm'].forEach(function(i){document.getElementById(i).value='';});
-    document.getElementById('prod-estq').value=0;document.getElementById('prod-cat').value='Vestidos';}
+    document.getElementById('prod-origem').value=p.origem||'0';
+    document.getElementById('prod-unidade').value=p.unidade||(categoriaEhCalcado(p.cat||'')?'PAR':'UN');
+    document.getElementById('prod-csosn').value=p.csosn||'102';
+    document.getElementById('prod-cfop').value=p.cfop||'5102';
+    document.getElementById('prod-escala').value=p.escala||'S';
+    document.getElementById('prod-origem-estoque').value=p.origem_estoque||'manual_sem_xml';
+  }else{
+    ['prod-cod','prod-nome','prod-preco','prod-desc2','prod-custo','prod-ean','prod-ncm'].forEach(function(i){document.getElementById(i).value='';});
+    document.getElementById('prod-estq').value=0;
+    document.getElementById('prod-cat').value='Vestido';
+    document.getElementById('prod-origem').value='0';
+    document.getElementById('prod-unidade').value='UN';
+    document.getElementById('prod-csosn').value='102';
+    document.getElementById('prod-cfop').value='5102';
+    document.getElementById('prod-escala').value='S';
+    document.getElementById('prod-origem-estoque').value='manual_sem_xml';
+    aplicarPadraoFiscal();
+  }
   abrirMd('mo-prod');
+}
+function calcEAN13CheckDigit(base12){
+  var nums=String(base12||'').replace(/\D/g,'').slice(0,12).split('').map(function(n){return parseInt(n,10)||0;});
+  while(nums.length<12) nums.unshift(0);
+  var sum=0;
+  for(var i=0;i<12;i++) sum += nums[i] * (i%2===0 ? 1 : 3);
+  return String((10 - (sum % 10)) % 10);
+}
+function gerarEANInternoUnico(produtos, ignorarId){
+  var usados=new Set((produtos||[])
+    .filter(function(p){ return !ignorarId || String(p.id)!==String(ignorarId); })
+    .map(function(p){ return String(p.ean||'').replace(/\D/g,''); })
+    .filter(Boolean));
+  var prefixo='7899900';
+  var maior=0;
+  usados.forEach(function(ean){
+    if(ean.length===13 && ean.indexOf(prefixo)===0){
+      var seq=parseInt(ean.slice(prefixo.length, 12),10);
+      if(!isNaN(seq) && seq>maior) maior=seq;
+    }
+  });
+  for(var tentativa=maior+1; tentativa<99999; tentativa++){
+    var base12=prefixo + String(tentativa).padStart(12-prefixo.length,'0');
+    var ean=base12 + calcEAN13CheckDigit(base12);
+    if(!usados.has(ean)) return ean;
+  }
+  return '';
+}
+
+function gerarReferenciaAutomatica(produtos, categoria, ignorarId){
+  var prefixo = REF_POR_CATEGORIA[categoria] || 'PRO';
+  var usados = new Set((produtos||[])
+    .filter(function(p){ return !ignorarId || String(p.id)!==String(ignorarId); })
+    .map(function(p){ return String(p.cod||'').trim().toUpperCase(); })
+    .filter(Boolean));
+  for(var numero=1; numero<10000; numero++){
+    var ref = prefixo + '-' + String(numero).padStart(4,'0');
+    if(!usados.has(ref)) return ref;
+  }
+  return prefixo + '-' + String(Date.now()).slice(-4);
 }
 function salvarProd(){
   var cod=document.getElementById('prod-cod').value.trim();
   var nome=document.getElementById('prod-nome').value.trim();
   var preco=parseFloat(document.getElementById('prod-preco').value);
-  if(!cod||!nome||!preco){toast('⚠️ Código, nome e preço são obrigatórios!');return;}
+  if(!nome||!preco){toast('⚠️ Nome e preço são obrigatórios!');return;}
   var id=document.getElementById('prod-id').value||DB.uid();
   var list=DB.get('produtos');
   var atual=list.find(function(p){return p.id===id;})||{};
+  var categoria=document.getElementById('prod-cat').value;
+  var origemEstoque=document.getElementById('prod-origem-estoque').value;
+  var codInformado=cod;
+  var codFinal=codInformado || atual.cod || '';
+
+  if(!codFinal){
+    codFinal=gerarReferenciaAutomatica(list, categoria, id);
+  }
+
+  var duplicadoCod=list.find(function(p){
+    return String(p.id)!==String(id) && String(p.cod||'').trim().toUpperCase()===String(codFinal).trim().toUpperCase();
+  });
+  if(duplicadoCod){toast('⚠️ Já existe outro produto com esta referência!');return;}
+
+  var eanInformado=document.getElementById('prod-ean').value.trim();
+  var eanFinal=eanInformado || atual.ean || '';
+
+  if(!eanFinal && origemEstoque==='manual_sem_xml'){
+    eanFinal=gerarEANInternoUnico(list, id);
+  }
+
+  if(eanFinal){
+    var duplicadoEAN=list.find(function(p){
+      return String(p.id)!==String(id) && String(p.ean||'').replace(/\D/g,'')===String(eanFinal).replace(/\D/g,'');
+    });
+    if(duplicadoEAN){toast('⚠️ Já existe outro produto com este código de barras!');return;}
+  }
+
   var obj={
     id:id,
-    cod:cod,
+    cod:codFinal,
     nome:nome,
     cat:document.getElementById('prod-cat').value,
     preco:preco,
     estq:parseInt(document.getElementById('prod-estq').value)||0,
     desc2:document.getElementById('prod-desc2').value,
     custo:parseFloat(document.getElementById('prod-custo').value)||0,
-    ean:document.getElementById('prod-ean').value.trim(),
+    ean:eanFinal,
     ncm:document.getElementById('prod-ncm').value.trim(),
+    origem:document.getElementById('prod-origem').value,
+    unidade:document.getElementById('prod-unidade').value,
+    csosn:document.getElementById('prod-csosn').value.trim()||'102',
+    cfop:document.getElementById('prod-cfop').value.trim()||'5102',
+    escala:document.getElementById('prod-escala').value,
+    origem_estoque:origemEstoque,
     createdAt:atual.createdAt||nowLocalISO(),
     updatedAt:nowLocalISO()
   };
   var idx=list.findIndex(function(p){return p.id===id;});
   if(idx>=0)list[idx]=Object.assign({}, atual, obj);else list.push(obj);
-  DB.set('produtos',list);fMd('mo-prod');renderProds();renderPGrid();
-  toast('✅ Produto salvo!','ok');
+  DB.set('produtos',list);
+  document.getElementById('prod-cod').value=codFinal;
+  document.getElementById('prod-ean').value=eanFinal;
+  fMd('mo-prod');renderProds();renderPGrid();
+  var gerouRef = !codInformado && !!codFinal;
+  var gerouEan = !eanInformado && origemEstoque==='manual_sem_xml' && !!eanFinal;
+  var msg = '✅ Produto salvo!';
+  if(gerouRef && gerouEan) msg = '✅ Produto salvo com referência e código de barras automáticos!';
+  else if(gerouRef) msg = '✅ Produto salvo com referência automática!';
+  else if(gerouEan) msg = '✅ Produto salvo com código de barras interno!';
+  toast(msg,'ok');
 }
 function delProd(id){if(!confirm('Excluir produto?'))return;DB.set('produtos',DB.get('produtos').filter(function(p){return p.id!==id;}));renderProds();renderPGrid();toast('🗑️ Excluído!');}
+
+
+var etiquetasSelecao=[];
+var etqBuscaLista=[];
+
+function getProdutosFiltradosLista(){
+  var q=((document.getElementById('p-sc')||{}).value||'').toLowerCase();
+  return (DB.get('produtos')||[]).filter(function(p){
+    return !q || String(p.nome||'').toLowerCase().includes(q) || String(p.cod||'').toLowerCase().includes(q);
+  });
+}
+
+function getEtiquetaSearchResults(q){
+  q=String(q||'').trim().toLowerCase();
+  var lista=(DB.get('produtos')||[]).filter(function(p){
+    if(!q) return true;
+    return String(p.nome||'').toLowerCase().includes(q) ||
+           String(p.cod||'').toLowerCase().includes(q) ||
+           String(p.ean||'').toLowerCase().includes(q);
+  });
+  lista.sort(function(a,b){ return String(a.nome||'').localeCompare(String(b.nome||''),'pt-BR'); });
+  return lista.slice(0,120);
+}
+
+function buscarEtiquetasPorNome(q){
+  etqBuscaLista = getEtiquetaSearchResults(q);
+  renderEtiquetaBusca();
+}
+
+function carregarEtiquetasDeProdutos(prods, limparAntes){
+  if(limparAntes!==false) etiquetasSelecao=[];
+  var mapa=new Map(etiquetasSelecao.map(function(i){ return [String(i.pid), i]; }));
+  (prods||[]).forEach(function(p){
+    if(!p || !p.id) return;
+    if(!mapa.has(String(p.id))) mapa.set(String(p.id), {pid:String(p.id), qty:1});
+  });
+  etiquetasSelecao=Array.from(mapa.values());
+  renderEtiquetaModal();
+}
+
+function abrirModalEtiquetas(pid){
+  if(pid){
+    var p=(DB.get('produtos')||[]).find(function(x){ return String(x.id)===String(pid); });
+    etiquetasSelecao = p ? [{pid:String(p.id), qty:1}] : [];
+  }else{
+    etiquetasSelecao = [];
+  }
+  var busca=document.getElementById('etq-busca');
+  if(busca) busca.value='';
+  etqBuscaLista = getEtiquetaSearchResults('');
+  renderEtiquetaBusca();
+  renderEtiquetaModal();
+  abrirMd('mo-etq');
+  setTimeout(function(){ var b=document.getElementById('etq-busca'); if(b) b.focus(); }, 80);
+}
+
+function limparEtiquetas(){
+  etiquetasSelecao=[];
+  var busca=document.getElementById('etq-busca');
+  if(busca) busca.value='';
+  etqBuscaLista = getEtiquetaSearchResults('');
+  renderEtiquetaBusca();
+  renderEtiquetaModal();
+}
+
+function adicionarSelecionados(){
+  var checks=document.querySelectorAll('#etq-busca-tb .etq-add-check:checked');
+  if(!checks.length){ toast('⚠️ Selecione pelo menos um produto.'); return; }
+  var mapa=new Map(etiquetasSelecao.map(function(i){ return [String(i.pid), {pid:String(i.pid), qty:Number(i.qty||0)}]; }));
+  checks.forEach(function(ch){
+    var tr=ch.closest('tr');
+    if(!tr) return;
+    var pid=String(tr.getAttribute('data-id')||'');
+    var inp=tr.querySelector('.etq-add-qty');
+    var qtd=Math.max(1, parseInt((inp&&inp.value)||1,10)||1);
+    if(mapa.has(pid)){
+      mapa.get(pid).qty += qtd;
+    }else{
+      mapa.set(pid, {pid:pid, qty:qtd});
+    }
+  });
+  etiquetasSelecao=Array.from(mapa.values());
+  renderEtiquetaModal();
+  renderEtiquetaBusca();
+}
+
+function renderEtiquetaBusca(){
+  var tb=document.getElementById('etq-busca-tb');
+  if(!tb) return;
+  var selecionados=new Set(etiquetasSelecao.map(function(i){ return String(i.pid); }));
+  tb.innerHTML=(etqBuscaLista||[]).map(function(p){
+    var ja=selecionados.has(String(p.id));
+    return '<tr data-id="'+escaparHtml(String(p.id))+'">'+
+      '<td><input type="checkbox" class="etq-add-check" '+(ja?'disabled':'')+'></td>'+
+      '<td>'+escaparHtml(p.nome||'')+(ja?' <span class="tm">(já adicionado)</span>':'')+'</td>'+
+      '<td>'+escaparHtml(p.cod||'')+'</td>'+
+      '<td>'+R(Number(p.preco||0))+'</td>'+
+      '<td><input class="fi etq-add-qty" type="number" min="1" step="1" value="1" style="width:80px;" '+(ja?'disabled':'')+'></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--txt2);">Nenhum produto encontrado</td></tr>';
+}
+
+function removerEtiquetaItem(pid){
+  etiquetasSelecao = etiquetasSelecao.filter(function(i){ return String(i.pid)!==String(pid); });
+  renderEtiquetaModal();
+}
+
+function atualizarQtdEtiqueta(pid, val){
+  var n=parseInt(val,10);
+  if(!isFinite(n) || n<0) n=0;
+  etiquetasSelecao = etiquetasSelecao.map(function(i){
+    return String(i.pid)===String(pid) ? {pid:i.pid, qty:n} : i;
+  });
+  renderEtiquetaModal();
+}
+
+function escaparHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]; });
+}
+
+function etiquetaCardHTML(p, idx){
+  var preco = 'R$ ' + Number(p.preco||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
+  var ref = p.cod || '';
+  var code = String(p.ean||p.cod||'').replace(/\s+/g,'');
+  return '<div class="etq-card">'+
+    '<div class="etq-brand">Bela Modas</div>'+
+    '<div class="etq-line"></div>'+
+    '<div class="etq-name">'+escaparHtml(p.nome||'')+'</div>'+
+    '<div class="etq-ref">Ref: '+escaparHtml(ref)+'</div>'+
+    '<div class="etq-price">'+escaparHtml(preco)+'</div>'+
+    '<div class="etq-barcode-wrap">'+
+      '<svg class="etq-barcode" id="etq-bar-'+idx+'" data-code="'+escaparHtml(code)+'"></svg>'+
+      '<div class="etq-code">'+escaparHtml(code)+'</div>'+
+    '</div>'+
+  '</div>';
+}
+
+function renderBarcodeSvgs(root){
+  if(typeof JsBarcode==='undefined') return;
+  (root||document).querySelectorAll('.etq-barcode').forEach(function(svg){
+    var code=String(svg.getAttribute('data-code')||'').replace(/\D/g,'');
+    if(!code) code='000000000000';
+    try{
+      if(code.length===13){
+        JsBarcode(svg, code, {format:'EAN13', displayValue:false, margin:0, width:0.9, height:26});
+      }else{
+        JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:0.8, height:26});
+      }
+    }catch(e){
+      try{ JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:0.75, height:26}); }catch(_e){}
+    }
+  });
+}
+
+function renderEtiquetaModal(){
+  var tb=document.getElementById('etq-tb');
+  var pv=document.getElementById('etq-preview');
+  if(!tb || !pv) return;
+  var prods=DB.get('produtos')||[];
+  var itens=etiquetasSelecao.map(function(i){
+    var p=prods.find(function(x){ return String(x.id)===String(i.pid); });
+    return p ? {prod:p, qty:Number(i.qty||0)} : null;
+  }).filter(Boolean);
+  tb.innerHTML = itens.map(function(it){
+    var p=it.prod;
+    return '<tr>'+
+      '<td>'+escaparHtml(p.nome||'')+'</td>'+
+      '<td>'+escaparHtml(p.cod||'')+'</td>'+
+      '<td>'+R(Number(p.preco||0))+'</td>'+
+      '<td><input class="fi" type="number" min="0" step="1" value="'+it.qty+'" style="width:90px;" oninput="atualizarQtdEtiqueta(\''+p.id+'\', this.value)"></td>'+
+      '<td><button class="btn bd2 xs" onclick="removerEtiquetaItem(\''+p.id+'\')">✕</button></td>'+
+    '</tr>';
+  }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--txt2);">Nenhum produto selecionado</td></tr>';
+
+  var primeiro = itens.find(function(it){ return it.qty>0; });
+  pv.innerHTML = primeiro ? etiquetaCardHTML(primeiro.prod, 0) : '<div class="tm">Selecione pelo menos um produto para visualizar a etiqueta.</div>';
+  renderBarcodeSvgs(pv);
+}
+
+function imprimirEtiquetasA4(){
+  var prods=DB.get('produtos')||[];
+  var lista=[];
+  etiquetasSelecao.forEach(function(it){
+    var p=prods.find(function(x){ return String(x.id)===String(it.pid); });
+    var qtd=Math.max(0, parseInt(it.qty,10)||0);
+    if(!p || !qtd) return;
+    for(var i=0;i<qtd;i++) lista.push(p);
+  });
+  if(!lista.length){ toast('⚠️ Selecione pelo menos uma etiqueta para imprimir.'); return; }
+  var host=document.getElementById('print-etiquetas');
+  host.innerHTML='<div class="a4-grid">'+lista.map(function(p, idx){ return etiquetaCardHTML(p, idx); }).join('')+'</div>';
+  renderBarcodeSvgs(host);
+  setTimeout(function(){ window.print(); }, 120);
+}
 
 // VENDA
 var cart=[],vCli=null,vForma='dinheiro',vDesconto=0;
@@ -1761,6 +2366,12 @@ function confirmarImportacaoXML(){
       if(it.ean) p.ean = it.ean;
       if(it.desc2) p.desc2 = it.desc2;
       if(Number(it.precoVenda||0) > 0) p.preco = Number(it.precoVenda||0);
+      p.origem = p.origem || '0';
+      p.unidade = p.unidade || (categoriaEhCalcado(p.cat||it.cat||'') ? 'PAR' : 'UN');
+      p.csosn = p.csosn || '102';
+      p.cfop = p.cfop || '5102';
+      p.escala = p.escala || 'S';
+      p.origem_estoque = 'xml_nfe';
       p.updatedAt = agora;
       produtos[idx] = p;
     }else{
@@ -1774,7 +2385,13 @@ function confirmarImportacaoXML(){
         desc2: it.desc2 || '',
         custo: Number(it.custo||0),
         ean: it.ean || '',
-        ncm: it.ncm || '',
+        ncm: it.ncm || (NCM_POR_CATEGORIA[it.cat || ''] || ''),
+        origem: '0',
+        unidade: categoriaEhCalcado(it.cat||'') ? 'PAR' : 'UN',
+        csosn: '102',
+        cfop: '5102',
+        escala: 'S',
+        origem_estoque: 'xml_nfe',
         createdAt: agora,
         updatedAt: agora
       });
@@ -2070,6 +2687,34 @@ function buscaRCli(){
       '<span style="font-weight:800;color:'+(sd>0.01?'var(--red2)':'#2ecc71')+'">'+R(sd)+'</span></div>';
   }).join('')||(q?'<div class="tm" style="padding:6px 0;">Nenhum encontrado</div>':'');
 }
+
+function movimentacaoCliente(cid){
+  var vendas=(DB.get('vendas')||[]).filter(function(v){return !v.deletedAt && String(v.cid||'')===String(cid);});
+  var pagamentos=(DB.get('pagamentos')||[]).filter(function(p){return !p.deletedAt && String(p.cid||'')===String(cid);});
+  var mov=[];
+  vendas.forEach(function(v){
+    mov.push({tipo:'Compra',valor:Number(v.total||0),data:v.data||v.createdAt||v.updatedAt||''});
+  });
+  pagamentos.forEach(function(p){
+    mov.push({tipo:'Recebimento',valor:Number(p.val!=null?p.val:(p.valor||0)),data:p.data||p.createdAt||p.updatedAt||''});
+  });
+  mov.sort(function(a,b){ return new Date(a.data||0)-new Date(b.data||0); });
+  return mov;
+}
+function renderMovimentacaoReceb(){
+  var el=document.getElementById('r-mov-list'); if(!el) return;
+  if(!rCli){ el.innerHTML='<div class="r-mov-empty">Selecione um cliente para visualizar a movimentação</div>'; return; }
+  var lista=movimentacaoCliente(rCli.id);
+  if(!lista.length){ el.innerHTML='<div class="r-mov-empty">Nenhuma movimentação encontrada</div>'; return; }
+  el.innerHTML=lista.map(function(m){
+    return '<div class="r-mov-row">'+
+      '<div class="r-mov-date">'+FD(m.data)+'</div>'+
+      '<div class="r-mov-type '+(m.tipo==='Compra'?'compra':'recebimento')+'">'+m.tipo+'</div>'+
+      '<div class="r-mov-value">'+R(m.valor)+'</div>'+
+    '</div>';
+  }).join('');
+}
+
 function selecionarRCli(cid){
   atualizarLayoutReceb();
   var c=DB.get('clientes').find(function(x){return x.id===cid;});if(!c)return;
@@ -2088,6 +2733,7 @@ function renderRecebPainel(){
     return '<tr><td>'+FD(f.data)+'</td><td>'+f.desc+'</td><td class="txt-r">'+R(f.val)+'</td></tr>';
   }).join('')||'<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem crediário</td></tr>';
   document.getElementById('r-painel').style.display='block';
+  renderMovimentacaoReceb();
 }
 
 function limparRCli(){
@@ -2096,6 +2742,7 @@ function limparRCli(){
   var sg=document.getElementById('r-sg'); if(sg) sg.innerHTML='';
   var rp=document.getElementById('r-painel'); if(rp) rp.style.display='none';
   var rv=document.getElementById('r-val'); if(rv) rv.value='';
+  var rm=document.getElementById('r-mov-list'); if(rm) rm.innerHTML='<div class="r-mov-empty">Selecione um cliente para visualizar a movimentação</div>';
   atualizarLayoutReceb();
 }
 function confirmarPag(){
