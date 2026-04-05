@@ -1,153 +1,360 @@
 /*!
-
 Bela Modas Sheets Sync — modo seguro
-
 Desktop escreve / mobile consulta
+Sem widget flutuante na tela
+*/
+(function () {
+  "use strict";
 
-Sem widget flutuante na tela */ (function () { "use strict";
+  const API_URL = "https://script.google.com/macros/s/AKfycbzH4m2rIWkzHLf_SPldVWBk6uSbhmwWz_OLZENRr0A-9XOzCtHsU5fbLtJCm-ZKss0k/exec";
+  const SYNC_INTERVAL_MS = 25000;
 
+  function pad2(n){ return String(n).padStart(2, "0"); }
 
-const API_URL = "https://script.google.com/macros/s/AKfycbzH4m2rIWkzHLf_SPldVWBk6uSbhmwWz_OLZENRr0A-9XOzCtHsU5fbLtJCm-ZKss0k/exec"; const SYNC_INTERVAL_MS = 25000;
+  function isoNow(){
+    const d = new Date();
+    return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()) +
+      "T" + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds());
+  }
 
-function pad2(n){ return String(n).padStart(2, "0"); }
+  function safeParse(text, fallback){
+    try { return JSON.parse(text); } catch(e) { return fallback; }
+  }
 
-function isoNow(){ const d = new Date(); return d.getFullYear() + "-" + pad2(d.getMonth()+1) + "-" + pad2(d.getDate()) + "T" + pad2(d.getHours()) + ":" + pad2(d.getMinutes()) + ":" + pad2(d.getSeconds()); }
+  function readLocal(name){
+    return safeParse(localStorage.getItem("bm_" + name) || "[]", []);
+  }
 
-function safeParse(text, fallback){ try { return JSON.parse(text); } catch(e) { return fallback; } }
+  function backupLocalSnapshot(){
+    const snapshot = {
+      when: isoNow(),
+      clientes: readLocal("clientes"),
+      produtos: readLocal("produtos"),
+      vendas: readLocal("vendas"),
+      pagamentos: readLocal("pagamentos"),
+      creditos: readLocal("creditos")
+    };
+    localStorage.setItem("bm_backup_latest", JSON.stringify(snapshot));
+  }
 
-function readLocal(name){ return safeParse(localStorage.getItem("bm_" + name) || "[]", []); }
+  async function postSheet(body, tentativas){
+    tentativas = tentativas || 3;
 
-function backupLocalSnapshot(){ const snapshot = { when: isoNow(), clientes: readLocal("clientes"), produtos: readLocal("produtos"), vendas: readLocal("vendas"), pagamentos: readLocal("pagamentos"), creditos: readLocal("creditos") }; localStorage.setItem("bm_backup_latest", JSON.stringify(snapshot)); }
+    for(let i = 0; i < tentativas; i++){
+      try{
+        const params = new URLSearchParams();
+        params.append("payload", JSON.stringify(body));
 
-async function postSheet(body, tentativas){ tentativas = tentativas || 3;
+        const r = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          body: params.toString(),
+          cache: "no-store"
+        });
 
-for(let i = 0; i < tentativas; i++){
-  try{
-    const params = new URLSearchParams();
-    params.append("payload", JSON.stringify(body));
+        if(!r.ok) throw new Error("POST falhou: " + r.status);
 
-    const r = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-      body: params.toString(),
-      cache: "no-store"
-    });
+        const text = await r.text();
+        const data = safeParse(text, null);
 
-    if(!r.ok) throw new Error("POST falhou: " + r.status);
+        if(!data || data.ok !== true){
+          throw new Error((data && data.error) || "Resposta inválida do servidor");
+        }
 
-    const text = await r.text();
-    const data = safeParse(text, null);
-
-    if(!data || data.ok !== true){
-      throw new Error((data && data.error) || "Resposta inválida do servidor");
+        return data;
+      }catch(err){
+        if(i === tentativas - 1) throw err;
+        await new Promise(r => setTimeout(r, 1200 * (i + 1)));
+      }
     }
-
-    return data;
-  }catch(err){
-    if(i === tentativas - 1) throw err;
-    await new Promise(r => setTimeout(r, 1200 * (i + 1)));
   }
-}
 
-}
+  function normalizeClientLocal(c){
+    const stamp = c.updatedAt || c.createdAt || c.data || isoNow();
+    return {
+      id: String(c.id || ("cli_" + Math.random().toString(36).slice(2, 10))),
+      nome: c.nome || "",
+      tel: c.tel || c.telefone || "",
+      cpf: c.cpf || "",
+      end: c.end || c.endereco || "",
+      obs: c.obs || "",
+      data: c.data || c.createdAt || stamp,
+      createdAt: c.createdAt || c.data || stamp,
+      updatedAt: c.updatedAt || stamp,
+      deletedAt: c.deletedAt || ""
+    };
+  }
 
-function normalizeClientLocal(c){ const stamp = c.updatedAt || c.createdAt || c.data || isoNow(); return { id: String(c.id || ("cli_" + Math.random().toString(36).slice(2, 10))), nome: c.nome || "", tel: c.tel || c.telefone || "", cpf: c.cpf || "", end: c.end || c.endereco || "", obs: c.obs || "", data: c.data || c.createdAt || stamp, createdAt: c.createdAt || c.data || stamp, updatedAt: c.updatedAt || stamp, deletedAt: c.deletedAt || "" }; }
+  function normalizeProductLocal(p){
+    const stamp = p.updatedAt || p.createdAt || isoNow();
 
-function normalizeProductLocal(p){ const stamp = p.updatedAt || p.createdAt || isoNow(); return { id: String(p.id || ("pro_" + Math.random().toString(36).slice(2, 10))), cod: p.cod || "", nome: p.nome || "", cat: p.cat || "", preco: Number(p.preco || 0), custo: Number(p.custo || 0), estq: Number(p.estq != null ? p.estq : (p.estoque != null ? p.estoque : 0)), ean: p.ean || "", ncm: p.ncm || "", desc2: p.desc2 || "", createdAt: p.createdAt || stamp, updatedAt: p.updatedAt || stamp, deletedAt: p.deletedAt || "" }; }
+    const categoria = String(p.cat || p.categoria || "").trim().toLowerCase();
 
-function normalizeVendaLocal(v){ const stamp = v.updatedAt || v.createdAt || v.data || isoNow(); return { id: String(v.id || ("ven_" + Math.random().toString(36).slice(2, 10))), cid: v.cid || "", cliNome: v.cliNome || v.cliente || "Balcão", forma: v.forma || v.forma_pagamento || "", subtotal: Number(v.subtotal || 0), desconto: Number(v.desconto || 0), total: Number(v.total || 0), itens: Array.isArray(v.itens) ? v.itens : [], data: v.data || stamp, createdAt: v.createdAt || v.data || stamp, updatedAt: v.updatedAt || stamp, deletedAt: v.deletedAt || "" }; }
+    const ehCalcado =
+      categoria.includes("tênis") ||
+      categoria.includes("tenis") ||
+      categoria.includes("chinelo") ||
+      categoria.includes("sandália") ||
+      categoria.includes("sandalia") ||
+      categoria.includes("bota") ||
+      categoria.includes("sapato") ||
+      categoria.includes("sapatilha");
 
-function normalizePagamentoLocal(p){ const stamp = p.updatedAt || p.createdAt || p.data || isoNow(); return { id: String(p.id || ("pag_" + Math.random().toString(36).slice(2, 10))), vid: p.vid || "", cid: p.cid || "", val: Number(p.val || p.valor || 0), forma: p.forma || p.forma_pagamento || "", obs: p.obs || "", data: p.data || stamp, createdAt: p.createdAt || p.data || stamp, updatedAt: p.updatedAt || stamp, deletedAt: p.deletedAt || "" }; }
+    return {
+      id: String(p.id || ("pro_" + Math.random().toString(36).slice(2, 10))),
+      cod: p.cod || "",
+      nome: p.nome || "",
+      cat: p.cat || p.categoria || "",
+      preco: Number(p.preco || 0),
+      custo: Number(p.custo || 0),
+      estq: Number(p.estq != null ? p.estq : (p.estoque != null ? p.estoque : 0)),
+      ean: p.ean || "",
+      ncm: p.ncm || "",
+      desc2: p.desc2 || "",
+      origem: p.origem || "0",
+      unidade: p.unidade || (ehCalcado ? "PAR" : "UN"),
+      csosn: p.csosn || "102",
+      cfop: p.cfop || "5102",
+      escala: p.escala || "S",
+      origem_estoque: p.origem_estoque || "manual_sem_xml",
+      createdAt: p.createdAt || stamp,
+      updatedAt: p.updatedAt || stamp,
+      deletedAt: p.deletedAt || ""
+    };
+  }
 
-function normalizeCreditoLocal(c){ const stamp = c.updatedAt || c.createdAt || c.data || isoNow(); return { id: String(c.id || ("cre_" + Math.random().toString(36).slice(2, 10))), cid: c.cid || "", vid: c.vid || "", cliNome: c.cliNome || c.cliente || "", desc: c.desc || c.descricao || "", val: Number(c.val || c.valor || 0), status: c.status || "aberto", vencimento: c.vencimento || c.data || stamp, data: c.data || c.vencimento || stamp, createdAt: c.createdAt || c.data || stamp, updatedAt: c.updatedAt || stamp, deletedAt: c.deletedAt || "" }; }
+  function normalizeVendaLocal(v){
+    const stamp = v.updatedAt || v.createdAt || v.data || isoNow();
+    return {
+      id: String(v.id || ("ven_" + Math.random().toString(36).slice(2, 10))),
+      cid: v.cid || "",
+      cliNome: v.cliNome || v.cliente || "Balcão",
+      forma: v.forma || v.forma_pagamento || "",
+      subtotal: Number(v.subtotal || 0),
+      desconto: Number(v.desconto || 0),
+      total: Number(v.total || 0),
+      itens: Array.isArray(v.itens) ? v.itens : [],
+      data: v.data || stamp,
+      createdAt: v.createdAt || v.data || stamp,
+      updatedAt: v.updatedAt || stamp,
+      deletedAt: v.deletedAt || ""
+    };
+  }
 
-function serializeClients(list){ return (list || []).map(c => { c = normalizeClientLocal(c); return { id: c.id, nome: c.nome, telefone: c.tel, cpf: c.cpf, endereco: c.end, obs: c.obs, data: c.data, createdAt: c.createdAt, updatedAt: c.updatedAt, deletedAt: c.deletedAt }; }); }
+  function normalizePagamentoLocal(p){
+    const stamp = p.updatedAt || p.createdAt || p.data || isoNow();
+    return {
+      id: String(p.id || ("pag_" + Math.random().toString(36).slice(2, 10))),
+      vid: p.vid || "",
+      cid: p.cid || "",
+      val: Number(p.val || p.valor || 0),
+      forma: p.forma || p.forma_pagamento || "",
+      obs: p.obs || "",
+      data: p.data || stamp,
+      createdAt: p.createdAt || p.data || stamp,
+      updatedAt: p.updatedAt || stamp,
+      deletedAt: p.deletedAt || ""
+    };
+  }
 
-function serializeProducts(list){ return (list || []).map(p => { p = normalizeProductLocal(p); return { id: p.id, cod: p.cod || "", nome: p.nome, cat: p.cat || "", preco: p.preco, custo: Number(p.custo || 0), estoque: p.estq, ean: p.ean || "", ncm: p.ncm || "", desc2: p.desc2 || "", createdAt: p.createdAt, updatedAt: p.updatedAt, deletedAt: p.deletedAt }; }); }
+  function normalizeCreditoLocal(c){
+    const stamp = c.updatedAt || c.createdAt || c.data || isoNow();
+    return {
+      id: String(c.id || ("cre_" + Math.random().toString(36).slice(2, 10))),
+      cid: c.cid || "",
+      vid: c.vid || "",
+      cliNome: c.cliNome || c.cliente || "",
+      desc: c.desc || c.descricao || "",
+      val: Number(c.val || c.valor || 0),
+      status: c.status || "aberto",
+      vencimento: c.vencimento || c.data || stamp,
+      data: c.data || c.vencimento || stamp,
+      createdAt: c.createdAt || c.data || stamp,
+      updatedAt: c.updatedAt || stamp,
+      deletedAt: c.deletedAt || ""
+    };
+  }
 
-function serializeVendas(list){ return (list || []).map(v => { v = normalizeVendaLocal(v); return { id: v.id, cid: v.cid, cliente: v.cliNome, total: v.total, subtotal: v.subtotal, desconto: v.desconto, forma_pagamento: v.forma, itens_json: JSON.stringify(v.itens || []), data: v.data, createdAt: v.createdAt, updatedAt: v.updatedAt, deletedAt: v.deletedAt }; }); }
+  function serializeClients(list){
+    return (list || []).map(c => {
+      c = normalizeClientLocal(c);
+      return {
+        id: c.id,
+        nome: c.nome,
+        telefone: c.tel,
+        cpf: c.cpf,
+        endereco: c.end,
+        obs: c.obs,
+        data: c.data,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        deletedAt: c.deletedAt
+      };
+    });
+  }
 
-function serializePagamentos(list){ return (list || []).map(p => { p = normalizePagamentoLocal(p); const vendaId = p.vid || (p.cid ? ("cid:" + p.cid) : ""); return { id: p.id, venda_id: vendaId, valor: p.val, forma_pagamento: p.forma, obs: p.obs, data: p.data, createdAt: p.createdAt, updatedAt: p.updatedAt, deletedAt: p.deletedAt }; }); }
+  function serializeProducts(list){
+    return (list || []).map(p => {
+      p = normalizeProductLocal(p);
+      return {
+        id: p.id,
+        cod: p.cod || "",
+        nome: p.nome,
+        cat: p.cat || "",
+        preco: p.preco,
+        custo: Number(p.custo || 0),
+        estoque: p.estq,
+        ean: p.ean || "",
+        ncm: p.ncm || "",
+        desc2: p.desc2 || "",
+        origem: p.origem || "0",
+        unidade: p.unidade || "UN",
+        csosn: p.csosn || "102",
+        cfop: p.cfop || "5102",
+        escala: p.escala || "S",
+        origem_estoque: p.origem_estoque || "manual_sem_xml",
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        deletedAt: p.deletedAt
+      };
+    });
+  }
 
-function serializeCreditos(list, clientes){ const cliById = new Map((clientes || []).map(c => [String(c.id), normalizeClientLocal(c)]));
+  function serializeVendas(list){
+    return (list || []).map(v => {
+      v = normalizeVendaLocal(v);
+      return {
+        id: v.id,
+        cid: v.cid,
+        cliente: v.cliNome,
+        total: v.total,
+        subtotal: v.subtotal,
+        desconto: v.desconto,
+        forma_pagamento: v.forma,
+        itens_json: JSON.stringify(v.itens || []),
+        data: v.data,
+        createdAt: v.createdAt,
+        updatedAt: v.updatedAt,
+        deletedAt: v.deletedAt
+      };
+    });
+  }
 
-return (list || []).map(c => {
-  c = normalizeCreditoLocal(c);
-  const cli = cliById.get(String(c.cid || "")) || {};
-  return {
-    id: c.id,
-    cid: c.cid,
-    vid: c.vid,
-    cliente: c.cliNome || cli.nome || "",
-    descricao: c.desc,
-    valor: c.val,
-    status: c.status,
-    vencimento: c.vencimento,
-    data: c.data,
-    createdAt: c.createdAt,
-    updatedAt: c.updatedAt,
-    deletedAt: c.deletedAt
+  function serializePagamentos(list){
+    return (list || []).map(p => {
+      p = normalizePagamentoLocal(p);
+      const vendaId = p.vid || (p.cid ? ("cid:" + p.cid) : "");
+      return {
+        id: p.id,
+        venda_id: vendaId,
+        cid: p.cid || "",
+        valor: p.val,
+        forma_pagamento: p.forma,
+        obs: p.obs,
+        data: p.data,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        deletedAt: p.deletedAt
+      };
+    });
+  }
+
+  function serializeCreditos(list, clientes){
+    const cliById = new Map((clientes || []).map(c => [String(c.id), normalizeClientLocal(c)]));
+
+    return (list || []).map(c => {
+      c = normalizeCreditoLocal(c);
+      const cli = cliById.get(String(c.cid || "")) || {};
+      return {
+        id: c.id,
+        cid: c.cid,
+        vid: c.vid,
+        cliente: c.cliNome || cli.nome || "",
+        descricao: c.desc,
+        valor: c.val,
+        status: c.status,
+        vencimento: c.vencimento,
+        data: c.data,
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        deletedAt: c.deletedAt
+      };
+    });
+  }
+
+  let debounceTimer = null;
+  let syncing = false;
+  let patchDone = false;
+  let _rawSet = localStorage.setItem.bind(localStorage);
+
+  async function pushLocalToRemote(){
+    backupLocalSnapshot();
+
+    const clientes = readLocal("clientes");
+    const produtos = readLocal("produtos");
+    const vendas = readLocal("vendas");
+    const pagamentos = readLocal("pagamentos");
+    const creditos = readLocal("creditos");
+
+    await postSheet({ action: "upsert", sheet: "clientes", rows: serializeClients(clientes) });
+    await postSheet({ action: "upsert", sheet: "produtos", rows: serializeProducts(produtos) });
+    await postSheet({ action: "upsert", sheet: "vendas", rows: serializeVendas(vendas) });
+    await postSheet({ action: "upsert", sheet: "recebimentos", rows: serializePagamentos(pagamentos) });
+    await postSheet({ action: "upsert", sheet: "cobrancas", rows: serializeCreditos(creditos, clientes) });
+
+    _rawSet("bm_last_sync_at", isoNow());
+  }
+
+  async function syncNow(force){
+    if(syncing) return;
+    syncing = true;
+
+    try{
+      await pushLocalToRemote();
+    }catch(err){
+      console.error("Erro ao sincronizar:", err);
+      if(force) throw err;
+    }finally{
+      syncing = false;
+    }
+  }
+
+  function scheduleSync(){
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(syncNow, 900);
+  }
+
+  function patchStorage(){
+    if(patchDone) return;
+    patchDone = true;
+
+    localStorage.setItem = function(key, value){
+      _rawSet(key, value);
+
+      if(/^bm_(clientes|produtos|vendas|pagamentos|creditos)$/.test(String(key))){
+        scheduleSync();
+      }
+    };
+  }
+
+  function start(){
+    patchStorage();
+
+    window.addEventListener("focus", function(){});
+    document.addEventListener("visibilitychange", function(){});
+
+    setInterval(syncNow, SYNC_INTERVAL_MS);
+  }
+
+  window.BelaSheetsSync = {
+    syncNow: syncNow,
+    scheduleSync: scheduleSync,
+    backupLocalSnapshot: backupLocalSnapshot
   };
-});
 
-}
-
-let debounceTimer = null; let syncing = false; let patchDone = false; let _rawSet = localStorage.setItem.bind(localStorage);
-
-async function pushLocalToRemote(){ backupLocalSnapshot();
-
-const clientes = readLocal("clientes");
-const produtos = readLocal("produtos");
-const vendas = readLocal("vendas");
-const pagamentos = readLocal("pagamentos");
-const creditos = readLocal("creditos");
-
-await postSheet({ action: "upsert", sheet: "clientes", rows: serializeClients(clientes) });
-await postSheet({ action: "upsert", sheet: "produtos", rows: serializeProducts(produtos) });
-await postSheet({ action: "upsert", sheet: "vendas", rows: serializeVendas(vendas) });
-await postSheet({ action: "upsert", sheet: "recebimentos", rows: serializePagamentos(pagamentos) });
-await postSheet({ action: "upsert", sheet: "cobrancas", rows: serializeCreditos(creditos, clientes) });
-
-_rawSet("bm_last_sync_at", isoNow());
-
-}
-
-async function syncNow(force){ if(syncing) return; syncing = true;
-
-try{
-  await pushLocalToRemote();
-}catch(err){
-  console.error("Erro ao sincronizar:", err);
-  if(force) throw err;
-}finally{
-  syncing = false;
-}
-
-}
-
-function scheduleSync(){ clearTimeout(debounceTimer); debounceTimer = setTimeout(syncNow, 900); }
-
-function patchStorage(){ if(patchDone) return; patchDone = true;
-
-localStorage.setItem = function(key, value){
-  _rawSet(key, value);
-
-  if(/^bm_(clientes|produtos|vendas|pagamentos|creditos)$/.test(String(key))){
-    scheduleSync();
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", start);
+  }else{
+    start();
   }
-};
-
-}
-
-function start(){ patchStorage();
-
-window.addEventListener("focus", function(){});
-document.addEventListener("visibilitychange", function(){});
-
-setInterval(syncNow, SYNC_INTERVAL_MS);
-
-}
-
-window.BelaSheetsSync = { syncNow: syncNow, scheduleSync: scheduleSync, backupLocalSnapshot: backupLocalSnapshot };
-
-if(document.readyState === "loading"){ document.addEventListener("DOMContentLoaded", start); }else{ start(); } })();
+})();
