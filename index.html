@@ -2729,19 +2729,21 @@ function wppExtrato(){
 function obterMovimentacoesCli(cid){
   var movs = [];
 
-  creditosValidos().filter(function(f){
+  var creditos = creditosValidos();
+  creditos.filter(function(f){
     return String((f && f.cid) || '') === String(cid || '');
   }).forEach(function(f){
     movs.push({
       tipo:'Compra',
       data:f.data || f.createdAt || '',
-      descricao:f.desc || 'Compra no crediário',
+      descricao:f.desc || f.descricao || 'Compra no crediário',
       valor:Number(f.val || f.valor || 0),
       classe:'txt-r'
     });
   });
 
-  pagamentosValidos().filter(function(p){
+  var pagamentos = pagamentosValidos();
+  pagamentos.filter(function(p){
     return String((p && p.cid) || '') === String(cid || '');
   }).forEach(function(p){
     var forma = String(p.forma || p.forma_pagamento || '').trim();
@@ -2759,7 +2761,9 @@ function obterMovimentacoesCli(cid){
   });
 
   movs.sort(function(a,b){
-    return toMillis_(b.data || 0) - toMillis_(a.data || 0);
+    var ta = (typeof toMillis_==='function') ? toMillis_(a.data || 0) : new Date(a.data || 0).getTime();
+    var tb = (typeof toMillis_==='function') ? toMillis_(b.data || 0) : new Date(b.data || 0).getTime();
+    return tb - ta;
   });
 
   return movs;
@@ -2781,10 +2785,10 @@ function renderMovimentacoesCliModal(){
   var movs = obterMovimentacoesCli(rCli.id);
 
   tb.innerHTML = movs.map(function(m){
-    return '<tr>'+
-      '<td>'+FD(m.data)+'</td>'+
-      '<td><b>'+m.tipo+'</b><span class="tm">'+m.descricao+'</span></td>'+
-      '<td class="'+m.classe+'">'+R(m.valor)+'</td>'+
+    return '<tr>' +
+      '<td>' + FD(m.data) + '</td>' +
+      '<td><b>' + m.tipo + '</b><span class="tm">' + m.descricao + '</span></td>' +
+      '<td class="' + m.classe + '">' + R(m.valor) + '</td>' +
     '</tr>';
   }).join('') || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem movimentação</td></tr>';
 }
@@ -2797,6 +2801,9 @@ function abrirMovimentacoesCli(){
   renderMovimentacoesCliModal();
   abrirMd('mo-mov-cli');
 }
+
+
+
 
 
 function renderCobranca(){
