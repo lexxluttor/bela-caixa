@@ -338,18 +338,56 @@ td{padding:8px 9px !important;font-size:12px !important;}
   margin-bottom:8px;
 }
 
+.r-pay-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin-top:8px;
+}
+.r-pay-actions .btn{
+  min-width:220px;
+  justify-content:center;
+}
 
+.mov-split{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  min-height:0;
+  flex:1;
+}
+.mov-col{
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  background:var(--s2);
+  border:1px solid var(--bdr);
+  border-radius:10px;
+  overflow:hidden;
+}
+.mov-head{
+  padding:10px 12px;
+  font-size:12px;
+  font-weight:800;
+  color:var(--red2);
+  border-bottom:1px solid var(--bdr);
+  background:rgba(255,255,255,.35);
+}
+.mov-col .tw{
+  flex:1;
+  min-height:0;
+  overflow:auto;
+  background:var(--s1);
+}
+.mov-col td:last-child,
+.mov-col th:last-child{
+  text-align:right;
+}
+@media (max-width: 1280px){
+  .mov-split{grid-template-columns:1fr;}
+}
 
-/* MOVIMENTAÇÃO DO CLIENTE */
-#r-mov-list{max-height:220px;overflow:auto;border:1px solid var(--bdr);border-radius:10px;background:var(--s1);}
-.r-mov-row{display:grid;grid-template-columns:72px 1fr auto;gap:10px;align-items:center;padding:9px 10px;border-bottom:1px solid var(--bdr);font-size:12px;}
-.r-mov-row:last-child{border-bottom:none;}
-.r-mov-date{color:var(--txt2);font-weight:700;}
-.r-mov-type{font-weight:800;}
-.r-mov-type.compra{color:var(--txt);}
-.r-mov-type.recebimento{color:var(--green);}
-.r-mov-value{font-weight:800;color:var(--red2);}
-.r-mov-empty{text-align:center;padding:16px;color:var(--txt2);font-size:12px;}
 
 
 /* ETIQUETAS */
@@ -537,18 +575,25 @@ td{padding:8px 9px !important;font-size:12px !important;}
         </div>
       </div>
       <div class="card">
-        <div class="ct">📋 Histórico de Crediário</div>
-        <div class="tw"><table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
-          <tbody id="r-tb"></tbody>
-        </table></div>
-      </div>
-      <div class="card">
         <div class="ct">📑 Movimentação do Cliente</div>
-        <div id="r-mov-list"><div class="r-mov-empty">Selecione um cliente para visualizar a movimentação</div></div>
+        <div class="mov-split">
+          <div class="mov-col">
+            <div class="mov-head">🛍️ Compras</div>
+            <div class="tw"><table>
+              <thead><tr><th>Data</th><th>Valor</th></tr></thead>
+              <tbody id="r-mov-compras"></tbody>
+            </table></div>
+          </div>
+          <div class="mov-col">
+            <div class="mov-head">💵 Recebimentos</div>
+            <div class="tw"><table>
+              <thead><tr><th>Data</th><th>Valor</th></tr></thead>
+              <tbody id="r-mov-receb"></tbody>
+            </table></div>
+          </div>
+        </div>
       </div>
       <div class="card">
-        <div class="ct">💵 Registrar Pagamento</div>
         <div class="g2">
           <div class="fg"><label class="fl">Valor Pago (R$)</label><input class="fi" id="r-val" type="number" step="0.01" min="0.01" placeholder="0,00"></div>
           <div class="fg"><label class="fl">Forma de Pagamento</label>
@@ -560,10 +605,12 @@ td{padding:8px 9px !important;font-size:12px !important;}
             </select>
           </div>
           <div class="fg gc"><label class="fl">Observação</label><input class="fi" id="r-obs" placeholder="Opcional..."></div>
-        </div>
-        <div class="fr">
-          <button class="btn bg2" onclick="confirmarPag()">✅ Confirmar Pagamento</button>
-          <button class="btn bb sm" onclick="wppExtrato()">📱 Enviar Extrato WPP</button>
+          <div class="fg gc">
+            <div class="fr r-pay-actions">
+              <button class="btn bg2" onclick="confirmarPag()">✅ Confirmar Pagamento</button>
+              <button class="btn bb" onclick="wppExtrato()">📲 Enviar Extrato WPP</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2687,39 +2734,34 @@ function buscaRCli(){
       '<span style="font-weight:800;color:'+(sd>0.01?'var(--red2)':'#2ecc71')+'">'+R(sd)+'</span></div>';
   }).join('')||(q?'<div class="tm" style="padding:6px 0;">Nenhum encontrado</div>':'');
 }
-
-function movimentacaoCliente(cid){
-  var vendas=(DB.get('vendas')||[]).filter(function(v){return !v.deletedAt && String(v.cid||'')===String(cid);});
-  var pagamentos=(DB.get('pagamentos')||[]).filter(function(p){return !p.deletedAt && String(p.cid||'')===String(cid);});
-  var mov=[];
-  vendas.forEach(function(v){
-    mov.push({tipo:'Compra',valor:Number(v.total||0),data:v.data||v.createdAt||v.updatedAt||''});
-  });
-  pagamentos.forEach(function(p){
-    mov.push({tipo:'Recebimento',valor:Number(p.val!=null?p.val:(p.valor||0)),data:p.data||p.createdAt||p.updatedAt||''});
-  });
-  mov.sort(function(a,b){ return new Date(a.data||0)-new Date(b.data||0); });
-  return mov;
-}
-function renderMovimentacaoReceb(){
-  var el=document.getElementById('r-mov-list'); if(!el) return;
-  if(!rCli){ el.innerHTML='<div class="r-mov-empty">Selecione um cliente para visualizar a movimentação</div>'; return; }
-  var lista=movimentacaoCliente(rCli.id);
-  if(!lista.length){ el.innerHTML='<div class="r-mov-empty">Nenhuma movimentação encontrada</div>'; return; }
-  el.innerHTML=lista.map(function(m){
-    return '<div class="r-mov-row">'+
-      '<div class="r-mov-date">'+FD(m.data)+'</div>'+
-      '<div class="r-mov-type '+(m.tipo==='Compra'?'compra':'recebimento')+'">'+m.tipo+'</div>'+
-      '<div class="r-mov-value">'+R(m.valor)+'</div>'+
-    '</div>';
-  }).join('');
-}
-
 function selecionarRCli(cid){
   atualizarLayoutReceb();
   var c=DB.get('clientes').find(function(x){return x.id===cid;});if(!c)return;
   rCli=c;document.getElementById('r-sc').value=c.nome;document.getElementById('r-sg').innerHTML='';renderRecebPainel();
 }
+function renderMovimentacaoClienteReceb(){
+  if(!rCli)return;
+  var compras=(DB.get('creditos')||[])
+    .filter(function(f){return !f.deletedAt && f.cid===rCli.id;})
+    .sort(function(a,b){return new Date(b.data||b.createdAt||0)-new Date(a.data||a.createdAt||0);});
+  var recebs=(DB.get('pagamentos')||[])
+    .filter(function(p){return !p.deletedAt && p.cid===rCli.id;})
+    .sort(function(a,b){return new Date(b.data||b.createdAt||0)-new Date(a.data||a.createdAt||0);});
+
+  var tbC=document.getElementById('r-mov-compras');
+  var tbR=document.getElementById('r-mov-receb');
+  if(tbC){
+    tbC.innerHTML=compras.map(function(f){
+      return '<tr><td>'+FD(f.data)+'</td><td class="txt-r">'+R(f.val||0)+'</td></tr>';
+    }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--txt2);">Sem compras</td></tr>';
+  }
+  if(tbR){
+    tbR.innerHTML=recebs.map(function(p){
+      return '<tr><td>'+FD(p.data)+'</td><td class="txt-g">'+R(p.val||p.valor||0)+'</td></tr>';
+    }).join('')||'<tr><td colspan="2" style="text-align:center;padding:14px;color:var(--txt2);">Sem recebimentos</td></tr>';
+  }
+}
+
 function renderRecebPainel(){
   if(!rCli)return;
   var s=saldo(rCli.id);
@@ -2727,13 +2769,9 @@ function renderRecebPainel(){
   document.getElementById('r-info').textContent=(rCli.cpf||'')+(rCli.tel?' · '+rCli.tel:'');
   document.getElementById('r-saldo').textContent=R(s.sd);
   document.getElementById('r-tf').textContent=R(s.tf);document.getElementById('r-tp').textContent=R(s.tp);
-  document.getElementById('r-val').value='';
-  var crds=creditosValidos().filter(function(f){return f.cid===rCli.id;});
-  document.getElementById('r-tb').innerHTML=crds.map(function(f){
-    return '<tr><td>'+FD(f.data)+'</td><td>'+f.desc+'</td><td class="txt-r">'+R(f.val)+'</td></tr>';
-  }).join('')||'<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem crediário</td></tr>';
+  var rv=document.getElementById('r-val'); if(rv) rv.value='';
+  renderMovimentacaoClienteReceb();
   document.getElementById('r-painel').style.display='block';
-  renderMovimentacaoReceb();
 }
 
 function limparRCli(){
@@ -2742,7 +2780,6 @@ function limparRCli(){
   var sg=document.getElementById('r-sg'); if(sg) sg.innerHTML='';
   var rp=document.getElementById('r-painel'); if(rp) rp.style.display='none';
   var rv=document.getElementById('r-val'); if(rv) rv.value='';
-  var rm=document.getElementById('r-mov-list'); if(rm) rm.innerHTML='<div class="r-mov-empty">Selecione um cliente para visualizar a movimentação</div>';
   atualizarLayoutReceb();
 }
 function confirmarPag(){
