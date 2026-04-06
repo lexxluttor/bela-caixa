@@ -3038,7 +3038,15 @@ function renderCaixa(){
     var cor=m.t==='f'?'var(--red2)':m.t==='p'?'var(--blue)':'var(--gold)';
     var btns='<span style="display:flex;gap:5px;flex-shrink:0;">';
     if(m.tipo==='venda'){
+      var vx=(DB.get('vendas')||[]).find(function(v){ return String(v.id)===String(m.sid); })||{};
       btns+='<button class="btn bh xs" onclick="abrirVdet(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Ver/Editar">🔍</button>';
+      btns+='<button class="btn bg2 xs" onclick="emitirNfceCaixa(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Emitir NFC-e">📄</button>';
+      if(vx.nfce_pdf_url){
+        btns+='<button class="btn bb xs" onclick="abrirNotaPdf(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Abrir PDF da nota">PDF</button>';
+      }
+      if(vx.nfce_xml_url){
+        btns+='<button class="btn bo xs" onclick="abrirNotaXml(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Abrir XML da nota">XML</button>';
+      }
       btns+='<button class="btn bd2 xs" onclick="pedirSenhaECancelar(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Cancelar">🚫</button>';
     }
     if(m.tipo==='pag'){
@@ -4894,6 +4902,155 @@ document.addEventListener('DOMContentLoaded',function(){
       _cancelarLimiteOriginal.apply(this, arguments);
     };
   }
+})();
+</script>
+
+
+<script>
+(function(){
+  window.BELA_NFCE_API_URL = 'https://bela-caixa-api.onrender.com';
+
+  function apiBase(){
+    return String(window.BELA_NFCE_API_URL || '').replace(/\/$/, '');
+  }
+
+  function acharVenda(vid){
+    return (DB.get('vendas') || []).find(function(v){
+      return String(v.id) === String(vid);
+    });
+  }
+
+  function acharCliente(cid){
+    return (DB.get('clientes') || []).find(function(c){
+      return String(c.id) === String(cid);
+    }) || null;
+  }
+
+  function itemNota(it){
+    return {
+      codigo: String(it.id || it.cod || ''),
+      descricao: String(it.nome || it.desc || 'Produto'),
+      ncm: String(it.ncm || ''),
+      cfop: String(it.cfop || '5102'),
+      csosn: String(it.csosn || '102'),
+      unidade: String(it.unidade || 'UN'),
+      quantidade: Number(it.qtd || it.quantidade || 1),
+      valorUnitario: Number(it.preco || it.valor || 0),
+      valorTotal: Number((it.qtd || it.quantidade || 1) * (it.preco || it.valor || 0)),
+      ean: String(it.ean || ''),
+      origem: String(it.origem || '0')
+    };
+  }
+
+  function payloadNota(venda, cliente){
+    var itens = Array.isArray(venda.itens) ? venda.itens : [];
+    return {
+      vendaId: venda.id,
+      dataVenda: venda.data || venda.createdAt || new Date().toISOString(),
+      ambiente: 'homologacao',
+      empresa: {
+        fantasia: 'Bela Modas'
+      },
+      cliente: cliente ? {
+        id: cliente.id || '',
+        nome: cliente.nome || venda.cliNome || 'Consumidor',
+        cpf: cliente.cpf || '',
+        telefone: cliente.tel || cliente.telefone || '',
+        endereco: cliente.end || cliente.endereco || ''
+      } : {
+        nome: venda.cliNome || 'Consumidor',
+        cpf: ''
+      },
+      itens: itens.map(itemNota),
+      pagamento: {
+        tipo: venda.forma || venda.forma_pagamento || 'dinheiro',
+        valor: Number(venda.total || 0)
+      },
+      total: Number(venda.total || 0)
+    };
+  }
+
+  function salvarRetornoNota(vid, data){
+    var vendas = DB.get('vendas') || [];
+    var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
+    if(idx < 0) return;
+
+    var nfce = (data && data.nfce) || {};
+    var idNota = String(nfce.id || ('nfce-' + Date.now()));
+    var base = apiBase();
+
+    vendas[idx].nfce_status = nfce.status || 'emitida_homologacao';
+    vendas[idx].nfce_numero = nfce.numero || idNota;
+    vendas[idx].nfce_chave = nfce.chave || idNota;
+    vendas[idx].nfce_xml_url = nfce.xml_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/xml');
+    vendas[idx].nfce_pdf_url = nfce.pdf_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/pdf');
+    vendas[idx].nfce_data = new Date().toISOString();
+    vendas[idx].updatedAt = new Date().toISOString();
+
+    DB.set('vendas', vendas);
+  }
+
+  window.emitirNfceCaixa = async function(vid){
+    try{
+      var venda = acharVenda(vid);
+      if(!venda){
+        toast('⚠️ Venda não encontrada!');
+        return;
+      }
+
+      if(venda.nfce_status && !confirm('Essa venda já possui dados de nota. Deseja emitir novamente?')){
+        return;
+      }
+
+      var cliente = acharCliente(venda.cid);
+      var payload = payloadNota(venda, cliente);
+      var base = apiBase();
+
+      toast('⏳ Enviando venda para API da NFC-e...');
+      var resp = await fetch(base + '/nfce/emitir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      var data;
+      try{
+        data = await resp.json();
+      }catch(e){
+        throw new Error('Resposta inválida da API.');
+      }
+
+      if(!resp.ok || !data || data.ok !== true){
+        throw new Error((data && (data.mensagem || data.error)) || 'Falha ao emitir NFC-e.');
+      }
+
+      salvarRetornoNota(vid, data);
+      try{ renderCaixa(); }catch(e){}
+      try{ renderVendas(); }catch(e){}
+      try{ renderDash(); }catch(e){}
+      toast('✅ NFC-e enviada com sucesso!','ok');
+    }catch(err){
+      toast('❌ ' + (err.message || 'Erro ao emitir NFC-e.'));
+    }
+  };
+
+  window.abrirNotaPdf = function(vid){
+    var venda = acharVenda(vid);
+    if(!venda || !venda.nfce_pdf_url){
+      toast('⚠️ PDF da nota ainda não disponível.');
+      return;
+    }
+    window.open(venda.nfce_pdf_url, '_blank');
+  };
+
+  window.abrirNotaXml = function(vid){
+    var venda = acharVenda(vid);
+    if(!venda || !venda.nfce_xml_url){
+      toast('⚠️ XML da nota ainda não disponível.');
+      return;
+    }
+    window.open(venda.nfce_xml_url, '_blank');
+  };
 })();
 </script>
 
