@@ -349,6 +349,12 @@ td{padding:8px 9px !important;font-size:12px !important;}
 
 
 
+
+/* RELATÓRIO XML */
+.rl-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.rl-actions .btn{white-space:nowrap;}
+.xml-help{font-size:12px;color:var(--txt2);margin-top:8px;}
+
 /* ETIQUETAS */
 .etq-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
 .etq-search{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1;}
@@ -676,7 +682,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
 <div class="pg" id="pg-relatorio">
   <div class="ph"><div class="ph-t">📈 Relatório Mensal</div></div>
   <div class="pb">
-    <div class="fr" style="margin-bottom:16px;">
+    <div class="fr rl-actions" style="margin-bottom:16px;">
       <select class="fi" id="rl-m" style="width:150px;" onchange="renderRel()">
         <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option>
         <option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option>
@@ -684,6 +690,8 @@ td{padding:8px 9px !important;font-size:12px !important;}
         <option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
       </select>
       <select class="fi" id="rl-a" style="width:100px;" onchange="renderRel()"></select>
+      <button class="btn bb sm" type="button" onclick="baixarXmlMesRelatorio()">📦 XML do mês</button>
+      <button class="btn bh sm" type="button" onclick="abrirXmlPeriodoRelatorio()">🗓️ XML por período</button>
     </div>
     <div class="stats" id="rl-st"></div>
     <div class="g2" style="margin-bottom:14px;">
@@ -943,30 +951,6 @@ td{padding:8px 9px !important;font-size:12px !important;}
     <div class="mf">
       <button class="btn bh" onclick="cancelarAlertaLimiteCliente()">Cancelar</button>
       <button class="btn br" onclick="continuarAlertaLimiteCliente()">Continuar</button>
-    </div>
-  </div>
-</div>
-
-
-<!-- MODAL ALERTA ATRASO CLIENTE -->
-<div class="ov" id="mo-atraso-cli">
-  <div class="md" style="max-width:520px;">
-    <div class="mh"><div class="mht">⚠️ Cliente em atraso</div><button class="mx" onclick="cancelarAlertaAtrasoCliente()">✕</button></div>
-    <div class="mb">
-      <div id="atraso-card" style="border-radius:14px;padding:16px;border:1px solid rgba(192,57,43,.35);background:rgba(192,57,43,.10);">
-        <div id="atraso-badge" style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;background:rgba(192,57,43,.15);color:var(--red);">Atraso superior a 30 dias</div>
-        <div id="atraso-msg" style="font-size:18px;font-weight:800;line-height:1.45;">Cliente com mais de 30 dias sem pagamento. Deseja continuar?</div>
-        <div class="g2" style="margin-top:14px;">
-          <div class="imp-box"><div class="fl">Cliente</div><div id="atraso-cliente" style="font-weight:800;font-size:15px;">—</div></div>
-          <div class="imp-box"><div class="fl">Último pagamento</div><div id="atraso-data" style="font-weight:800;font-size:15px;">—</div></div>
-          <div class="imp-box"><div class="fl">Dias sem pagamento</div><div id="atraso-dias" style="font-weight:900;font-size:18px;color:var(--red2);">—</div></div>
-          <div class="imp-box"><div class="fl">Saldo em aberto</div><div id="atraso-saldo" style="font-weight:900;font-size:18px;color:var(--red2);">R$ 0,00</div></div>
-        </div>
-      </div>
-    </div>
-    <div class="mf">
-      <button class="btn bh" onclick="cancelarAlertaAtrasoCliente()">Cancelar</button>
-      <button class="btn br" onclick="continuarAlertaAtrasoCliente()">Continuar</button>
     </div>
   </div>
 </div>
@@ -3038,15 +3022,7 @@ function renderCaixa(){
     var cor=m.t==='f'?'var(--red2)':m.t==='p'?'var(--blue)':'var(--gold)';
     var btns='<span style="display:flex;gap:5px;flex-shrink:0;">';
     if(m.tipo==='venda'){
-      var vx=(DB.get('vendas')||[]).find(function(v){ return String(v.id)===String(m.sid); })||{};
       btns+='<button class="btn bh xs" onclick="abrirVdet(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Ver/Editar">🔍</button>';
-      btns+='<button class="btn bg2 xs" onclick="emitirNfceCaixa(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Emitir NFC-e">📄</button>';
-      if(vx.nfce_pdf_url){
-        btns+='<button class="btn bb xs" onclick="abrirNotaPdf(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Abrir PDF da nota">PDF</button>';
-      }
-      if(vx.nfce_xml_url){
-        btns+='<button class="btn bo xs" onclick="abrirNotaXml(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Abrir XML da nota">XML</button>';
-      }
       btns+='<button class="btn bd2 xs" onclick="pedirSenhaECancelar(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Cancelar">🚫</button>';
     }
     if(m.tipo==='pag'){
@@ -4759,297 +4735,100 @@ document.addEventListener('DOMContentLoaded',function(){
 </div>
 
 
-<script>
-(function(){
-  var _atrasoCliPendente = null;
-
-  function toDateSafe(v){
-    var d = new Date(v || 0);
-    return isNaN(d.getTime()) ? null : d;
-  }
-
-  function fmtDataAtraso(v){
-    var d = toDateSafe(v);
-    return d ? FD(d.toISOString()) : '—';
-  }
-
-  function dadosAtrasoCliente(cli){
-    if(!cli || !cli.id || typeof saldo !== 'function') return null;
-
-    var saldoAberto = Number((saldo(cli.id) || {}).sd || 0);
-    if(saldoAberto <= 0) return null;
-
-    var pagamentos = (typeof pagamentosValidos === 'function' ? pagamentosValidos() : (DB.get('pagamentos')||[]))
-      .filter(function(p){
-        return p && !p.deletedAt && String(p.cid || '') === String(cli.id);
-      })
-      .sort(function(a,b){
-        return new Date(b.data || b.createdAt || 0).getTime() - new Date(a.data || a.createdAt || 0).getTime();
-      });
-
-    var creditos = (typeof creditosValidos === 'function' ? creditosValidos() : (DB.get('creditos')||[]))
-      .filter(function(c){
-        var st = String((c && c.status) || '').toLowerCase();
-        return c && !c.deletedAt && String(c.cid || '') === String(cli.id) && st !== 'pago' && st !== 'quitado' && st !== 'cancelado';
-      });
-
-    if(!creditos.length) return null;
-
-    var dataRef = '';
-    if(pagamentos.length){
-      dataRef = pagamentos[0].data || pagamentos[0].createdAt || '';
-    }else{
-      var maisAntigo = creditos.slice().sort(function(a,b){
-        return new Date(a.data || a.createdAt || 0).getTime() - new Date(b.data || b.createdAt || 0).getTime();
-      })[0];
-      dataRef = (maisAntigo && (maisAntigo.data || maisAntigo.createdAt)) || '';
-    }
-
-    var base = toDateSafe(dataRef);
-    if(!base) return null;
-
-    var hoje = new Date();
-    hoje.setHours(0,0,0,0);
-    base.setHours(0,0,0,0);
-    var dias = Math.floor((hoje.getTime() - base.getTime()) / 86400000);
-
-    if(dias <= 30) return null;
-
-    return {
-      cliente: cli,
-      dias: dias,
-      saldo: saldoAberto,
-      dataRef: dataRef
-    };
-  }
-
-  function preencherModalAtraso(info){
-    if(!info || !info.cliente) return;
-    var cli = info.cliente;
-    var elCliente = document.getElementById('atraso-cliente');
-    var elData = document.getElementById('atraso-data');
-    var elDias = document.getElementById('atraso-dias');
-    var elSaldo = document.getElementById('atraso-saldo');
-    var elMsg = document.getElementById('atraso-msg');
-    if(elCliente) elCliente.textContent = cli.nome || 'Cliente';
-    if(elData) elData.textContent = fmtDataAtraso(info.dataRef);
-    if(elDias) elDias.textContent = info.dias + ' dias';
-    if(elSaldo) elSaldo.textContent = R(info.saldo);
-    if(elMsg) elMsg.textContent = 'Cliente com mais de 30 dias sem pagamento. Deseja continuar a venda?';
-  }
-
-  window.continuarAlertaAtrasoCliente = function(){
-    _atrasoCliPendente = null;
-    if(typeof fMd === 'function') fMd('mo-atraso-cli');
-  };
-
-  window.cancelarAlertaAtrasoCliente = function(){
-    _atrasoCliPendente = null;
-    if(typeof fMd === 'function') fMd('mo-atraso-cli');
-    if(typeof remCli === 'function') remCli();
-  };
-
-  window.verificarAtrasoClienteVenda = function(cli){
-    var info = dadosAtrasoCliente(cli);
-    if(!info) return false;
-    _atrasoCliPendente = info;
-    preencherModalAtraso(info);
-    if(typeof abrirMd === 'function') abrirMd('mo-atraso-cli');
-    return true;
-  };
-
-  function tentarAbrirAtrasoDepoisDoLimite(){
-    if(!_atrasoCliPendente) return;
-    setTimeout(function(){
-      if(document.getElementById('mo-limite-cli') && document.getElementById('mo-limite-cli').classList.contains('on')) return;
-      preencherModalAtraso(_atrasoCliPendente);
-      if(typeof abrirMd === 'function') abrirMd('mo-atraso-cli');
-    }, 120);
-  }
-
-  if(typeof selecionarVCli === 'function'){
-    var _selecionarVCliOriginal = selecionarVCli;
-    window.selecionarVCli = function(cid){
-      _selecionarVCliOriginal.apply(this, arguments);
-      try{
-        var cli = (typeof vCli !== 'undefined' && vCli) ? vCli : (DB.get('clientes')||[]).find(function(x){ return String(x.id) === String(cid); });
-        var info = dadosAtrasoCliente(cli);
-        _atrasoCliPendente = info;
-        if(!info) return;
-        var limiteOn = !!(document.getElementById('mo-limite-cli') && document.getElementById('mo-limite-cli').classList.contains('on'));
-        if(limiteOn){
-          tentarAbrirAtrasoDepoisDoLimite();
-        }else{
-          preencherModalAtraso(info);
-          if(typeof abrirMd === 'function') abrirMd('mo-atraso-cli');
-        }
-      }catch(e){}
-    };
-  }
-
-  if(typeof continuarAlertaLimiteCliente === 'function'){
-    var _continuarLimiteOriginal = continuarAlertaLimiteCliente;
-    window.continuarAlertaLimiteCliente = function(){
-      _continuarLimiteOriginal.apply(this, arguments);
-      tentarAbrirAtrasoDepoisDoLimite();
-    };
-  }
-
-  if(typeof cancelarAlertaLimiteCliente === 'function'){
-    var _cancelarLimiteOriginal = cancelarAlertaLimiteCliente;
-    window.cancelarAlertaLimiteCliente = function(){
-      _atrasoCliPendente = null;
-      _cancelarLimiteOriginal.apply(this, arguments);
-    };
-  }
-})();
-</script>
+<div class="ov" id="mo-xml-periodo">
+  <div class="md">
+    <div class="mh">
+      <div class="mht">📦 Exportar XML por período</div>
+      <button class="mx" onclick="fMd('mo-xml-periodo')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="g2">
+        <div class="fg">
+          <label class="fl">Data inicial</label>
+          <input class="fi" id="xml-periodo-inicio" type="date">
+        </div>
+        <div class="fg">
+          <label class="fl">Data final</label>
+          <input class="fi" id="xml-periodo-fim" type="date">
+        </div>
+      </div>
+      <div class="xml-help">O sistema vai baixar um arquivo .zip com os XML das NFC-e do período informado.</div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" type="button" onclick="fMd('mo-xml-periodo')">Fechar</button>
+      <button class="btn bb" type="button" onclick="baixarXmlPeriodoRelatorio()">⬇️ Baixar XML</button>
+    </div>
+  </div>
+</div>
 
 
 <script>
 (function(){
-  window.BELA_NFCE_API_URL = 'https://bela-caixa-api.onrender.com';
+  window.BELA_NFCE_API_URL = window.BELA_NFCE_API_URL || 'https://bela-caixa-api.onrender.com';
 
   function apiBase(){
     return String(window.BELA_NFCE_API_URL || '').replace(/\/$/, '');
   }
 
-  function acharVenda(vid){
-    return (DB.get('vendas') || []).find(function(v){
-      return String(v.id) === String(vid);
-    });
+  function mesAnoSelecionado(){
+    var mesEl = document.getElementById('rl-m');
+    var anoEl = document.getElementById('rl-a');
+    var mes = mesEl ? Number(mesEl.value) + 1 : (new Date().getMonth() + 1);
+    var ano = anoEl ? String(anoEl.value || new Date().getFullYear()) : String(new Date().getFullYear());
+    return ano + '-' + String(mes).padStart(2,'0');
   }
 
-  function acharCliente(cid){
-    return (DB.get('clientes') || []).find(function(c){
-      return String(c.id) === String(cid);
-    }) || null;
+  function downloadArquivo(url){
+    var a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
-  function itemNota(it){
-    return {
-      codigo: String(it.id || it.cod || ''),
-      descricao: String(it.nome || it.desc || 'Produto'),
-      ncm: String(it.ncm || ''),
-      cfop: String(it.cfop || '5102'),
-      csosn: String(it.csosn || '102'),
-      unidade: String(it.unidade || 'UN'),
-      quantidade: Number(it.qtd || it.quantidade || 1),
-      valorUnitario: Number(it.preco || it.valor || 0),
-      valorTotal: Number((it.qtd || it.quantidade || 1) * (it.preco || it.valor || 0)),
-      ean: String(it.ean || ''),
-      origem: String(it.origem || '0')
-    };
-  }
-
-  function payloadNota(venda, cliente){
-    var itens = Array.isArray(venda.itens) ? venda.itens : [];
-    return {
-      vendaId: venda.id,
-      dataVenda: venda.data || venda.createdAt || new Date().toISOString(),
-      ambiente: 'homologacao',
-      empresa: {
-        fantasia: 'Bela Modas'
-      },
-      cliente: cliente ? {
-        id: cliente.id || '',
-        nome: cliente.nome || venda.cliNome || 'Consumidor',
-        cpf: cliente.cpf || '',
-        telefone: cliente.tel || cliente.telefone || '',
-        endereco: cliente.end || cliente.endereco || ''
-      } : {
-        nome: venda.cliNome || 'Consumidor',
-        cpf: ''
-      },
-      itens: itens.map(itemNota),
-      pagamento: {
-        tipo: venda.forma || venda.forma_pagamento || 'dinheiro',
-        valor: Number(venda.total || 0)
-      },
-      total: Number(venda.total || 0)
-    };
-  }
-
-  function salvarRetornoNota(vid, data){
-    var vendas = DB.get('vendas') || [];
-    var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
-    if(idx < 0) return;
-
-    var nfce = (data && data.nfce) || {};
-    var idNota = String(nfce.id || ('nfce-' + Date.now()));
-    var base = apiBase();
-
-    vendas[idx].nfce_status = nfce.status || 'emitida_homologacao';
-    vendas[idx].nfce_numero = nfce.numero || idNota;
-    vendas[idx].nfce_chave = nfce.chave || idNota;
-    vendas[idx].nfce_xml_url = nfce.xml_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/xml');
-    vendas[idx].nfce_pdf_url = nfce.pdf_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/pdf');
-    vendas[idx].nfce_data = new Date().toISOString();
-    vendas[idx].updatedAt = new Date().toISOString();
-
-    DB.set('vendas', vendas);
-  }
-
-  window.emitirNfceCaixa = async function(vid){
+  window.baixarXmlMesRelatorio = function(){
     try{
-      var venda = acharVenda(vid);
-      if(!venda){
-        toast('⚠️ Venda não encontrada!');
-        return;
-      }
-
-      if(venda.nfce_status && !confirm('Essa venda já possui dados de nota. Deseja emitir novamente?')){
-        return;
-      }
-
-      var cliente = acharCliente(venda.cid);
-      var payload = payloadNota(venda, cliente);
-      var base = apiBase();
-
-      toast('⏳ Enviando venda para API da NFC-e...');
-      var resp = await fetch(base + '/nfce/emitir', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      var data;
-      try{
-        data = await resp.json();
-      }catch(e){
-        throw new Error('Resposta inválida da API.');
-      }
-
-      if(!resp.ok || !data || data.ok !== true){
-        throw new Error((data && (data.mensagem || data.error)) || 'Falha ao emitir NFC-e.');
-      }
-
-      salvarRetornoNota(vid, data);
-      try{ renderCaixa(); }catch(e){}
-      try{ renderVendas(); }catch(e){}
-      try{ renderDash(); }catch(e){}
-      toast('✅ NFC-e enviada com sucesso!','ok');
+      var mes = mesAnoSelecionado();
+      var url = apiBase() + '/nfce/xml/mes/' + mes;
+      downloadArquivo(url);
+      if(typeof toast === 'function') toast('📦 Baixando XML do mês ' + mes + '...');
     }catch(err){
-      toast('❌ ' + (err.message || 'Erro ao emitir NFC-e.'));
+      if(typeof toast === 'function') toast('❌ Erro ao baixar XML do mês.');
     }
   };
 
-  window.abrirNotaPdf = function(vid){
-    var venda = acharVenda(vid);
-    if(!venda || !venda.nfce_pdf_url){
-      toast('⚠️ PDF da nota ainda não disponível.');
-      return;
-    }
-    window.open(venda.nfce_pdf_url, '_blank');
+  window.abrirXmlPeriodoRelatorio = function(){
+    var hoje = new Date();
+    var anoEl = document.getElementById('rl-a');
+    var mesEl = document.getElementById('rl-m');
+    var ano = Number((anoEl && anoEl.value) || hoje.getFullYear());
+    var mes = Number((mesEl && mesEl.value) || hoje.getMonth());
+    var inicio = new Date(ano, mes, 1);
+    var fim = new Date(ano, mes + 1, 0);
+    var fmt = function(d){
+      return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    };
+    var iniEl = document.getElementById('xml-periodo-inicio');
+    var fimEl = document.getElementById('xml-periodo-fim');
+    if(iniEl && !iniEl.value) iniEl.value = fmt(inicio);
+    if(fimEl && !fimEl.value) fimEl.value = fmt(fim);
+    if(typeof oMd === 'function') oMd('mo-xml-periodo');
   };
 
-  window.abrirNotaXml = function(vid){
-    var venda = acharVenda(vid);
-    if(!venda || !venda.nfce_xml_url){
-      toast('⚠️ XML da nota ainda não disponível.');
+  window.baixarXmlPeriodoRelatorio = function(){
+    var ini = document.getElementById('xml-periodo-inicio');
+    var fim = document.getElementById('xml-periodo-fim');
+    var inicio = ini ? ini.value : '';
+    var final = fim ? fim.value : '';
+    if(!inicio || !final){
+      if(typeof toast === 'function') toast('⚠️ Informe a data inicial e a data final.');
       return;
     }
-    window.open(venda.nfce_xml_url, '_blank');
+    var url = apiBase() + '/nfce/xml/periodo?inicio=' + encodeURIComponent(inicio) + '&fim=' + encodeURIComponent(final);
+    downloadArquivo(url);
+    if(typeof fMd === 'function') fMd('mo-xml-periodo');
+    if(typeof toast === 'function') toast('📦 Baixando XML do período...');
   };
 })();
 </script>
