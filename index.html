@@ -371,13 +371,32 @@ td{padding:8px 9px !important;font-size:12px !important;}
 .etq-barcode{width:34mm;height:10mm;}
 .etq-code{font-size:5.7pt;letter-spacing:.5px;line-height:1;margin-top:.6mm;}
 #print-etiquetas{display:none;}
-#print-etiquetas .a4-grid{display:grid;grid-template-columns:repeat(3, 60mm);grid-auto-rows:40mm;gap:4mm;justify-content:center;padding:10mm;box-sizing:border-box;}
+#print-etiquetas .a4-grid{display:grid;justify-content:center;padding:10mm;box-sizing:border-box;}
+#print-etiquetas .a4-grid.size-6x4{grid-template-columns:repeat(3, 60mm);grid-auto-rows:40mm;gap:4mm;}
+#print-etiquetas .a4-grid.size-7x2{grid-template-columns:repeat(2, 70mm);grid-auto-rows:20mm;gap:4mm;}
+#print-etiquetas .termica-list{display:flex;flex-direction:column;gap:3mm;align-items:flex-start;padding:4mm;box-sizing:border-box;}
+.etq-card.size-6x4{padding:3mm;width:60mm;height:40mm;justify-content:flex-start;}
+.etq-card.size-6x4 .etq-brand{display:block;}
+.etq-card.size-6x4 .etq-line{display:block;}
+.etq-card.size-6x4 .etq-name{font-size:7.4pt;min-height:8.5mm;}
+.etq-card.size-6x4 .etq-ref{display:block;font-size:5.3pt;line-height:1.1;margin-top:.6mm;}
+.etq-card.size-6x4 .etq-price{font-size:16pt;font-weight:900;line-height:1;margin:1.8mm 0 1.2mm;}
+.etq-card.size-6x4 .etq-barcode{width:34mm;height:10mm;}
+.etq-card.size-6x4 .etq-code{display:block;font-size:5.7pt;letter-spacing:.5px;line-height:1;margin-top:.6mm;}
+.etq-card.size-7x2{padding:1.3mm 2mm;width:70mm;height:20mm;justify-content:center;}
+.etq-card.size-7x2 .etq-brand,.etq-card.size-7x2 .etq-line{display:none;}
+.etq-card.size-7x2 .etq-name{font-size:7.2pt;min-height:auto;font-weight:800;line-height:1.05;max-height:6mm;overflow:hidden;}
+.etq-card.size-7x2 .etq-ref{display:none;}
+.etq-card.size-7x2 .etq-price{font-size:11.5pt;font-weight:900;line-height:1;margin:.6mm 0 .5mm;}
+.etq-card.size-7x2 .etq-barcode{width:32mm;height:5.5mm;}
+.etq-card.size-7x2 .etq-code{display:none;}
 @page{size:A4 portrait;margin:10mm;}
 @media print{
   body{background:#fff !important;overflow:visible !important;}
   .shell,#fkbar,.ov,#toast,#pz{display:none !important;}
   #print-etiquetas{display:block !important;}
   #print-etiquetas .a4-grid{display:grid !important;}
+  #print-etiquetas .termica-list{display:flex !important;}
   #print-etiquetas .etq-card{box-shadow:none !important;border:1px solid #777 !important;}
 }
 
@@ -872,8 +891,24 @@ td{padding:8px 9px !important;font-size:12px !important;}
           <input id="etq-busca" class="fi" placeholder="Digite o nome, ref ou código de barras do produto" oninput="buscarEtiquetasPorNome(this.value)">
           <button class="btn bh sm" onclick="limparEtiquetas()">Limpar</button>
         </div>
-        <span class="tm">A4 • etiqueta fixa 6x4 cm • escolha vários produtos e ajuste a quantidade por item</span>
       </div>
+      <div class="g2" style="margin-bottom:10px;">
+        <div class="fg">
+          <label class="fl">Tamanho da etiqueta</label>
+          <select id="etq-formato" class="fi" onchange="alterarFormatoEtiqueta(this.value)">
+            <option value="6x4">Padrão 6 x 4 cm</option>
+            <option value="7x2">Horizontal 7 x 2 cm</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label class="fl">Modo de impressão</label>
+          <select id="etq-modo" class="fi" onchange="alterarModoEtiqueta(this.value)">
+            <option value="a4">Folha A4</option>
+            <option value="termica">Avulsa / térmica</option>
+          </select>
+        </div>
+      </div>
+      <div class="tm" style="margin:-2px 0 10px 0;">Escolha o tamanho da etiqueta e o tipo de impressão. O formato 7 x 2 cm pode ser impresso em folha A4 ou em impressão avulsa/térmica.</div>
       <div class="card" style="margin-bottom:10px;">
         <div class="fs" style="margin-bottom:8px;gap:10px;flex-wrap:wrap;">
           <div class="ct" style="margin-bottom:0;">Resultados da busca</div>
@@ -1592,6 +1627,34 @@ function diasSemPag(cid){
   var ultima=new Date(Math.max.apply(null,pgs.map(function(p){return new Date(p.data);})));
   return Math.floor((new Date()-ultima)/(1000*60*60*24));
 }
+
+function lerDeletedStore(nome){
+  try{
+    return JSON.parse(localStorage.getItem('bm_deleted_'+nome) || '[]');
+  }catch(e){
+    return [];
+  }
+}
+function salvarDeletedStore(nome, lista){
+  localStorage.setItem('bm_deleted_'+nome, JSON.stringify(lista||[]));
+}
+function registrarDeletedStore(nome, item){
+  if(!item || !item.id) return;
+  var agora = new Date().toISOString();
+  var tomb = Object.assign({}, item, {
+    deletedAt: item.deletedAt || agora,
+    updatedAt: agora
+  });
+  var lista = lerDeletedStore(nome);
+  var idx = lista.findIndex(function(x){ return String(x && x.id || '') === String(tomb.id); });
+  if(idx >= 0) lista[idx] = Object.assign({}, lista[idx], tomb);
+  else lista.push(tomb);
+  salvarDeletedStore(nome, lista);
+}
+function registrarDeletedLote(nome, itens){
+  (itens||[]).forEach(function(item){ registrarDeletedStore(nome, item); });
+}
+
 function toast(msg,tipo){
   var t=document.getElementById('toast');
   t.textContent=msg;
@@ -1735,6 +1798,7 @@ function delCli(id){
     var cli=clis.find(function(c){return c.id===id;});
     if(!cli){toast('⚠️ Cliente não encontrado!');return;}
     if(!confirm('Excluir cliente "'+(cli.nome||'Sem nome')+'"?\nEssa ação não pode ser desfeita!'))return;
+    registrarDeletedStore('clientes', cli);
     DB.set('clientes', clis.filter(function(c){return c.id!==id;}));
     renderClis();
     toast('🗑️ Cliente excluído com segurança!','ok');
@@ -1905,11 +1969,22 @@ function salvarProd(){
   else if(gerouEan) msg = '✅ Produto salvo com código de barras interno!';
   toast(msg,'ok');
 }
-function delProd(id){if(!confirm('Excluir produto?'))return;DB.set('produtos',DB.get('produtos').filter(function(p){return p.id!==id;}));renderProds();renderPGrid();toast('🗑️ Excluído!');}
+function delProd(id){
+  if(!confirm('Excluir produto?'))return;
+  var prods=DB.get('produtos')||[];
+  var prod=prods.find(function(p){return p.id===id;});
+  if(prod) registrarDeletedStore('produtos', prod);
+  DB.set('produtos',prods.filter(function(p){return p.id!==id;}));
+  renderProds();
+  renderPGrid();
+  toast('🗑️ Excluído!','ok');
+}
 
 
 var etiquetasSelecao=[];
 var etqBuscaLista=[];
+var etqFormato='6x4';
+var etqModoImpressao='a4';
 
 function getProdutosFiltradosLista(){
   var q=((document.getElementById('p-sc')||{}).value||'').toLowerCase();
@@ -2026,18 +2101,46 @@ function escaparHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]; });
 }
 
-function etiquetaCardHTML(p, idx){
+function alterarFormatoEtiqueta(v){
+  etqFormato = String(v||'6x4');
+  renderEtiquetaModal();
+}
+
+function alterarModoEtiqueta(v){
+  etqModoImpressao = String(v||'a4');
+}
+
+function getEtiquetaFormatoCfg(fmt){
+  fmt = String(fmt||etqFormato||'6x4');
+  if(fmt==='7x2'){
+    return {
+      cls:'size-7x2',
+      barcodeWidth13:0.72,
+      barcodeWidth128:0.66,
+      barcodeHeight:16
+    };
+  }
+  return {
+    cls:'size-6x4',
+    barcodeWidth13:0.9,
+    barcodeWidth128:0.8,
+    barcodeHeight:26
+  };
+}
+
+function etiquetaCardHTML(p, idx, formato){
+  var cfg = getEtiquetaFormatoCfg(formato);
   var preco = 'R$ ' + Number(p.preco||0).toLocaleString('pt-BR',{minimumFractionDigits:2, maximumFractionDigits:2});
   var ref = p.cod || '';
   var code = String(p.ean||p.cod||'').replace(/\s+/g,'');
-  return '<div class="etq-card">'+
+  return '<div class="etq-card '+cfg.cls+'">'+
     '<div class="etq-brand">Bela Modas</div>'+
     '<div class="etq-line"></div>'+
-    '<div class="etq-name">'+escaparHtml(p.nome||'')+'</div>'+
+    '<div class="etq-name">'+escaparHtml(p.nome||'')+(ref?' Ref '+escaparHtml(ref):'')+'</div>'+
     '<div class="etq-ref">Ref: '+escaparHtml(ref)+'</div>'+
     '<div class="etq-price">'+escaparHtml(preco)+'</div>'+
     '<div class="etq-barcode-wrap">'+
-      '<svg class="etq-barcode" id="etq-bar-'+idx+'" data-code="'+escaparHtml(code)+'"></svg>'+
+      '<svg class="etq-barcode" id="etq-bar-'+idx+'" data-formatocfg="'+cfg.cls+'" data-code="'+escaparHtml(code)+'"></svg>'+
       '<div class="etq-code">'+escaparHtml(code)+'</div>'+
     '</div>'+
   '</div>';
@@ -2048,14 +2151,16 @@ function renderBarcodeSvgs(root){
   (root||document).querySelectorAll('.etq-barcode').forEach(function(svg){
     var code=String(svg.getAttribute('data-code')||'').replace(/\D/g,'');
     if(!code) code='000000000000';
+    var cls = String(svg.getAttribute('data-formatocfg')||'size-6x4');
+    var cfg = cls.indexOf('7x2')>=0 ? {w13:0.72,w128:0.66,h:16} : {w13:0.9,w128:0.8,h:26};
     try{
       if(code.length===13){
-        JsBarcode(svg, code, {format:'EAN13', displayValue:false, margin:0, width:0.9, height:26});
+        JsBarcode(svg, code, {format:'EAN13', displayValue:false, margin:0, width:cfg.w13, height:cfg.h});
       }else{
-        JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:0.8, height:26});
+        JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:cfg.w128, height:cfg.h});
       }
     }catch(e){
-      try{ JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:0.75, height:26}); }catch(_e){}
+      try{ JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:Math.max(0.55,cfg.w128-0.05), height:cfg.h}); }catch(_e){}
     }
   });
 }
@@ -2080,8 +2185,13 @@ function renderEtiquetaModal(){
     '</tr>';
   }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--txt2);">Nenhum produto selecionado</td></tr>';
 
+  var formatoSel = document.getElementById('etq-formato');
+  if(formatoSel) formatoSel.value = etqFormato;
+  var modoSel = document.getElementById('etq-modo');
+  if(modoSel) modoSel.value = etqModoImpressao;
+
   var primeiro = itens.find(function(it){ return it.qty>0; });
-  pv.innerHTML = primeiro ? etiquetaCardHTML(primeiro.prod, 0) : '<div class="tm">Selecione pelo menos um produto para visualizar a etiqueta.</div>';
+  pv.innerHTML = primeiro ? etiquetaCardHTML(primeiro.prod, 0, etqFormato) : '<div class="tm">Selecione pelo menos um produto para visualizar a etiqueta.</div>';
   renderBarcodeSvgs(pv);
 }
 
@@ -2096,7 +2206,11 @@ function imprimirEtiquetasA4(){
   });
   if(!lista.length){ toast('⚠️ Selecione pelo menos uma etiqueta para imprimir.'); return; }
   var host=document.getElementById('print-etiquetas');
-  host.innerHTML='<div class="a4-grid">'+lista.map(function(p, idx){ return etiquetaCardHTML(p, idx); }).join('')+'</div>';
+  if(etqModoImpressao==='termica'){
+    host.innerHTML='<div class="termica-list">'+lista.map(function(p, idx){ return etiquetaCardHTML(p, idx, etqFormato); }).join('')+'</div>';
+  }else{
+    host.innerHTML='<div class="a4-grid size-'+etqFormato+'">'+lista.map(function(p, idx){ return etiquetaCardHTML(p, idx, etqFormato); }).join('')+'</div>';
+  }
   renderBarcodeSvgs(host);
   setTimeout(function(){ window.print(); }, 120);
 }
@@ -3121,6 +3235,7 @@ function excluirRecebCaixa(pid){
     if(!pag){toast('⚠️ Recebimento não encontrado!');return;}
     var cli=DB.get('clientes').find(function(x){return x.id===pag.cid;})||{nome:'Cliente'};
     if(!confirm('Excluir recebimento de '+R(pag.val)+' do cliente '+cli.nome+'?\nEsta ação não pode ser desfeita!'))return;
+    registrarDeletedStore('pagamentos', pag);
     DB.set('pagamentos', pgs.filter(function(x){return x.id!==pid;}));
     renderCaixa();
     renderReceb();
@@ -3634,6 +3749,18 @@ function cancelarVenda(vid){
   if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?\nEsta ação não pode ser desfeita!')){return;}
 
   ajustarEstoqueVenda(v.itens || [], 'somar');
+
+  var creditosRem = (DB.get('creditos')||[]).filter(function(c){ return String(c.vid||'')===String(vid); });
+  var fiadosRem = Array.isArray(DB.get('fiados')) ? (DB.get('fiados')||[]).filter(function(f){ return String(f.vid||'')===String(vid); }) : [];
+  var pagamentosRem = (DB.get('pagamentos')||[]).filter(function(p){
+    var pvid=String(p.vid || p.venda_id || '');
+    return pvid===String(vid);
+  });
+
+  registrarDeletedStore('vendas', v);
+  registrarDeletedLote('creditos', creditosRem);
+  registrarDeletedLote('creditos', fiadosRem);
+  registrarDeletedLote('pagamentos', pagamentosRem);
 
   DB.set('vendas', vendas.filter(function(x){return x.id!==vid;}));
   DB.set('creditos', (DB.get('creditos')||[]).filter(function(c){ return String(c.vid||'')!==String(vid); }));
