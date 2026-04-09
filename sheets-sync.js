@@ -1,9 +1,9 @@
 /*!
-Bela Modas Sheets Sync — versão estável
-Compatível com movimentações por cliente
-Mantém dados fiscais dos produtos
+Bela Modas Sheets Sync — versão estável corrigida
+Sincroniza inclusões, edições e exclusões
 Desktop escreve / mobile consulta
 */
+
 (function () {
 
 "use strict";
@@ -13,30 +13,134 @@ const API_URL =
 
 const SYNC_INTERVAL = 25000;
 
+
+/* DATA */
+
 function agoraISO(){
+
 const d = new Date();
 
 return d.getFullYear()+"-"+
+
 String(d.getMonth()+1).padStart(2,"0")+"-"+
+
 String(d.getDate()).padStart(2,"0")+"T"+
+
 String(d.getHours()).padStart(2,"0")+":"+
+
 String(d.getMinutes()).padStart(2,"0")+":"+
+
 String(d.getSeconds()).padStart(2,"0");
+
 }
 
+
+/* STORAGE */
+
 function lerLocal(nome){
+
 try{
+
 return JSON.parse(
+
 localStorage.getItem("bm_"+nome) || "[]"
+
 );
+
 }catch(e){
+
 return [];
+
 }
+
 }
+
+
+function lerDeleted(nome){
+
+try{
+
+return JSON.parse(
+
+localStorage.getItem("bm_deleted_"+nome) || "[]"
+
+);
+
+}catch(e){
+
+return [];
+
+}
+
+}
+
+
+function salvarDeleted(nome,dados){
+
+localStorage.setItem(
+
+"bm_deleted_"+nome,
+
+JSON.stringify(dados||[])
+
+);
+
+}
+
+
+/* DETECTAR REMOÇÕES */
+
+function detectarRemovidos(nome,antes,depois){
+
+const mapaDepois = new Set(
+
+depois.map(x=>String(x.id))
+
+);
+
+
+const removidos = antes
+
+.filter(x=>!mapaDepois.has(String(x.id)))
+
+.map(x=>({
+
+...x,
+
+deletedAt: agoraISO(),
+
+updatedAt: agoraISO()
+
+}));
+
+
+if(removidos.length){
+
+const antigos = lerDeleted(nome);
+
+
+salvarDeleted(
+
+nome,
+
+[...antigos,...removidos]
+
+);
+
+}
+
+}
+
+
+/* BACKUP */
 
 function salvarBackup(){
 
-const backup = {
+localStorage.setItem(
+
+"bm_backup",
+
+JSON.stringify({
 
 data: agoraISO(),
 
@@ -50,374 +154,233 @@ pagamentos: lerLocal("pagamentos"),
 
 creditos: lerLocal("creditos")
 
-};
+})
 
-localStorage.setItem(
-"bm_backup",
-JSON.stringify(backup)
 );
 
 }
+
+
+/* ENVIO */
 
 async function enviar(body){
 
 const params = new URLSearchParams();
 
 params.append(
+
 "payload",
+
 JSON.stringify(body)
+
 );
 
+
 const r = await fetch(
+
 API_URL,
+
 {
+
 method:"POST",
 
 headers:{
+
 "Content-Type":
+
 "application/x-www-form-urlencoded"
+
 },
 
 body:params.toString()
+
 }
+
 );
 
-const txt = await r.text();
 
-try{
-return JSON.parse(txt);
-}catch(e){
-
-return {
-ok:false,
-erro:"resposta invalida"
-};
+return JSON.parse(await r.text());
 
 }
 
-}
 
-function normalizarCliente(c){
-
-const t =
-c.updatedAt ||
-c.createdAt ||
-c.data ||
-agoraISO();
-
-return {
-
-id:
-String(
-c.id ||
-"cli_"+
-Math.random()
-.toString(36)
-.slice(2,9)
-),
-
-nome:c.nome||"",
-
-telefone:
-c.tel||
-c.telefone||
-"",
-
-cpf:c.cpf||"",
-
-endereco:
-c.end||
-c.endereco||
-"",
-
-obs:c.obs||"",
-
-data:
-c.data||
-t,
-
-createdAt:
-c.createdAt||
-t,
-
-updatedAt:
-c.updatedAt||
-t,
-
-deletedAt:
-c.deletedAt||""
-
-};
-
-}
+/* NORMALIZAÇÃO */
 
 function normalizarProduto(p){
 
-const t =
-p.updatedAt ||
-p.createdAt ||
-agoraISO();
-
 return {
 
-id:
-String(
-p.id ||
-"pro_"+
-Math.random()
-.toString(36)
-.slice(2,9)
-),
+id:p.id,
 
 cod:p.cod||"",
 
 nome:p.nome||"",
 
-cat:
-p.cat||
-p.categoria||
-"",
+cat:p.cat||"",
 
-preco:
-Number(p.preco||0),
+preco:Number(p.preco||0),
 
-custo:
-Number(p.custo||0),
+custo:Number(p.custo||0),
 
-estoque:
-Number(
-p.estq ??
-p.estoque ??
-0
-),
+estoque:Number(p.estoque||0),
 
 ean:p.ean||"",
 
 ncm:p.ncm||"",
 
-desc2:p.desc2||"",
-
 origem:p.origem||"0",
 
-unidade:
-p.unidade||"UN",
+csosn:p.csosn||"102",
 
-csosn:
-p.csosn||"102",
+cfop:p.cfop||"5102",
 
-cfop:
-p.cfop||"5102",
+createdAt:p.createdAt||agoraISO(),
 
-escala:
-p.escala||"S",
+updatedAt:p.updatedAt||agoraISO(),
 
-origem_estoque:
-p.origem_estoque||
-"manual",
-
-createdAt:
-p.createdAt||t,
-
-updatedAt:
-p.updatedAt||t,
-
-deletedAt:
-p.deletedAt||""
+deletedAt:p.deletedAt||""
 
 };
 
 }
+
+
+function normalizarCliente(c){
+
+return {
+
+id:c.id,
+
+nome:c.nome||"",
+
+telefone:c.telefone||c.tel||"",
+
+cpf:c.cpf||"",
+
+endereco:c.endereco||c.end||"",
+
+obs:c.obs||"",
+
+createdAt:c.createdAt||agoraISO(),
+
+updatedAt:c.updatedAt||agoraISO(),
+
+deletedAt:c.deletedAt||""
+
+};
+
+}
+
 
 function normalizarVenda(v){
 
-const t =
-v.updatedAt ||
-v.createdAt ||
-v.data ||
-agoraISO();
-
 return {
 
-id:
-String(
-v.id ||
-"ven_"+
-Math.random()
-.toString(36)
-.slice(2,9)
-),
+id:v.id,
 
 cid:v.cid||"",
 
-cliente:
-v.cliNome||
-v.cliente||
-"Balcão",
+cliente:v.cliente||"",
 
-forma_pagamento:
-v.forma||
-v.forma_pagamento||
-"",
+forma_pagamento:v.forma_pagamento||"",
 
-subtotal:
-Number(v.subtotal||0),
+total:Number(v.total||0),
 
-desconto:
-Number(v.desconto||0),
+itens_json:JSON.stringify(v.itens||[]),
 
-total:
-Number(v.total||0),
+data:v.data||agoraISO(),
 
-itens_json:
-JSON.stringify(
-v.itens||[]
-),
+createdAt:v.createdAt||agoraISO(),
 
-data:
-v.data||t,
+updatedAt:v.updatedAt||agoraISO(),
 
-createdAt:
-v.createdAt||t,
-
-updatedAt:
-v.updatedAt||t,
-
-deletedAt:
-v.deletedAt||""
+deletedAt:v.deletedAt||""
 
 };
 
 }
+
 
 function normalizarPagamento(p){
 
-const t =
-p.updatedAt ||
-p.createdAt ||
-p.data ||
-agoraISO();
-
 return {
 
-id:
-String(
-p.id ||
-"pag_"+
-Math.random()
-.toString(36)
-.slice(2,9)
-),
+id:p.id,
 
-cid:
-p.cid||"",   // importante
+cid:p.cid||"",
 
-venda_id:
-p.vid||
-(
-p.cid
-? "cid:"+p.cid
-: ""
-),
+venda_id:p.venda_id||"",
 
-valor:
-Number(
-p.val||
-p.valor||
-0
-),
+valor:Number(p.valor||0),
 
-forma_pagamento:
-p.forma||
-p.forma_pagamento||
-"",
+forma_pagamento:p.forma_pagamento||"",
 
-obs:p.obs||"",
+createdAt:p.createdAt||agoraISO(),
 
-data:
-p.data||t,
+updatedAt:p.updatedAt||agoraISO(),
 
-createdAt:
-p.createdAt||t,
-
-updatedAt:
-p.updatedAt||t,
-
-deletedAt:
-p.deletedAt||""
+deletedAt:p.deletedAt||""
 
 };
 
 }
 
-function normalizarCredito(c){
 
-const t =
-c.updatedAt ||
-c.createdAt ||
-c.data ||
-agoraISO();
+function normalizarCredito(c){
 
 return {
 
-id:
-String(
-c.id ||
-"cre_"+
-Math.random()
-.toString(36)
-.slice(2,9)
-),
+id:c.id,
 
 cid:c.cid||"",
 
 vid:c.vid||"",
 
-cliente:
-c.cliNome||
-c.cliente||
-"",
+valor:Number(c.valor||0),
 
-descricao:
-c.desc||
-c.descricao||
-"",
+status:c.status||"aberto",
 
-valor:
-Number(
-c.val||
-c.valor||
-0
-),
+vencimento:c.vencimento||agoraISO(),
 
-status:
-c.status||
-"aberto",
+createdAt:c.createdAt||agoraISO(),
 
-vencimento:
-c.vencimento||
-c.data||
-t,
+updatedAt:c.updatedAt||agoraISO(),
 
-data:
-c.data||
-t,
-
-createdAt:
-c.createdAt||t,
-
-updatedAt:
-c.updatedAt||t,
-
-deletedAt:
-c.deletedAt||""
+deletedAt:c.deletedAt||""
 
 };
 
 }
 
+
+/* SYNC */
+
 async function enviarTudo(){
 
 salvarBackup();
+
+
+const clientes = lerLocal("clientes");
+
+const produtos = lerLocal("produtos");
+
+const vendas = lerLocal("vendas");
+
+const pagamentos = lerLocal("pagamentos");
+
+const creditos = lerLocal("creditos");
+
+
+const clientesDeleted = lerDeleted("clientes");
+
+const produtosDeleted = lerDeleted("produtos");
+
+const vendasDeleted = lerDeleted("vendas");
+
+const pagamentosDeleted = lerDeleted("pagamentos");
+
+const creditosDeleted = lerDeleted("creditos");
+
 
 await enviar({
 
@@ -426,10 +389,19 @@ action:"upsert",
 sheet:"clientes",
 
 rows:
-lerLocal("clientes")
+
+clientes
+
 .map(normalizarCliente)
 
+.concat(
+
+clientesDeleted.map(normalizarCliente)
+
+)
+
 });
+
 
 await enviar({
 
@@ -438,10 +410,19 @@ action:"upsert",
 sheet:"produtos",
 
 rows:
-lerLocal("produtos")
+
+produtos
+
 .map(normalizarProduto)
 
+.concat(
+
+produtosDeleted.map(normalizarProduto)
+
+)
+
 });
+
 
 await enviar({
 
@@ -450,10 +431,19 @@ action:"upsert",
 sheet:"vendas",
 
 rows:
-lerLocal("vendas")
+
+vendas
+
 .map(normalizarVenda)
 
+.concat(
+
+vendasDeleted.map(normalizarVenda)
+
+)
+
 });
+
 
 await enviar({
 
@@ -462,10 +452,19 @@ action:"upsert",
 sheet:"recebimentos",
 
 rows:
-lerLocal("pagamentos")
+
+pagamentos
+
 .map(normalizarPagamento)
 
+.concat(
+
+pagamentosDeleted.map(normalizarPagamento)
+
+)
+
 });
+
 
 await enviar({
 
@@ -474,61 +473,90 @@ action:"upsert",
 sheet:"cobrancas",
 
 rows:
-lerLocal("creditos")
+
+creditos
+
 .map(normalizarCredito)
+
+.concat(
+
+creditosDeleted.map(normalizarCredito)
+
+)
 
 });
 
+
 localStorage.setItem(
+
 "bm_last_sync",
+
 agoraISO()
+
 );
 
 }
 
-let timer;
 
-function agendar(){
+/* DETECTAR ALTERAÇÃO LOCAL */
 
-clearTimeout(timer);
+const originalSetItem = localStorage.setItem;
 
-timer =
-setTimeout(
-enviarTudo,
-800
-);
 
-}
+localStorage.setItem = function(k,v){
 
-const original =
-localStorage.setItem;
+const nome = String(k).replace("bm_","");
 
-localStorage.setItem =
-function(k,v){
-
-original.call(
-localStorage,
-k,
-v
-);
 
 if(
-String(k)
-.match(
-/bm_(clientes|produtos|vendas|pagamentos|creditos)/
-)
+
+["clientes","produtos","vendas","pagamentos","creditos"]
+
+.includes(nome)
+
 ){
 
-agendar();
+const antes = lerLocal(nome);
+
+
+originalSetItem.call(localStorage,k,v);
+
+
+const depois = lerLocal(nome);
+
+
+detectarRemovidos(
+
+nome,
+
+antes,
+
+depois
+
+);
+
+
+enviarTudo();
+
+
+return;
 
 }
+
+
+originalSetItem.call(localStorage,k,v);
 
 };
 
+
 setInterval(
+
 enviarTudo,
+
 SYNC_INTERVAL
+
 );
+
 
 window.BelaSheetsSync = {
 
