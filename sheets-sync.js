@@ -1,5 +1,5 @@
 /*!
-Bela Modas Sheets Sync — versão estável corrigida
+Bela Modas Sheets Sync — versão corrigida
 Sincroniza inclusões, edições e exclusões
 Desktop escreve / mobile consulta
 */
@@ -12,7 +12,7 @@ const API_URL =
 "https://script.google.com/macros/s/AKfycbzH4m2rIWkzHLf_SPldVWBk6uSbhmwWz_OLZENRr0A-9XOzCtHsU5fbLtJCm-ZKss0k/exec";
 
 const SYNC_INTERVAL = 25000;
-
+let syncEmAndamento = false;
 
 /* DATA */
 
@@ -21,19 +21,28 @@ function agoraISO(){
 const d = new Date();
 
 return d.getFullYear()+"-"+
-
 String(d.getMonth()+1).padStart(2,"0")+"-"+
-
 String(d.getDate()).padStart(2,"0")+"T"+
-
 String(d.getHours()).padStart(2,"0")+":"+
-
 String(d.getMinutes()).padStart(2,"0")+":"+
-
 String(d.getSeconds()).padStart(2,"0");
 
 }
 
+function numeroSeguro(v){
+const n = Number(String(v ?? "").replace(",","."));
+return Number.isFinite(n) ? n : 0;
+}
+
+function safeParseJson(v, fallback){
+if(Array.isArray(v)) return v;
+if(v == null || v === "") return fallback;
+try{
+return JSON.parse(v);
+}catch(e){
+return fallback;
+}
+}
 
 /* STORAGE */
 
@@ -198,9 +207,20 @@ body:params.toString()
 
 );
 
+const txt = await r.text();
+let json = {};
 
-return JSON.parse(await r.text());
+try{
+json = JSON.parse(txt);
+}catch(e){
+throw new Error("Resposta inválida do Apps Script");
+}
 
+if(!r.ok || json.ok === false){
+throw new Error(json.error || "Falha ao sincronizar");
+}
+
+return json;
 }
 
 
@@ -218,11 +238,11 @@ nome:p.nome||"",
 
 cat:p.cat||"",
 
-preco:Number(p.preco||0),
+preco:numeroSeguro(p.preco),
 
-custo:Number(p.custo||0),
+custo:numeroSeguro(p.custo),
 
-estoque:Number(p.estoque||0),
+estoque:numeroSeguro(p.estoque),
 
 ean:p.ean||"",
 
@@ -261,9 +281,11 @@ endereco:c.endereco||c.end||"",
 
 obs:c.obs||"",
 
-createdAt:c.createdAt||agoraISO(),
+data:c.data||c.createdAt||agoraISO(),
 
-updatedAt:c.updatedAt||agoraISO(),
+createdAt:c.createdAt||c.data||agoraISO(),
+
+updatedAt:c.updatedAt||c.data||agoraISO(),
 
 deletedAt:c.deletedAt||""
 
@@ -280,19 +302,19 @@ id:v.id,
 
 cid:v.cid||"",
 
-cliente:v.cliente||"",
+cliente:v.cliente||v.cliNome||"",
 
-forma_pagamento:v.forma_pagamento||"",
+forma_pagamento:v.forma_pagamento||v.forma||"",
 
-total:Number(v.total||0),
+total:numeroSeguro(v.total),
 
-itens_json:JSON.stringify(v.itens||[]),
+itens_json:JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
 
-data:v.data||agoraISO(),
+data:v.data||v.createdAt||agoraISO(),
 
-createdAt:v.createdAt||agoraISO(),
+createdAt:v.createdAt||v.data||agoraISO(),
 
-updatedAt:v.updatedAt||agoraISO(),
+updatedAt:v.updatedAt||v.data||agoraISO(),
 
 deletedAt:v.deletedAt||""
 
@@ -309,15 +331,19 @@ id:p.id,
 
 cid:p.cid||"",
 
-venda_id:p.venda_id||"",
+venda_id:p.venda_id||p.vid||"",
 
-valor:Number(p.valor||0),
+valor:numeroSeguro(p.valor ?? p.val),
 
-forma_pagamento:p.forma_pagamento||"",
+forma_pagamento:p.forma_pagamento||p.forma||"",
 
-createdAt:p.createdAt||agoraISO(),
+obs:p.obs||"",
 
-updatedAt:p.updatedAt||agoraISO(),
+data:p.data||p.createdAt||agoraISO(),
+
+createdAt:p.createdAt||p.data||agoraISO(),
+
+updatedAt:p.updatedAt||p.data||agoraISO(),
 
 deletedAt:p.deletedAt||""
 
@@ -334,17 +360,23 @@ id:c.id,
 
 cid:c.cid||"",
 
-vid:c.vid||"",
+vid:c.vid||c.venda_id||"",
 
-valor:Number(c.valor||0),
+cliente:c.cliente||c.cliNome||"",
+
+descricao:c.descricao||c.desc||"",
+
+valor:numeroSeguro(c.valor ?? c.val),
 
 status:c.status||"aberto",
 
-vencimento:c.vencimento||agoraISO(),
+vencimento:c.vencimento||"",
 
-createdAt:c.createdAt||agoraISO(),
+data:c.data||c.createdAt||agoraISO(),
 
-updatedAt:c.updatedAt||agoraISO(),
+createdAt:c.createdAt||c.data||agoraISO(),
+
+updatedAt:c.updatedAt||c.data||agoraISO(),
 
 deletedAt:c.deletedAt||""
 
@@ -356,6 +388,11 @@ deletedAt:c.deletedAt||""
 /* SYNC */
 
 async function enviarTudo(){
+
+if(syncEmAndamento) return;
+syncEmAndamento = true;
+
+try{
 
 salvarBackup();
 
@@ -495,6 +532,14 @@ agoraISO()
 
 );
 
+}catch(e){
+console.error("Erro na sincronização Bela Modas:", e);
+localStorage.setItem("bm_last_sync_error", String(e && e.message || e));
+throw e;
+}finally{
+syncEmAndamento = false;
+}
+
 }
 
 
@@ -536,7 +581,9 @@ depois
 );
 
 
-enviarTudo();
+enviarTudo().catch(function(err){
+console.error(err);
+});
 
 
 return;
@@ -551,7 +598,13 @@ originalSetItem.call(localStorage,k,v);
 
 setInterval(
 
-enviarTudo,
+function(){
+
+enviarTudo().catch(function(err){
+console.error(err);
+});
+
+},
 
 SYNC_INTERVAL
 
