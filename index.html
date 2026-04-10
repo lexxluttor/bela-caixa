@@ -990,6 +990,29 @@ td{padding:8px 9px !important;font-size:12px !important;}
   </div>
 </div>
 
+<!-- MODAL ATRASO PAGAMENTO -->
+<div class="ov" id="mo-atraso-cli">
+  <div class="md" style="max-width:520px;">
+    <div class="mh"><div class="mht">⏰ Pagamento em Atraso</div><button class="mx" onclick="cancelarAlertaAtrasoCliente()">✕</button></div>
+    <div class="mb">
+      <div id="atraso-card" style="border-radius:14px;padding:16px;border:1px solid rgba(192,57,43,.35);background:rgba(192,57,43,.10);">
+        <div style="display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;background:rgba(192,57,43,.15);color:var(--red);">⚠️ Mais de 30 dias sem pagamento</div>
+        <div style="font-size:18px;font-weight:800;line-height:1.45;color:var(--red2);">Cliente com pagamento em atraso. Deseja continuar a venda?</div>
+        <div class="g2" style="margin-top:14px;">
+          <div class="imp-box"><div class="fl">Cliente</div><div id="atraso-cliente" style="font-weight:800;font-size:15px;">—</div></div>
+          <div class="imp-box"><div class="fl">Dias sem pagamento</div><div id="atraso-dias" style="font-weight:800;font-size:15px;color:var(--red2);">0 dias</div></div>
+          <div class="imp-box"><div class="fl">Saldo em aberto</div><div id="atraso-saldo" style="font-weight:800;font-size:15px;color:var(--red2);">R$ 0,00</div></div>
+          <div class="imp-box"><div class="fl">Ref. último pagamento</div><div id="atraso-data" style="font-weight:800;font-size:15px;">—</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" onclick="cancelarAlertaAtrasoCliente()">Cancelar</button>
+      <button class="btn br" onclick="continuarAlertaAtrasoCliente()">Continuar</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL PRODUTO -->
 <div class="ov" id="mo-prod">
   <div class="md">
@@ -1605,12 +1628,59 @@ function verificarLimiteClienteVenda(cli){
 function continuarAlertaLimiteCliente(){
   _limiteCliPendente=null;
   fMd('mo-limite-cli');
+  // Se há atraso pendente, abre o modal de atraso em seguida
+  if(_atrasoCliPendente){
+    var c=_atrasoCliPendente;
+    _atrasoCliPendente=null;
+    setTimeout(function(){ verificarAtrasoClienteVenda(c); }, 200);
+  }
 }
 function cancelarAlertaLimiteCliente(){
   _limiteCliPendente=null;
+  try{ _atrasoCliPendente = null; }catch(e){}
   fMd('mo-limite-cli');
   remCli();
 }
+
+/* ── ALERTA ATRASO (> 30 dias sem pagamento) ── */
+var _atrasoCliPendente=null;
+function dadosAtrasoCliente(cli){
+  if(!cli||!cli.id) return null;
+  var sd=saldo(cli.id).sd;
+  if(sd<=0) return null;
+  var dias=diasSemPag(cli.id);
+  if(dias<=30) return null;
+  // data de referência: último pagamento ou primeira compra
+  var pgs=pagamentosValidos().filter(function(p){return p.cid===cli.id;});
+  var dataRef='';
+  if(pgs.length){
+    dataRef=pgs.slice().sort(function(a,b){return new Date(b.data)-new Date(a.data);})[0].data||'';
+  }else{
+    var crds=creditosValidos().filter(function(f){return f.cid===cli.id;});
+    if(crds.length) dataRef=crds.slice().sort(function(a,b){return new Date(a.data)-new Date(b.data);})[0].data||'';
+  }
+  return {cliente:cli, dias:dias, saldo:sd, dataRef:dataRef};
+}
+function verificarAtrasoClienteVenda(cli){
+  var info=dadosAtrasoCliente(cli);
+  if(!info) return;
+  _atrasoCliPendente=cli;
+  document.getElementById('atraso-cliente').textContent=cli.nome||'Cliente';
+  document.getElementById('atraso-dias').textContent=info.dias+' dias';
+  document.getElementById('atraso-saldo').textContent=R(info.saldo);
+  document.getElementById('atraso-data').textContent=info.dataRef?(typeof FD==='function'?FD(info.dataRef):info.dataRef):'-';
+  abrirMd('mo-atraso-cli');
+}
+function continuarAlertaAtrasoCliente(){
+  _atrasoCliPendente=null;
+  fMd('mo-atraso-cli');
+}
+function cancelarAlertaAtrasoCliente(){
+  _atrasoCliPendente=null;
+  fMd('mo-atraso-cli');
+  remCli();
+}
+
 function saldo(cid){
   var tf=creditosValidos().filter(function(f){return f.cid===cid;}).reduce(function(s,f){return s+Number(f.val||0);},0);
   var tp=pagamentosValidos().filter(function(p){return p.cid===cid;}).reduce(function(s,p){return s+Number(p.val||0);},0);
@@ -2500,7 +2570,7 @@ function confirmarImportacaoXML(){
         estq: Number(it.qtd||0),
         desc2: it.desc2 || '',
         custo: Number(it.custo||0),
-        ean: it.ean || '',
+        ean: it.ean || it.codigo_barras || it.codBarras || it.codigoDeBarras || '',
         ncm: it.ncm || (NCM_POR_CATEGORIA[it.cat || ''] || ''),
         origem: '0',
         unidade: categoriaEhCalcado(it.cat||'') ? 'PAR' : 'UN',
@@ -2551,13 +2621,20 @@ function selecionarVCli(cid){
   var sc=document.getElementById('v-sc');
   if(sc){ sc.value=c.nome+(c.tel?' · '+c.tel:''); sc.style.color='var(--red2)'; sc.style.fontWeight='800'; sc.readOnly=true; }
   document.getElementById('v-sg').innerHTML='';
-  // Trocar botões por X Remover
   var row=document.getElementById('v-row-busca');
   if(row){
     row.innerHTML='<input class="fi" id="v-sc" value="'+c.nome+(c.tel?' · '+c.tel:'')+'" readonly style="flex:1;color:var(--red2);font-weight:800;">'+
     '<button class="btn bh sm" onclick="remCli()">✕ Remover</button>';
   }
-  verificarLimiteClienteVenda(c);
+  var temLimite=dadosLimiteCliente(c);
+  var abreAtraso=(dadosAtrasoCliente(c)!==null);
+  if(temLimite.limite && (temLimite.excedeu||temLimite.alerta)){
+    verificarLimiteClienteVenda(c);
+    // Se também tem atraso, abre após fechar limite (via continuarAlertaLimiteCliente)
+    if(abreAtraso) _atrasoCliPendente=c;
+  } else if(abreAtraso){
+    verificarAtrasoClienteVenda(c);
+  }
 }
 function remCli(){
   vCli=null;
@@ -4990,19 +5067,22 @@ document.addEventListener('DOMContentLoaded',function(){
   }
 
   function itemNota(it){
+    var qtd = Number(it.qtd || it.qty || it.quantidade || 1);
+    var valorUnit = Number(it.preco || it.valorUnitario || it.valor || 0);
     return {
-      codigo: String(it.id || it.cod || ''),
+      codigo: String(it.cod || it.codigo || it.ref || it.id || ''),
       descricao: String(it.nome || it.desc || 'Produto'),
       ncm: String(it.ncm || ''),
       cfop: String(it.cfop || '5102'),
       csosn: String(it.csosn || '102'),
       unidade: String(it.unidade || 'UN'),
-      quantidade: Number(it.qtd || it.quantidade || 1),
-      valorUnitario: Number(it.preco || it.valor || 0),
-      valorTotal: Number(it.valorTotal || ((it.qtd || it.quantidade || 1) * (it.preco || it.valor || 0))),
-      ean: String(it.ean || ''),
+      quantidade: qtd,
+      valorUnitario: valorUnit,
+      valorTotal: Number(it.valorTotal || (qtd * valorUnit)),
+      ean: String(it.ean || it.codigo_barras || it.codBarras || it.codigoDeBarras || ''),
       origem: String(it.origem || '0')
     };
+  };
   }
 
   function payloadNota(venda, cliente){
