@@ -2339,11 +2339,35 @@ function renderPGrid(){
   }).join('')||'<div style="color:var(--txt2);padding:16px;font-size:13px;">Nenhum produto cadastrado</div>';
 }
 function addProd(pid){
-  var p=DB.get('produtos').find(function(x){return x.id===pid;});
+  var p=(DB.get('produtos')||[]).find(function(x){return x.id===pid;});
   if(!p)return;
-  var ex=cart.find(function(i){return i.pid===pid;});
-  if(ex)ex.qty++;
-  else cart.push({id:DB.uid(),pid:pid,desc:p.nome,preco:p.preco,qty:1});
+  var ex=cart.find(function(i){return String(i.pid||'')===String(pid);});
+  if(ex){
+    ex.qty++;
+    if(!ex.cod) ex.cod = p.cod || p.codigo || '';
+    if(!ex.ean) ex.ean = p.ean || p.codigo_barras || p.codBarras || p.codigoDeBarras || '';
+    if(!ex.ncm) ex.ncm = p.ncm || '';
+    if(!ex.cfop) ex.cfop = p.cfop || '5102';
+    if(!ex.csosn) ex.csosn = p.csosn || '102';
+    if(!ex.unidade) ex.unidade = p.unidade || 'UN';
+    if(!ex.origem) ex.origem = p.origem || '0';
+  }else{
+    cart.push({
+      id:DB.uid(),
+      pid:pid,
+      cod:p.cod||p.codigo||'',
+      ean:p.ean||p.codigo_barras||p.codBarras||p.codigoDeBarras||'',
+      ncm:p.ncm||'',
+      cfop:p.cfop||'5102',
+      csosn:p.csosn||'102',
+      unidade:p.unidade||'UN',
+      origem:p.origem||'0',
+      desc:p.nome,
+      nome:p.nome,
+      preco:Number(p.preco||0),
+      qty:1
+    });
+  }
   renderCart();toast(p.nome+' adicionado!','ok');
 }
 function posSugProdutoManual(){
@@ -2649,14 +2673,60 @@ function remCli(){
 }
 function addItem(){
   var desc=document.getElementById('v-desc').value.trim();
-  var preco=parseFloat(document.getElementById('v-preco').value);
+  var preco=parseFloat(String(document.getElementById('v-preco').value||'').replace(',','.'));
   var qty=parseInt(document.getElementById('v-qty').value)||1;
   if(!desc||!preco||preco<=0){toast('⚠️ Preencha descrição e preço!');return;}
-  var ex=cart.find(function(i){return i.desc===desc&&i.preco===preco;});
-  if(ex)ex.qty+=qty;else cart.push({id:DB.uid(),desc:desc,preco:preco,qty:qty});
-  document.getElementById('v-desc').value='';document.getElementById('v-preco').value='';document.getElementById('v-qty').value='1';
+
+  var produtos = DB.get('produtos') || [];
+  var descNorm = desc.toLowerCase().trim();
+  var p = produtos.find(function(x){
+    var nome = String(x.nome||'').toLowerCase().trim();
+    var cod = String(x.cod||x.codigo||'').toLowerCase().trim();
+    var ean = String(x.ean||x.codigo_barras||x.codBarras||x.codigoDeBarras||'').toLowerCase().trim();
+    return nome === descNorm || cod === descNorm || ean === descNorm;
+  }) || null;
+
+  var item = {
+    id:DB.uid(),
+    pid:p ? p.id : '',
+    cod:p ? (p.cod||p.codigo||'') : '',
+    ean:p ? (p.ean||p.codigo_barras||p.codBarras||p.codigoDeBarras||'') : '',
+    ncm:p ? (p.ncm||'') : '',
+    cfop:p ? (p.cfop||'5102') : '5102',
+    csosn:p ? (p.csosn||'102') : '102',
+    unidade:p ? (p.unidade||'UN') : 'UN',
+    origem:p ? (p.origem||'0') : '0',
+    desc:p ? (p.nome||desc) : desc,
+    nome:p ? (p.nome||desc) : desc,
+    preco:Number(preco||0),
+    qty:qty
+  };
+
+  var ex = cart.find(function(i){
+    if(item.pid && i.pid) return String(i.pid)===String(item.pid);
+    return String(i.desc||'')===String(item.desc||'') && Number(i.preco||0)===Number(item.preco||0);
+  });
+
+  if(ex){
+    ex.qty += qty;
+    if(!ex.cod && item.cod) ex.cod = item.cod;
+    if(!ex.ean && item.ean) ex.ean = item.ean;
+    if(!ex.ncm && item.ncm) ex.ncm = item.ncm;
+    if(!ex.cfop && item.cfop) ex.cfop = item.cfop;
+    if(!ex.csosn && item.csosn) ex.csosn = item.csosn;
+    if(!ex.unidade && item.unidade) ex.unidade = item.unidade;
+    if(!ex.origem && item.origem) ex.origem = item.origem;
+    if(!ex.pid && item.pid) ex.pid = item.pid;
+  }else{
+    cart.push(item);
+  }
+
+  document.getElementById('v-desc').value='';
+  document.getElementById('v-preco').value='';
+  document.getElementById('v-qty').value='1';
   limparBuscaProdutoManual();
-  document.getElementById('v-desc').focus();renderCart();
+  document.getElementById('v-desc').focus();
+  renderCart();
 }
 function chgQty(id,d){
   var idx=cart.findIndex(function(i){return i.id===id;});if(idx<0)return;
@@ -5067,20 +5137,30 @@ document.addEventListener('DOMContentLoaded',function(){
   }
 
   function itemNota(it){
+    var produtos = DB.get('produtos') || [];
+    var p = produtos.find(function(x){
+      return String(x.id || '') === String(it.pid || it.produto_id || it.idProduto || '') ||
+             (it.cod && String(x.cod || x.codigo || '') === String(it.cod)) ||
+             (it.codigo && String(x.cod || x.codigo || '') === String(it.codigo)) ||
+             (it.ean && String(x.ean || x.codigo_barras || x.codBarras || x.codigoDeBarras || '') === String(it.ean)) ||
+             (it.codigo_barras && String(x.ean || x.codigo_barras || x.codBarras || x.codigoDeBarras || '') === String(it.codigo_barras));
+    }) || {};
+
     var qtd = Number(it.qtd || it.qty || it.quantidade || 1);
-    var valorUnit = Number(it.preco || it.valorUnitario || it.valor || 0);
+    var valorUnit = Number(it.preco || it.valorUnitario || it.valor || p.preco || 0);
+
     return {
-      codigo: String(it.cod || it.codigo || it.ref || it.id || ''),
-      descricao: String(it.nome || it.desc || 'Produto'),
-      ncm: String(it.ncm || ''),
-      cfop: String(it.cfop || '5102'),
-      csosn: String(it.csosn || '102'),
-      unidade: String(it.unidade || 'UN'),
+      codigo: String(it.cod || it.codigo || p.cod || p.codigo || it.ref || it.id || ''),
+      descricao: String(it.nome || it.desc || p.nome || 'Produto'),
+      ncm: String(it.ncm || p.ncm || ''),
+      cfop: String(it.cfop || p.cfop || '5102'),
+      csosn: String(it.csosn || p.csosn || '102'),
+      unidade: String(it.unidade || p.unidade || 'UN'),
       quantidade: qtd,
       valorUnitario: valorUnit,
       valorTotal: Number(it.valorTotal || (qtd * valorUnit)),
-      ean: String(it.ean || it.codigo_barras || it.codBarras || it.codigoDeBarras || ''),
-      origem: String(it.origem || '0')
+      ean: String(it.ean || it.codigo_barras || it.codBarras || it.codigoDeBarras || p.ean || p.codigo_barras || p.codBarras || p.codigoDeBarras || ''),
+      origem: String(it.origem || p.origem || '0')
     };
   }
 
