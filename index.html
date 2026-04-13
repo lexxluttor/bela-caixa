@@ -5095,7 +5095,7 @@ document.addEventListener('DOMContentLoaded',function(){
     var fimEl = document.getElementById('xml-periodo-fim');
     if(iniEl && !iniEl.value) iniEl.value = fmt(inicio);
     if(fimEl && !fimEl.value) fimEl.value = fmt(fim);
-    if(typeof oMd === 'function') oMd('mo-xml-periodo');
+    if(typeof abrirMd === 'function') abrirMd('mo-xml-periodo'); else if(typeof oMd === 'function') oMd('mo-xml-periodo');
   };
 
   window.baixarXmlPeriodoRelatorio = function(){
