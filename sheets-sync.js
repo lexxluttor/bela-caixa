@@ -228,6 +228,13 @@ return json;
 
 function normalizarProduto(p){
 
+const eanPrincipal = String(p.ean || "").trim();
+const codigosExtras = String(
+  p.codigos_barras != null
+    ? p.codigos_barras
+    : (p.codigosBarras != null ? p.codigosBarras : "")
+).trim();
+
 return {
 
 id:p.id,
@@ -244,7 +251,9 @@ custo:numeroSeguro(p.custo),
 
 estoque:numeroSeguro(p.estoque),
 
-ean:p.ean||"",
+ean:eanPrincipal,
+
+codigos_barras:codigosExtras,
 
 ncm:p.ncm||"",
 
