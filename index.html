@@ -1975,7 +1975,7 @@ function renderProds(){
   var rows=prods.map(function(p){
     return '<tr><td><b style="color:var(--gold);">'+p.cod+'</b></td>'+
       '<td><b>'+p.nome+'</b>'+(p.desc2?'<br><span class="tm">'+p.desc2+'</span>':'')+'</td>'+
-      '<td><b>'+(p.grupo||categoriaPrincipalPorSubcategoria(p.subcat||p.cat||''))+'</b><br><span class="tm">'+(p.subcat||p.cat||'—')+'</span></td>'+
+      '<td><b>'+(p.grupo||categoriaPrincipalPorSubcategoria(p.subcategoria||p.subcat||p.cat||''))+'</b><br><span class="tm">'+(p.subcategoria||p.subcat||p.cat||'—')+'</span></td>'+
       '<td class="txt-go">'+R(p.preco)+'</td>'+
       '<td>'+(p.estq||0)+'</td>'+
       '<td><span style="display:flex;gap:4px;">'+
@@ -1997,7 +1997,7 @@ function abrirMdProd(id){
   document.getElementById('prod-id').value=id||'';
   if(id){var p=DB.get('produtos').find(function(x){return x.id===id;});
     document.getElementById('prod-cod').value=p.cod||'';document.getElementById('prod-nome').value=p.nome||'';
-    var subcatSalva=p.subcat||p.cat||'Vestido';
+    var subcatSalva=p.subcategoria||p.subcat||p.cat||'Vestido';
     var grupoSalvo=p.grupo||categoriaPrincipalPorSubcategoria(subcatSalva);
     preencherCategoriasProduto(grupoSalvo, subcatSalva);
     document.getElementById('prod-preco').value=p.preco||'';
@@ -2006,7 +2006,7 @@ function abrirMdProd(id){
     document.getElementById('prod-ean').value=(p.ean||'');
     document.getElementById('prod-ncm').value=p.ncm||'';
     document.getElementById('prod-origem').value=p.origem||'0';
-    document.getElementById('prod-unidade').value=p.unidade||(categoriaEhCalcado(p.subcat||p.cat||'')?'PAR':'UN');
+    document.getElementById('prod-unidade').value=p.unidade||(categoriaEhCalcado(p.subcategoria||p.subcat||p.cat||'')?'PAR':'UN');
     document.getElementById('prod-csosn').value=p.csosn||'102';
     document.getElementById('prod-cfop').value=p.cfop||'5102';
     document.getElementById('prod-escala').value=p.escala||'S';
@@ -2140,6 +2140,7 @@ function salvarProd(){
     nome:nome,
     cat:document.getElementById('prod-cat').value,
     subcat:document.getElementById('prod-cat').value,
+    subcategoria:document.getElementById('prod-cat').value,
     grupo:grupo,
     preco:preco,
     estq:parseInt(document.getElementById('prod-estq').value)||0,
@@ -3587,7 +3588,7 @@ function renderRel(){
   vendas.forEach(function(v){
     (v.itens||[]).forEach(function(i){
       var p=prods.find(function(x){return x.id===i.pid||x.nome===i.desc;})||{};
-      var subcat=(p.subcat||p.cat||i.cat||i.desc||'Outros');
+      var subcat=(p.subcategoria||p.subcat||p.cat||i.cat||i.desc||'Outros');
       var grupo=(p.grupo||categoriaPrincipalPorSubcategoria(subcat)||'OUTROS');
       var qtd=(Number(i.qty)||0);
       var totalItem=(Number(i.preco)||0)*qtd;
