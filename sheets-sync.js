@@ -245,6 +245,10 @@ nome:p.nome||"",
 
 cat:p.cat||"",
 
+grupo:p.grupo||"",
+
+subcategoria:p.subcategoria||"",
+
 preco:numeroSeguro(p.preco),
 
 custo:numeroSeguro(p.custo),
