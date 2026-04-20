@@ -699,7 +699,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
 </div>
 
 <div class="pg" id="pg-relatorio">
-  <div class="ph"><div class="ph-t">📈 Relatório Mensal</div></div>
+  <div class="ph"><div class="ph-t">📈 Relatórios</div></div>
   <div class="pb">
     <div class="fr rl-actions" style="margin-bottom:16px;">
       <select class="fi" id="rl-m" style="width:150px;" onchange="renderRel()">
@@ -712,17 +712,42 @@ td{padding:8px 9px !important;font-size:12px !important;}
       <button class="btn bb sm" type="button" onclick="baixarXmlMesRelatorio()">📦 XML do mês</button>
       <button class="btn bh sm" type="button" onclick="abrirXmlPeriodoRelatorio()">🗓️ XML por período</button>
     </div>
-    <div class="stats" id="rl-st"></div>
-    <div class="g2" style="margin-bottom:14px;">
-      <div class="card"><div class="ct">💳 Por Pagamento</div><div id="rl-f"></div></div>
-      <div class="card"><div class="ct">🏆 Mais Vendidos</div><div id="rl-p"></div></div>
+
+    <div class="vtabs" style="margin-bottom:14px;">
+      <button class="vtab on" id="rl-tab-mensal" type="button" onclick="trocarAbaRelatorio('mensal')">📈 Relatório mensal</button>
+      <button class="vtab" id="rl-tab-categorias" type="button" onclick="trocarAbaRelatorio('categorias')">🧩 Categorias</button>
     </div>
-    <div class="card">
-      <div class="ct">📋 Todas as Vendas</div>
-      <div class="tw"><table>
-        <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th></tr></thead>
-        <tbody id="rl-tb"></tbody>
-      </table></div>
+
+    <div class="vtab-panel on" id="rl-panel-mensal" style="display:block;">
+      <div class="stats" id="rl-st"></div>
+      <div class="g2" style="margin-bottom:14px;">
+        <div class="card"><div class="ct">💳 Por Pagamento</div><div id="rl-f"></div></div>
+        <div class="card"><div class="ct">🏆 Mais Vendidos</div><div id="rl-p"></div></div>
+      </div>
+      <div class="card">
+        <div class="ct">📋 Todas as Vendas</div>
+        <div class="tw"><table>
+          <thead><tr><th>Data</th><th>Cliente</th><th>Itens</th><th>Pagamento</th><th>Total</th></tr></thead>
+          <tbody id="rl-tb"></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <div class="vtab-panel" id="rl-panel-categorias">
+      <div class="g2" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="ct">🥧 Participação por categoria</div>
+          <div id="rl-cat-chart"></div>
+        </div>
+        <div class="card">
+          <div class="ct">📊 Resumo por categoria principal</div>
+          <div id="rl-cat-resumo"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">🧾 Subcategorias</div>
+        <div id="rl-subcats"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1021,7 +1046,8 @@ td{padding:8px 9px !important;font-size:12px !important;}
       <input type="hidden" id="prod-id">
       <div class="g2">
         <div class="fg"><label class="fl">Código / Ref *</label><input class="fi" id="prod-cod" placeholder="Ex: VF001"></div>
-        <div class="fg"><label class="fl">Categoria</label>
+        <div class="fg"><label class="fl">Categoria principal</label><select class="fi" id="prod-grupo"></select></div>
+        <div class="fg"><label class="fl">Subcategoria</label>
           <select class="fi" id="prod-cat"></select>
         </div>
         <div class="fg gc"><label class="fl">Nome do Produto *</label><input class="fi" id="prod-nome" placeholder="Ex: Camisa Polo Masculina"></div>
@@ -1183,13 +1209,18 @@ td{padding:8px 9px !important;font-size:12px !important;}
 
 
 
-const CATEGORIAS_FISCAIS = [
-  "Tênis masculino","Tênis feminino","Chinelos","Sandálias","Botas","Sapatos","Sapatilhas",
-  "Camisa masculina","Camiseta masculina","Polo masculina","Calça masculina","Bermuda masculina","Jeans masculino","Jaqueta masculina",
-  "Blusa feminina","Camiseta feminina","Vestido","Saia","Calça feminina","Jeans feminino","Short feminino","Conjunto feminino","Jaqueta feminina",
-  "Bolsas","Mochilas","Cintos","Carteiras","Bonés",
-  "Acessórios","Outros"
-];
+const CATEGORIAS_PRINCIPAIS = ["CALÇADOS","ROUPAS","ACESSÓRIOS","OUTROS"];
+
+const SUBCATEGORIAS_POR_PRINCIPAL = {
+  "CALÇADOS": ["Tênis masculino","Tênis feminino","Chinelos","Sandálias","Botas","Sapatos","Sapatilhas"],
+  "ROUPAS": ["Camisa masculina","Camiseta masculina","Polo masculina","Calça masculina","Bermuda masculina","Jeans masculino","Jaqueta masculina","Blusa feminina","Camiseta feminina","Vestido","Saia","Calça feminina","Jeans feminino","Short feminino","Conjunto feminino","Jaqueta feminina","Calça moletom","Blusa moletom","Conjunto moletom"],
+  "ACESSÓRIOS": ["Bolsas","Mochilas","Cintos","Carteiras","Bonés","Acessórios"],
+  "OUTROS": ["Outros"]
+};
+
+const CATEGORIAS_FISCAIS = CATEGORIAS_PRINCIPAIS.flatMap(function(grupo){
+  return SUBCATEGORIAS_POR_PRINCIPAL[grupo] || [];
+});
 
 const NCM_POR_CATEGORIA = {
   "Tênis masculino": "64041100",
@@ -1215,6 +1246,9 @@ const NCM_POR_CATEGORIA = {
   "Short feminino": "62046300",
   "Conjunto feminino": "61042300",
   "Jaqueta feminina": "62029300",
+  "Calça moletom": "61046200",
+  "Blusa moletom": "61102000",
+  "Conjunto moletom": "61042300",
   "Bolsas": "42022210",
   "Mochilas": "42029200",
   "Cintos": "42033000",
@@ -1248,6 +1282,9 @@ const REF_POR_CATEGORIA = {
   "Short feminino": "SHO",
   "Conjunto feminino": "CON",
   "Jaqueta feminina": "JAF",
+  "Calça moletom": "MOLC",
+  "Blusa moletom": "MOLB",
+  "Conjunto moletom": "MOLJ",
   "Bolsas": "BOL",
   "Mochilas": "MOC",
   "Cintos": "CIN",
@@ -1257,6 +1294,45 @@ const REF_POR_CATEGORIA = {
   "Outros": "PRO"
 };
 
+const SUBCATEGORIA_TO_PRINCIPAL = Object.fromEntries(
+  Object.entries(SUBCATEGORIAS_POR_PRINCIPAL).flatMap(function(entry){
+    var grupo = entry[0], lista = entry[1];
+    return lista.map(function(sub){ return [sub, grupo]; });
+  })
+);
+
+function categoriaPrincipalPorSubcategoria(subcat){
+  return SUBCATEGORIA_TO_PRINCIPAL[subcat] || 'OUTROS';
+}
+
+function preencherCategoriasPrincipaisProduto(){
+  var grupoEl = document.getElementById('prod-grupo');
+  if(!grupoEl) return;
+  var atual = grupoEl.value;
+  grupoEl.innerHTML = CATEGORIAS_PRINCIPAIS.map(function(grupo){
+    return '<option value="' + grupo + '">' + grupo + '</option>';
+  }).join('');
+  grupoEl.value = CATEGORIAS_PRINCIPAIS.indexOf(atual) >= 0 ? atual : 'ROUPAS';
+}
+
+function preencherSubcategoriasProduto(grupoSelecionado, subcatSelecionada){
+  var sel = document.getElementById('prod-cat');
+  if(!sel) return;
+  var grupo = grupoSelecionado || 'ROUPAS';
+  var lista = SUBCATEGORIAS_POR_PRINCIPAL[grupo] || SUBCATEGORIAS_POR_PRINCIPAL['OUTROS'];
+  sel.innerHTML = lista.map(function(cat){
+    return '<option value="' + cat + '">' + cat + '</option>';
+  }).join('');
+  sel.value = lista.indexOf(subcatSelecionada) >= 0 ? subcatSelecionada : (lista[0] || 'Outros');
+}
+
+function atualizarCategoriaPrincipalProduto(){
+  var grupoEl = document.getElementById('prod-grupo');
+  var subcatEl = document.getElementById('prod-cat');
+  if(!grupoEl || !subcatEl) return;
+  var grupo = categoriaPrincipalPorSubcategoria(subcatEl.value);
+  grupoEl.value = grupo;
+}
 
 function categoriaEhCalcado(cat){
   return ["Tênis masculino","Tênis feminino","Chinelos","Sandálias","Botas","Sapatos","Sapatilhas"].indexOf(cat) >= 0;
@@ -1282,6 +1358,9 @@ function sugerirCategoriaPorNome(nome){
   if(n.includes('bone')) return 'Bonés';
   if(n.includes('vestido')) return 'Vestido';
   if(n.includes('saia')) return 'Saia';
+  if(n.includes('conjunto moletom') || (n.includes('conjunto') && n.includes('moletom'))) return 'Conjunto moletom';
+  if(n.includes('blusa moletom') || n.includes('moletom canguru') || n.includes('moletom')) return 'Blusa moletom';
+  if(n.includes('calca moletom')) return 'Calça moletom';
   if(n.includes('blusa')) return 'Blusa feminina';
   if(n.includes('camisa')) return 'Camisa masculina';
   if(n.includes('polo')) return 'Polo masculina';
@@ -1291,6 +1370,7 @@ function sugerirCategoriaPorNome(nome){
   if(n.includes('jaqueta masculina')) return 'Jaqueta masculina';
   if(n.includes('bermuda')) return 'Bermuda masculina';
   if(n.includes('short')) return 'Short feminino';
+  if(n.includes('calca moletom')) return 'Calça moletom';
   if(n.includes('calca feminina') || n.includes('legging')) return 'Calça feminina';
   if(n.includes('calca masculina')) return 'Calça masculina';
   if(n.includes('jeans')) return 'Jeans feminino';
@@ -1304,8 +1384,12 @@ function sugerirCategoriaAutomaticamente(){
   if(catEl.dataset.manualCategory === '1') return;
   var sugerida = sugerirCategoriaPorNome(nomeEl.value);
   if(!sugerida) return;
+  var grupo = categoriaPrincipalPorSubcategoria(sugerida);
+  preencherCategoriasProduto(grupo, sugerida);
+  catEl = document.getElementById('prod-cat');
   catEl.value = sugerida;
   catEl.dataset.autoCategory = sugerida;
+  atualizarCategoriaPrincipalProduto();
   preencherNcmPorCategoria();
   aplicarPadraoFiscal();
 }
@@ -1333,23 +1417,32 @@ function entradaManualSemXML(){
   if(document.getElementById('prod-origem-estoque')) document.getElementById('prod-origem-estoque').value = 'manual_sem_xml';
 }
 
-function preencherCategoriasProduto(){
-  var sel = document.getElementById('prod-cat');
-  if(!sel) return;
-  var atual = sel.value;
-  sel.innerHTML = CATEGORIAS_FISCAIS.map(function(cat){
-    return '<option value="' + cat + '">' + cat + '</option>';
-  }).join('');
-  sel.value = atual && CATEGORIAS_FISCAIS.indexOf(atual) >= 0 ? atual : 'Vestido';
+function preencherCategoriasProduto(grupoSelecionado, subcatSelecionada){
+  preencherCategoriasPrincipaisProduto();
+  var grupoEl = document.getElementById('prod-grupo');
+  var grupo = grupoSelecionado || grupoEl.value || 'ROUPAS';
+  if(grupoEl) grupoEl.value = CATEGORIAS_PRINCIPAIS.indexOf(grupo) >= 0 ? grupo : 'ROUPAS';
+  preencherSubcategoriasProduto(grupo, subcatSelecionada);
+  atualizarCategoriaPrincipalProduto();
 }
 
 document.addEventListener('DOMContentLoaded', function(){
-  preencherCategoriasProduto();
+  preencherCategoriasProduto('ROUPAS', 'Vestido');
+  var grupoEl = document.getElementById('prod-grupo');
   var sel = document.getElementById('prod-cat');
   var nomeEl = document.getElementById('prod-nome');
+  if(grupoEl){
+    grupoEl.addEventListener('change', function(){
+      if(sel) sel.dataset.manualCategory = '1';
+      preencherSubcategoriasProduto(grupoEl.value);
+      preencherNcmPorCategoria();
+      aplicarPadraoFiscal();
+    });
+  }
   if(sel){
     sel.addEventListener('change', function(){
       sel.dataset.manualCategory = '1';
+      atualizarCategoriaPrincipalProduto();
       preencherNcmPorCategoria();
       aplicarPadraoFiscal();
     });
@@ -1882,7 +1975,7 @@ function renderProds(){
   var rows=prods.map(function(p){
     return '<tr><td><b style="color:var(--gold);">'+p.cod+'</b></td>'+
       '<td><b>'+p.nome+'</b>'+(p.desc2?'<br><span class="tm">'+p.desc2+'</span>':'')+'</td>'+
-      '<td>'+p.cat+'</td>'+
+      '<td><b>'+(p.grupo||categoriaPrincipalPorSubcategoria(p.subcat||p.cat||''))+'</b><br><span class="tm">'+(p.subcat||p.cat||'—')+'</span></td>'+
       '<td class="txt-go">'+R(p.preco)+'</td>'+
       '<td>'+(p.estq||0)+'</td>'+
       '<td><span style="display:flex;gap:4px;">'+
@@ -1894,7 +1987,7 @@ function renderProds(){
   document.getElementById('p-tb').innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto cadastrado</td></tr>';
 }
 function abrirMdProd(id){
-  preencherCategoriasProduto();
+  preencherCategoriasProduto('ROUPAS', 'Vestido');
   var catElCtrl = document.getElementById('prod-cat');
   if(catElCtrl){
     catElCtrl.dataset.manualCategory = id ? '1' : '';
@@ -1904,13 +1997,16 @@ function abrirMdProd(id){
   document.getElementById('prod-id').value=id||'';
   if(id){var p=DB.get('produtos').find(function(x){return x.id===id;});
     document.getElementById('prod-cod').value=p.cod||'';document.getElementById('prod-nome').value=p.nome||'';
-    document.getElementById('prod-cat').value=p.cat||'Vestido';document.getElementById('prod-preco').value=p.preco||'';
+    var subcatSalva=p.subcat||p.cat||'Vestido';
+    var grupoSalvo=p.grupo||categoriaPrincipalPorSubcategoria(subcatSalva);
+    preencherCategoriasProduto(grupoSalvo, subcatSalva);
+    document.getElementById('prod-preco').value=p.preco||'';
     document.getElementById('prod-estq').value=p.estq||0;document.getElementById('prod-desc2').value=p.desc2||'';
     document.getElementById('prod-custo').value=p.custo!=null?p.custo:'';
     document.getElementById('prod-ean').value=(p.ean||'');
     document.getElementById('prod-ncm').value=p.ncm||'';
     document.getElementById('prod-origem').value=p.origem||'0';
-    document.getElementById('prod-unidade').value=p.unidade||(categoriaEhCalcado(p.cat||'')?'PAR':'UN');
+    document.getElementById('prod-unidade').value=p.unidade||(categoriaEhCalcado(p.subcat||p.cat||'')?'PAR':'UN');
     document.getElementById('prod-csosn').value=p.csosn||'102';
     document.getElementById('prod-cfop').value=p.cfop||'5102';
     document.getElementById('prod-escala').value=p.escala||'S';
@@ -1918,7 +2014,7 @@ function abrirMdProd(id){
   }else{
     ['prod-cod','prod-nome','prod-preco','prod-desc2','prod-custo','prod-ean','prod-ncm'].forEach(function(i){document.getElementById(i).value='';});
     document.getElementById('prod-estq').value=0;
-    document.getElementById('prod-cat').value='Vestido';
+    preencherCategoriasProduto('ROUPAS', 'Vestido');
     document.getElementById('prod-origem').value='0';
     document.getElementById('prod-unidade').value='UN';
     document.getElementById('prod-csosn').value='102';
@@ -2005,6 +2101,7 @@ function salvarProd(){
   var list=DB.get('produtos');
   var atual=list.find(function(p){return p.id===id;})||{};
   var categoria=document.getElementById('prod-cat').value;
+  var grupo=(document.getElementById('prod-grupo').value||categoriaPrincipalPorSubcategoria(categoria));
   var origemEstoque=document.getElementById('prod-origem-estoque').value;
   var codInformado=cod;
   var codFinal=codInformado || atual.cod || '';
@@ -2042,6 +2139,8 @@ function salvarProd(){
     cod:codFinal,
     nome:nome,
     cat:document.getElementById('prod-cat').value,
+    subcat:document.getElementById('prod-cat').value,
+    grupo:grupo,
     preco:preco,
     estq:parseInt(document.getElementById('prod-estq').value)||0,
     desc2:document.getElementById('prod-desc2').value,
@@ -3447,6 +3546,17 @@ function excluirRecebCaixa(pid){
 }
 
 // RELATÓRIO
+function trocarAbaRelatorio(aba){
+  var tabs=['mensal','categorias'];
+  tabs.forEach(function(nome){
+    var tab=document.getElementById('rl-tab-'+nome);
+    var panel=document.getElementById('rl-panel-'+nome);
+    if(tab) tab.classList.toggle('on', nome===aba);
+    if(panel) panel.classList.toggle('on', nome===aba);
+    if(panel) panel.style.display = nome===aba ? 'block' : 'none';
+  });
+}
+
 function renderRel(){
   var mes=parseInt(document.getElementById('rl-m').value),ano=parseInt(document.getElementById('rl-a').value);
   if(isNaN(ano))return;
@@ -3455,38 +3565,101 @@ function renderRel(){
   var tvista=vendas.filter(function(v){return v.forma!=='fiado';}).reduce(function(s,v){return s+v.total;},0);
   var tfiado=vendas.filter(function(v){return v.forma==='fiado';}).reduce(function(s,v){return s+v.total;},0);
   var trec=pgs.reduce(function(s,p){return s+p.val;},0);
+
   document.getElementById('rl-st').innerHTML=
     '<div class="st stg"><div class="sl">Vendas Vista</div><div class="sv">'+R(tvista)+'</div><span style="font-size:12px;color:var(--txt2)">'+vendas.filter(function(v){return v.forma!=='fiado';}).length+' vendas</span></div>'+
     '<div class="st str"><div class="sl">Crediário Gerado</div><div class="sv">'+R(tfiado)+'</div></div>'+
     '<div class="st stb"><div class="sl">Recebimentos</div><div class="sv">'+R(trec)+'</div></div>'+
     '<div class="st stgo"><div class="sl">Receita Total</div><div class="sv">'+R(tvista+trec)+'</div></div>';
-  var formas={};vendas.filter(function(v){return v.forma!=='fiado';}).forEach(function(v){formas[v.forma]=(formas[v.forma]||0)+v.total;});
+
+  var formas={};
+  vendas.filter(function(v){return v.forma!=='fiado';}).forEach(function(v){formas[v.forma]=(formas[v.forma]||0)+v.total;});
   document.getElementById('rl-f').innerHTML=Object.entries(formas).map(function(e){
     return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bdr);font-size:14px;"><span>'+FF(e[0])+'</span><span style="color:var(--gold);font-weight:800;">'+R(e[1])+'</span></div>';
   }).join('')||'<div style="text-align:center;padding:16px;color:var(--txt2)">Sem dados</div>';
-  // Por categoria de produto
+
   var prods=DB.get('produtos');
-  var cats={};
-  var ico={Vestidos:'👗',Blusas:'👚','Calças':'👖',Saias:'👘','Acessórios':'💍','Calçados':'👠',Lingerie:'🩱',Outros:'🛍️'};
-  vendas.forEach(function(v){(v.itens||[]).forEach(function(i){
-    var p=prods.find(function(x){return x.id===i.pid||x.nome===i.desc;});
-    var cat=p?p.cat:'Outros';
-    if(!cats[cat])cats[cat]={total:0,qty:0};
-    cats[cat].total+=i.preco*i.qty; cats[cat].qty+=i.qty;
-  });});
-  var catHTML=Object.entries(cats).sort(function(a,b){return b[1].total-a[1].total;}).map(function(e){
-    return '<tr><td style="padding:9px;border-bottom:1px solid var(--bdr)">'+(ico[e[0]]||'🛍️')+' '+e[0]+'</td>'+
-      '<td style="padding:9px;border-bottom:1px solid var(--bdr);text-align:center">'+e[1].qty+' un.</td>'+
-      '<td style="padding:9px;border-bottom:1px solid var(--bdr);text-align:right;font-weight:800;color:var(--gold)">'+R(e[1].total)+'</td></tr>';
-  }).join('');
-  document.getElementById('rl-p').innerHTML=catHTML?
-    '<table style="width:100%;border-collapse:collapse;font-size:14px;"><thead><tr style="background:var(--s2)"><th style="padding:9px;text-align:left">Categoria</th><th style="padding:9px;text-align:center">Qtd</th><th style="padding:9px;text-align:right">Total</th></tr></thead><tbody>'+catHTML+'</tbody></table>':
+  var grupos={};
+  var subcats={};
+  var ico={CALÇADOS:'👠',ROUPAS:'👗','ACESSÓRIOS':'👜',OUTROS:'🛍️'};
+  var cores={CALÇADOS:'#1a5276',ROUPAS:'#c0392b','ACESSÓRIOS':'#b8860b',OUTROS:'#7f8c8d'};
+
+  vendas.forEach(function(v){
+    (v.itens||[]).forEach(function(i){
+      var p=prods.find(function(x){return x.id===i.pid||x.nome===i.desc;})||{};
+      var subcat=(p.subcat||p.cat||i.cat||i.desc||'Outros');
+      var grupo=(p.grupo||categoriaPrincipalPorSubcategoria(subcat)||'OUTROS');
+      var qtd=(Number(i.qty)||0);
+      var totalItem=(Number(i.preco)||0)*qtd;
+      if(!grupos[grupo])grupos[grupo]={total:0,qty:0};
+      if(!subcats[subcat])subcats[subcat]={grupo:grupo,total:0,qty:0};
+      grupos[grupo].total+=totalItem;
+      grupos[grupo].qty+=qtd;
+      subcats[subcat].total+=totalItem;
+      subcats[subcat].qty+=qtd;
+    });
+  });
+
+  var gruposOrdenados=Object.entries(grupos).sort(function(a,b){return b[1].total-a[1].total;});
+  var subcatsOrdenadas=Object.entries(subcats).sort(function(a,b){return b[1].total-a[1].total;});
+
+  document.getElementById('rl-p').innerHTML=subcatsOrdenadas.length?subcatsOrdenadas.slice(0,10).map(function(e){
+    return '<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--bdr);font-size:14px;">'+
+      '<span><b>'+e[0]+'</b><br><span class="tm">'+e[1].qty+' un. • '+e[1].grupo+'</span></span>'+
+      '<span style="color:var(--gold);font-weight:800;white-space:nowrap;">'+R(e[1].total)+'</span></div>';
+  }).join(''):'<div style="text-align:center;padding:16px;color:var(--txt2)">Sem vendas</div>';
+
+  var totalCategorias=gruposOrdenados.reduce(function(s,e){return s+e[1].total;},0);
+  var gradiente=gruposOrdenados.length?gruposOrdenados.map(function(e,idx,arr){
+    var ini=arr.slice(0,idx).reduce(function(s,x){return s+x[1].total;},0);
+    var fim=ini+e[1].total;
+    var p1=totalCategorias?((ini/totalCategorias)*100):0;
+    var p2=totalCategorias?((fim/totalCategorias)*100):0;
+    return (cores[e[0]]||'#7f8c8d')+' '+p1+'% '+p2+'%';
+  }).join(', '):'#dcdce4 0 100%';
+
+  var resumoHTML=gruposOrdenados.length?
+    '<div class="tw"><table><thead><tr><th>Categoria</th><th>Qtd</th><th>%</th><th>Total</th></tr></thead><tbody>'+
+    gruposOrdenados.map(function(e){
+      var pct=totalCategorias?((e[1].total/totalCategorias)*100):0;
+      return '<tr><td><b>'+(ico[e[0]]||'🛍️')+' '+e[0]+'</b></td><td style="text-align:center">'+e[1].qty+'</td><td style="text-align:center">'+pct.toFixed(1).replace('.',',')+'%</td><td style="text-align:right;font-weight:800;color:var(--gold)">'+R(e[1].total)+'</td></tr>';
+    }).join('')+
+    '</tbody></table></div>':
     '<div style="text-align:center;padding:16px;color:var(--txt2)">Sem vendas</div>';
+
+  var legendasHTML=gruposOrdenados.map(function(e){
+    var pct=totalCategorias?((e[1].total/totalCategorias)*100):0;
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--bdr);">'+
+      '<div style="display:flex;align-items:center;gap:8px;"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+(cores[e[0]]||'#7f8c8d')+';"></span><b>'+(ico[e[0]]||'🛍️')+' '+e[0]+'</b></div>'+
+      '<div style="text-align:right;"><div style="font-weight:800;color:var(--gold)">'+R(e[1].total)+'</div><div class="tm">'+pct.toFixed(1).replace('.',',')+'% • '+e[1].qty+' un.</div></div></div>';
+  }).join('');
+
+  document.getElementById('rl-cat-chart').innerHTML=gruposOrdenados.length?
+    '<div style="display:flex;gap:18px;align-items:center;justify-content:center;flex-wrap:wrap;">'+
+      '<div style="width:220px;height:220px;border-radius:50%;background:conic-gradient('+gradiente+');position:relative;flex:0 0 auto;">'+
+        '<div style="position:absolute;inset:28px;background:var(--s1);border-radius:50%;display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;font-weight:800;color:var(--txt);line-height:1.25;">'+
+          '<div><div style="font-size:11px;color:var(--txt2);text-transform:uppercase;">Total vendido</div><div style="font-family:Playfair Display,serif;font-size:24px;color:var(--red2);">'+R(totalCategorias)+'</div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="flex:1;min-width:220px;">'+legendasHTML+'</div>'+
+    '</div>':
+    '<div style="text-align:center;padding:16px;color:var(--txt2)">Sem vendas</div>';
+
+  document.getElementById('rl-cat-resumo').innerHTML=resumoHTML;
+  document.getElementById('rl-subcats').innerHTML=subcatsOrdenadas.length?
+    '<div class="tw"><table><thead><tr><th>Subcategoria</th><th>Categoria</th><th>Qtd</th><th>Total</th></tr></thead><tbody>'+
+    subcatsOrdenadas.map(function(e){
+      return '<tr><td><b>'+e[0]+'</b></td><td>'+(ico[e[1].grupo]||'🛍️')+' '+e[1].grupo+'</td><td style="text-align:center">'+e[1].qty+'</td><td style="text-align:right;font-weight:800;color:var(--gold)">'+R(e[1].total)+'</td></tr>';
+    }).join('')+
+    '</tbody></table></div>':
+    '<div style="text-align:center;padding:16px;color:var(--txt2)">Sem vendas</div>';
+
   var rows=vendas.slice().sort(function(a,b){return new Date(b.data)-new Date(a.data);}).map(function(v){
     return '<tr><td>'+FD(v.data)+'</td><td>'+v.cliNome+'</td><td style="font-size:12px;">'+v.itens.map(function(i){return i.desc+' x'+i.qty;}).join(', ')+'</td><td>'+FF(v.forma)+'</td><td style="color:var(--gold);font-weight:800;">'+R(v.total)+'</td></tr>';
   }).join('');
   document.getElementById('rl-tb').innerHTML=rows||'<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--txt2)">Sem vendas</td></tr>';
 }
+
 // INIT
 window.addEventListener('load', function(){
   carregarTema();
