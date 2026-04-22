@@ -2588,10 +2588,11 @@ function buscarProdutoManual(){
   var q=(inp.value||'').trim().toLowerCase();
   if(!q){limparBuscaProdutoManual();return;}
   var res=(DB.get('produtos')||[]).filter(function(p){
-    var nome=(p.nome||'').toLowerCase();
-    var cod=(p.cod||'').toLowerCase();
-    var barras=String(p.ean||p.codigos_barras||p.codigo_barras||p.codBarras||p.codigoDeBarras||'').toLowerCase();
-    return nome.includes(q)||cod.includes(q)||barras.includes(q);
+    var nome=String(p.nome||'').toLowerCase();
+    var cod=String(p.cod||'').toLowerCase();
+    var barras=String(p.ean||'').toLowerCase();
+    var barrasExtras=String(p.codigos_barras||p.codigosBarras||'').toLowerCase();
+    return nome.includes(q)||cod.includes(q)||barras.includes(q)||barrasExtras.includes(q);
   }).slice(0,8);
 
   if(!res.length){limparBuscaProdutoManual();return;}
@@ -3646,8 +3647,9 @@ function renderRel(){
     (v.itens||[]).forEach(function(i){
       var p=prods.find(function(x){return x.id===i.pid||x.nome===i.desc;})||{};
       var textoItem=(i.desc||i.nome||i.cat||'');
-      var subcat=(p.subcategoria||p.subcat||p.cat||i.cat||inferSubcategoriaPorTexto(textoItem)||textoItem||'Outros');
-      var grupo=(p.grupo||categoriaPrincipalPorSubcategoria(subcat)||inferCategoriaPorTexto(textoItem)||'OUTROS');
+      var temCadastro=!!(p && (p.id||p.nome));
+      var subcat=(temCadastro ? (p.subcategoria||p.subcat||p.cat||'') : '') || i.cat || inferSubcategoriaPorTexto(textoItem) || textoItem || 'Outros';
+      var grupo=(temCadastro ? (p.grupo||categoriaPrincipalPorSubcategoria(subcat)||'') : '') || inferCategoriaPorTexto(textoItem) || categoriaPrincipalPorSubcategoria(subcat) || 'OUTROS';
       var qtd=(Number(i.qty)||0);
       var totalItem=(Number(i.preco)||0)*qtd;
       if(!grupos[grupo])grupos[grupo]={total:0,qty:0};
@@ -4904,7 +4906,30 @@ document.addEventListener('DOMContentLoaded',function(){
     </div>
   </div>
 </div>
-  <!-- app-enhancements.js removido: usava sync antigo -->
+
+  <script src="./app-enhancements.js">
+document.addEventListener('DOMContentLoaded',function(){
+  var f=document.getElementById('v-desc');
+  if(f){
+    f.focus();
+    f.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        var val=this.value.trim();
+        if(/^\d{6,}$/.test(val)){
+          var p=buscarProdutoPorCodigoOuCodigoBarras(val);
+          if(p){
+            addProd(p.id);
+            this.value='';
+            limparBuscaProdutoManual();
+            e.preventDefault();
+          }
+        }
+      }
+    });
+  }
+});
+
+</script>
 <script>
 document.addEventListener('keydown', function(e){
   if(e.key === 'F6'){
@@ -5211,8 +5236,52 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 
 
-<script src="./sheets-config.js"></script>
-<script src="./sheets-sync.js"></script>
+<script src="./sheets-config.js">
+document.addEventListener('DOMContentLoaded',function(){
+  var f=document.getElementById('v-desc');
+  if(f){
+    f.focus();
+    f.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        var val=this.value.trim();
+        if(/^\d{6,}$/.test(val)){
+          var p=buscarProdutoPorCodigoOuCodigoBarras(val);
+          if(p){
+            addProd(p.id);
+            this.value='';
+            limparBuscaProdutoManual();
+            e.preventDefault();
+          }
+        }
+      }
+    });
+  }
+});
+
+</script>
+<script src="./sheets-sync.js">
+document.addEventListener('DOMContentLoaded',function(){
+  var f=document.getElementById('v-desc');
+  if(f){
+    f.focus();
+    f.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        var val=this.value.trim();
+        if(/^\d{6,}$/.test(val)){
+          var p=buscarProdutoPorCodigoOuCodigoBarras(val);
+          if(p){
+            addProd(p.id);
+            this.value='';
+            limparBuscaProdutoManual();
+            e.preventDefault();
+          }
+        }
+      }
+    });
+  }
+});
+
+</script>
 
 <div class="ov" id="mo-mov-cli">
   <div class="md wide">
