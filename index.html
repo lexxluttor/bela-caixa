@@ -2590,14 +2590,14 @@ function buscarProdutoManual(){
   var res=(DB.get('produtos')||[]).filter(function(p){
     var nome=(p.nome||'').toLowerCase();
     var cod=(p.cod||'').toLowerCase();
-    var barras=(p.ean||'').toLowerCase();
+    var barras=String(p.ean||p.codigos_barras||p.codigo_barras||p.codBarras||p.codigoDeBarras||'').toLowerCase();
     return nome.includes(q)||cod.includes(q)||barras.includes(q);
   }).slice(0,8);
 
   if(!res.length){limparBuscaProdutoManual();return;}
 
   sg.innerHTML=res.map(function(p){
-    var estq=Number(p.estq||0);
+    var estq=Number(p.estoque!=null?p.estoque:(p.estq||0));
     var cls=estq<=0?'zero':(estq<=3?'low':'');
     return '<div class="v-sug-item" onclick="selecionarProdutoManual(\''+p.id+'\')">'+
       '<div class="v-sug-nome">'+(p.nome||'')+'</div>'+
@@ -4904,30 +4904,7 @@ document.addEventListener('DOMContentLoaded',function(){
     </div>
   </div>
 </div>
-
-  <script src="./app-enhancements.js">
-document.addEventListener('DOMContentLoaded',function(){
-  var f=document.getElementById('v-desc');
-  if(f){
-    f.focus();
-    f.addEventListener('keydown',function(e){
-      if(e.key==='Enter'){
-        var val=this.value.trim();
-        if(/^\d{6,}$/.test(val)){
-          var p=buscarProdutoPorCodigoOuCodigoBarras(val);
-          if(p){
-            addProd(p.id);
-            this.value='';
-            limparBuscaProdutoManual();
-            e.preventDefault();
-          }
-        }
-      }
-    });
-  }
-});
-
-</script>
+  <!-- app-enhancements.js removido: usava sync antigo -->
 <script>
 document.addEventListener('keydown', function(e){
   if(e.key === 'F6'){
@@ -5234,52 +5211,8 @@ document.addEventListener('DOMContentLoaded',function(){
 </script>
 
 
-<script src="./sheets-config.js">
-document.addEventListener('DOMContentLoaded',function(){
-  var f=document.getElementById('v-desc');
-  if(f){
-    f.focus();
-    f.addEventListener('keydown',function(e){
-      if(e.key==='Enter'){
-        var val=this.value.trim();
-        if(/^\d{6,}$/.test(val)){
-          var p=buscarProdutoPorCodigoOuCodigoBarras(val);
-          if(p){
-            addProd(p.id);
-            this.value='';
-            limparBuscaProdutoManual();
-            e.preventDefault();
-          }
-        }
-      }
-    });
-  }
-});
-
-</script>
-<script src="./sheets-sync.js">
-document.addEventListener('DOMContentLoaded',function(){
-  var f=document.getElementById('v-desc');
-  if(f){
-    f.focus();
-    f.addEventListener('keydown',function(e){
-      if(e.key==='Enter'){
-        var val=this.value.trim();
-        if(/^\d{6,}$/.test(val)){
-          var p=buscarProdutoPorCodigoOuCodigoBarras(val);
-          if(p){
-            addProd(p.id);
-            this.value='';
-            limparBuscaProdutoManual();
-            e.preventDefault();
-          }
-        }
-      }
-    });
-  }
-});
-
-</script>
+<script src="./sheets-config.js"></script>
+<script src="./sheets-sync.js"></script>
 
 <div class="ov" id="mo-mov-cli">
   <div class="md wide">
