@@ -1,19 +1,16 @@
 /*!
-Bela Modas Sheets Sync — restauração corrigida
+Bela Modas Sheets Sync — restauração conservadora
 Sincroniza inclusões, edições e exclusões
 Desktop escreve / mobile consulta
 + restauração automática do servidor
 + preservação de datas originais
++ sem recriar cobrancas automaticamente
 */
 
 (function () {
 
 "use strict";
 
-/*
-  IMPORTANTE:
-  Esta URL é a do Apps Script que respondeu com os seus dados em ?action=getAll
-*/
 const API_URL =
 "https://script.google.com/macros/s/AKfycbxvE2DpOpZDW1bZOvatqdN0HjSOXI3gvFdGPSj7qeUb6NF2V-K18-5tpil1KGW4O1lB/exec";
 
@@ -49,15 +46,15 @@ function safeParseJson(v, fallback){
 }
 
 function dataOriginal(v){
-  return v.data || v.createdAt || "";
+  return v && (v.data || v.createdAt || "") || "";
 }
 
 function createdOriginal(v){
-  return v.createdAt || v.data || "";
+  return v && (v.createdAt || v.data || "") || "";
 }
 
 function updatedOriginal(v){
-  return v.updatedAt || v.createdAt || v.data || "";
+  return v && (v.updatedAt || v.createdAt || v.data || "") || "";
 }
 
 /* STORAGE */
@@ -85,9 +82,9 @@ function salvarDeleted(nome,dados){
 /* DETECTAR REMOÇÕES */
 
 function detectarRemovidos(nome,antes,depois){
-  const mapaDepois = new Set(depois.map(x=>String(x.id)));
+  const mapaDepois = new Set((depois || []).map(x=>String(x.id)));
 
-  const removidos = antes
+  const removidos = (antes || [])
     .filter(x=>!mapaDepois.has(String(x.id)))
     .map(x=>({
       ...x,
@@ -97,7 +94,7 @@ function detectarRemovidos(nome,antes,depois){
 
   if(removidos.length){
     const antigos = lerDeleted(nome);
-    salvarDeleted(nome, [...antigos,...removidos]);
+    salvarDeleted(nome, [...antigos, ...removidos]);
   }
 }
 
@@ -167,156 +164,111 @@ async function buscarTudoServidor(){
   return json;
 }
 
-/* NORMALIZAÇÃO LOCAL (formato que o index espera) */
+/* NORMALIZAÇÃO PARA O FORMATO LOCAL QUE O INDEX JÁ USA */
 
 function normalizarProduto(p){
-  const eanPrincipal = String(p.ean || "").trim();
+  const eanPrincipal = String(p && p.ean || "").trim();
   const codigosExtras = String(
-    p.codigos_barras != null
+    p && p.codigos_barras != null
       ? p.codigos_barras
-      : (p.codigosBarras != null ? p.codigosBarras : "")
+      : (p && p.codigosBarras != null ? p.codigosBarras : "")
   ).trim();
 
   return {
-    id:p.id || "",
-    cod:p.cod || "",
-    nome:p.nome || "",
-    cat:p.cat || "",
-    grupo:p.grupo || "",
-    subcategoria:p.subcategoria || "",
-    subcat:p.subcategoria || p.subcat || p.cat || "",
-    preco:numeroSeguro(p.preco),
-    custo:numeroSeguro(p.custo),
-    estoque:numeroSeguro(p.estoque),
-    ean:eanPrincipal,
-    codigos_barras:codigosExtras,
-    ncm:p.ncm || "",
-    origem:p.origem || "0",
-    csosn:p.csosn || "102",
-    cfop:p.cfop || "5102",
-    createdAt:createdOriginal(p) || agoraISO(),
-    updatedAt:updatedOriginal(p) || agoraISO(),
-    deletedAt:p.deletedAt || ""
+    id: p && p.id || "",
+    cod: p && p.cod || "",
+    nome: p && p.nome || "",
+    cat: p && p.cat || "",
+    grupo: p && p.grupo || "",
+    subcategoria: p && p.subcategoria || "",
+    subcat: (p && (p.subcategoria || p.subcat || p.cat)) || "",
+    preco: numeroSeguro(p && p.preco),
+    custo: numeroSeguro(p && p.custo),
+    estoque: numeroSeguro(p && p.estoque),
+    ean: eanPrincipal,
+    codigos_barras: codigosExtras,
+    ncm: p && p.ncm || "",
+    origem: p && p.origem || "0",
+    csosn: p && p.csosn || "102",
+    cfop: p && p.cfop || "5102",
+    createdAt: createdOriginal(p),
+    updatedAt: updatedOriginal(p),
+    deletedAt: p && p.deletedAt || ""
   };
 }
 
 function normalizarCliente(c){
   return {
-    id:c.id || "",
-    nome:c.nome || "",
-    telefone:c.telefone || c.tel || "",
-    cpf:c.cpf || "",
-    endereco:c.endereco || c.end || "",
-    obs:c.obs || "",
-    data:dataOriginal(c) || "",
-    createdAt:createdOriginal(c) || "",
-    updatedAt:updatedOriginal(c) || "",
-    deletedAt:c.deletedAt || ""
+    id: c && c.id || "",
+    nome: c && c.nome || "",
+    telefone: c && (c.telefone || c.tel) || "",
+    cpf: c && c.cpf || "",
+    endereco: c && (c.endereco || c.end) || "",
+    obs: c && c.obs || "",
+    data: dataOriginal(c),
+    createdAt: createdOriginal(c),
+    updatedAt: updatedOriginal(c),
+    deletedAt: c && c.deletedAt || ""
   };
 }
 
 function normalizarVenda(v){
   return {
-    id:v.id || "",
-    cid:v.cid || "",
-    cliente:v.cliente || v.cliNome || "",
-    cliNome:v.cliente || v.cliNome || "",
-    forma_pagamento:v.forma_pagamento || v.forma || "",
-    forma:v.forma_pagamento || v.forma || "",
-    total:numeroSeguro(v.total),
-    itens_json: typeof v.itens_json === "string"
+    id: v && v.id || "",
+    cid: v && v.cid || "",
+    cliente: v && (v.cliente || v.cliNome) || "",
+    cliNome: v && (v.cliente || v.cliNome) || "",
+    forma_pagamento: v && (v.forma_pagamento || v.forma) || "",
+    forma: v && (v.forma_pagamento || v.forma) || "",
+    total: numeroSeguro(v && v.total),
+    itens_json: typeof (v && v.itens_json) === "string"
       ? v.itens_json
-      : JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
-    itens:safeParseJson(v.itens_json, v.itens || []),
-    data:dataOriginal(v) || "",
-    createdAt:createdOriginal(v) || "",
-    updatedAt:updatedOriginal(v) || "",
-    deletedAt:v.deletedAt || ""
+      : JSON.stringify(safeParseJson(v && v.itens_json, (v && v.itens) || [])),
+    itens: safeParseJson(v && v.itens_json, (v && v.itens) || []),
+    data: dataOriginal(v),
+    createdAt: createdOriginal(v),
+    updatedAt: updatedOriginal(v),
+    deletedAt: v && v.deletedAt || ""
   };
 }
 
 function normalizarPagamento(p){
   return {
-    id:p.id || "",
-    cid:p.cid || "",
-    venda_id:p.venda_id || p.vid || "",
-    vid:p.venda_id || p.vid || "",
-    valor:numeroSeguro(p.valor ?? p.val),
-    val:numeroSeguro(p.valor ?? p.val),
-    forma_pagamento:p.forma_pagamento || p.forma || "",
-    forma:p.forma_pagamento || p.forma || "",
-    obs:p.obs || "",
-    data:dataOriginal(p) || "",
-    createdAt:createdOriginal(p) || "",
-    updatedAt:updatedOriginal(p) || "",
-    deletedAt:p.deletedAt || ""
+    id: p && p.id || "",
+    cid: p && p.cid || "",
+    venda_id: p && (p.venda_id || p.vid) || "",
+    vid: p && (p.venda_id || p.vid) || "",
+    valor: numeroSeguro(p && (p.valor ?? p.val)),
+    val: numeroSeguro(p && (p.valor ?? p.val)),
+    forma_pagamento: p && (p.forma_pagamento || p.forma) || "",
+    forma: p && (p.forma_pagamento || p.forma) || "",
+    obs: p && p.obs || "",
+    data: dataOriginal(p),
+    createdAt: createdOriginal(p),
+    updatedAt: updatedOriginal(p),
+    deletedAt: p && p.deletedAt || ""
   };
 }
 
 function normalizarCredito(c){
   return {
-    id:c.id || "",
-    cid:c.cid || "",
-    vid:c.vid || c.venda_id || "",
-    venda_id:c.vid || c.venda_id || "",
-    cliente:c.cliente || c.cliNome || "",
-    cliNome:c.cliente || c.cliNome || "",
-    descricao:c.descricao || c.desc || "",
-    desc:c.descricao || c.desc || "",
-    valor:numeroSeguro(c.valor ?? c.val),
-    val:numeroSeguro(c.valor ?? c.val),
-    status:c.status || "aberto",
-    vencimento:c.vencimento || "",
-    data:dataOriginal(c) || "",
-    createdAt:createdOriginal(c) || "",
-    updatedAt:updatedOriginal(c) || "",
-    deletedAt:c.deletedAt || ""
+    id: c && c.id || "",
+    cid: c && c.cid || "",
+    vid: c && (c.vid || c.venda_id) || "",
+    venda_id: c && (c.vid || c.venda_id) || "",
+    cliente: c && (c.cliente || c.cliNome) || "",
+    cliNome: c && (c.cliente || c.cliNome) || "",
+    descricao: c && (c.descricao || c.desc) || "",
+    desc: c && (c.descricao || c.desc) || "",
+    valor: numeroSeguro(c && (c.valor ?? c.val)),
+    val: numeroSeguro(c && (c.valor ?? c.val)),
+    status: c && c.status || "aberto",
+    vencimento: c && c.vencimento || "",
+    data: dataOriginal(c),
+    createdAt: createdOriginal(c),
+    updatedAt: updatedOriginal(c),
+    deletedAt: c && c.deletedAt || ""
   };
-}
-
-/* RECRIAR CRÉDITOS SE COBRANCAS ESTIVER VAZIA */
-
-function recriarCreditosPorVendas(vendas, pagamentos){
-  const listaPagamentos = (pagamentos || []).map(normalizarPagamento);
-
-  return (vendas || [])
-    .filter(v => {
-      const forma = String(v.forma_pagamento || v.forma || "").toLowerCase();
-      return forma.includes("credi") || forma.includes("fiado");
-    })
-    .map(v => {
-      const vendaId = String(v.id || "");
-      const pagamentosDaVenda = listaPagamentos.filter(p =>
-        String(p.vid || p.venda_id || "") === vendaId
-      );
-
-      const totalPago = pagamentosDaVenda.reduce((s, p) => s + numeroSeguro(p.valor ?? p.val), 0);
-      const totalVenda = numeroSeguro(v.total);
-      const saldo = Math.max(0, totalVenda - totalPago);
-
-      let status = "aberto";
-      if (saldo <= 0) status = "pago";
-      else if (totalPago > 0) status = "parcial";
-
-      return normalizarCredito({
-        id: "cred_" + vendaId,
-        cid: v.cid || "",
-        vid: vendaId,
-        venda_id: vendaId,
-        cliente: v.cliente || v.cliNome || "",
-        cliNome: v.cliente || v.cliNome || "",
-        descricao: "Crediário da venda " + vendaId,
-        desc: "Crediário da venda " + vendaId,
-        valor: saldo,
-        val: saldo,
-        status: status,
-        vencimento: "",
-        data: dataOriginal(v) || "",
-        createdAt: createdOriginal(v) || "",
-        updatedAt: updatedOriginal(v) || "",
-        deletedAt: ""
-      });
-    });
 }
 
 /* RESTAURAÇÃO */
@@ -341,12 +293,8 @@ async function restaurarDoServidor(opcoes){
     const vendas = (dados.vendas || []).map(normalizarVenda);
     const pagamentos = (dados.recebimentos || []).map(normalizarPagamento);
 
-    let creditos = (dados.cobrancas || []).map(normalizarCredito);
-
-    if(!creditos.length && vendas.length){
-      creditos = recriarCreditosPorVendas(vendas, pagamentos);
-      console.warn("Bela Modas: cobrancas vazia no servidor; créditos recriados pelas vendas:", creditos.length);
-    }
+    // conservador: só usa cobrancas se vier do servidor
+    const creditos = (dados.cobrancas || []).map(normalizarCredito);
 
     localStorage.setItem("bm_clientes", JSON.stringify(clientes));
     localStorage.setItem("bm_produtos", JSON.stringify(produtos));
@@ -445,7 +393,7 @@ localStorage.setItem = function(k,v){
 
     const depois = lerLocal(nome);
 
-    detectarRemovidos(nome, antes, depois);
+    detectarRemovidos(nome,antes,depois);
 
     enviarTudo().catch(function(err){
       console.error(err);
