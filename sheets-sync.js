@@ -3,6 +3,7 @@ Bela Modas Sheets Sync — restauração corrigida
 Sincroniza inclusões, edições e exclusões
 Desktop escreve / mobile consulta
 + restauração automática do servidor
++ preservação de datas originais
 */
 
 (function () {
@@ -45,6 +46,18 @@ function safeParseJson(v, fallback){
   }catch(e){
     return fallback;
   }
+}
+
+function dataOriginal(v){
+  return v.data || v.createdAt || "";
+}
+
+function createdOriginal(v){
+  return v.createdAt || v.data || "";
+}
+
+function updatedOriginal(v){
+  return v.updatedAt || v.createdAt || v.data || "";
 }
 
 /* STORAGE */
@@ -165,124 +178,145 @@ function normalizarProduto(p){
   ).trim();
 
   return {
-    id:p.id,
-    cod:p.cod||"",
-    nome:p.nome||"",
-    cat:p.cat||"",
-    grupo:p.grupo||"",
-    subcategoria:p.subcategoria||"",
-    subcat:p.subcategoria||p.subcat||p.cat||"",
+    id:p.id || "",
+    cod:p.cod || "",
+    nome:p.nome || "",
+    cat:p.cat || "",
+    grupo:p.grupo || "",
+    subcategoria:p.subcategoria || "",
+    subcat:p.subcategoria || p.subcat || p.cat || "",
     preco:numeroSeguro(p.preco),
     custo:numeroSeguro(p.custo),
     estoque:numeroSeguro(p.estoque),
     ean:eanPrincipal,
     codigos_barras:codigosExtras,
-    ncm:p.ncm||"",
-    origem:p.origem||"0",
-    csosn:p.csosn||"102",
-    cfop:p.cfop||"5102",
-    createdAt:p.createdAt||agoraISO(),
-    updatedAt:p.updatedAt||agoraISO(),
-    deletedAt:p.deletedAt||""
+    ncm:p.ncm || "",
+    origem:p.origem || "0",
+    csosn:p.csosn || "102",
+    cfop:p.cfop || "5102",
+    createdAt:createdOriginal(p) || agoraISO(),
+    updatedAt:updatedOriginal(p) || agoraISO(),
+    deletedAt:p.deletedAt || ""
   };
 }
 
 function normalizarCliente(c){
   return {
-    id:c.id,
-    nome:c.nome||"",
-    telefone:c.telefone||c.tel||"",
-    cpf:c.cpf||"",
-    endereco:c.endereco||c.end||"",
-    obs:c.obs||"",
-    data:c.data||c.createdAt||agoraISO(),
-    createdAt:c.createdAt||c.data||agoraISO(),
-    updatedAt:c.updatedAt||c.data||agoraISO(),
-    deletedAt:c.deletedAt||""
+    id:c.id || "",
+    nome:c.nome || "",
+    telefone:c.telefone || c.tel || "",
+    cpf:c.cpf || "",
+    endereco:c.endereco || c.end || "",
+    obs:c.obs || "",
+    data:dataOriginal(c) || "",
+    createdAt:createdOriginal(c) || "",
+    updatedAt:updatedOriginal(c) || "",
+    deletedAt:c.deletedAt || ""
   };
 }
 
 function normalizarVenda(v){
   return {
-    id:v.id,
-    cid:v.cid||"",
-    cliente:v.cliente||v.cliNome||"",
-    cliNome:v.cliente||v.cliNome||"",
-    forma_pagamento:v.forma_pagamento||v.forma||"",
-    forma:v.forma_pagamento||v.forma||"",
+    id:v.id || "",
+    cid:v.cid || "",
+    cliente:v.cliente || v.cliNome || "",
+    cliNome:v.cliente || v.cliNome || "",
+    forma_pagamento:v.forma_pagamento || v.forma || "",
+    forma:v.forma_pagamento || v.forma || "",
     total:numeroSeguro(v.total),
     itens_json: typeof v.itens_json === "string"
       ? v.itens_json
       : JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     itens:safeParseJson(v.itens_json, v.itens || []),
-    data:v.data||v.createdAt||agoraISO(),
-    createdAt:v.createdAt||v.data||agoraISO(),
-    updatedAt:v.updatedAt||v.data||agoraISO(),
-    deletedAt:v.deletedAt||""
+    data:dataOriginal(v) || "",
+    createdAt:createdOriginal(v) || "",
+    updatedAt:updatedOriginal(v) || "",
+    deletedAt:v.deletedAt || ""
   };
 }
 
 function normalizarPagamento(p){
   return {
-    id:p.id,
-    cid:p.cid||"",
-    venda_id:p.venda_id||p.vid||"",
-    vid:p.venda_id||p.vid||"",
+    id:p.id || "",
+    cid:p.cid || "",
+    venda_id:p.venda_id || p.vid || "",
+    vid:p.venda_id || p.vid || "",
     valor:numeroSeguro(p.valor ?? p.val),
     val:numeroSeguro(p.valor ?? p.val),
-    forma_pagamento:p.forma_pagamento||p.forma||"",
-    forma:p.forma_pagamento||p.forma||"",
-    obs:p.obs||"",
-    data:p.data||p.createdAt||agoraISO(),
-    createdAt:p.createdAt||p.data||agoraISO(),
-    updatedAt:p.updatedAt||p.data||agoraISO(),
-    deletedAt:p.deletedAt||""
+    forma_pagamento:p.forma_pagamento || p.forma || "",
+    forma:p.forma_pagamento || p.forma || "",
+    obs:p.obs || "",
+    data:dataOriginal(p) || "",
+    createdAt:createdOriginal(p) || "",
+    updatedAt:updatedOriginal(p) || "",
+    deletedAt:p.deletedAt || ""
   };
 }
 
 function normalizarCredito(c){
   return {
-    id:c.id,
-    cid:c.cid||"",
-    vid:c.vid||c.venda_id||"",
-    venda_id:c.vid||c.venda_id||"",
-    cliente:c.cliente||c.cliNome||"",
-    cliNome:c.cliente||c.cliNome||"",
-    descricao:c.descricao||c.desc||"",
-    desc:c.descricao||c.desc||"",
+    id:c.id || "",
+    cid:c.cid || "",
+    vid:c.vid || c.venda_id || "",
+    venda_id:c.vid || c.venda_id || "",
+    cliente:c.cliente || c.cliNome || "",
+    cliNome:c.cliente || c.cliNome || "",
+    descricao:c.descricao || c.desc || "",
+    desc:c.descricao || c.desc || "",
     valor:numeroSeguro(c.valor ?? c.val),
     val:numeroSeguro(c.valor ?? c.val),
-    status:c.status||"aberto",
-    vencimento:c.vencimento||"",
-    data:c.data||c.createdAt||agoraISO(),
-    createdAt:c.createdAt||c.data||agoraISO(),
-    updatedAt:c.updatedAt||c.data||agoraISO(),
-    deletedAt:c.deletedAt||""
+    status:c.status || "aberto",
+    vencimento:c.vencimento || "",
+    data:dataOriginal(c) || "",
+    createdAt:createdOriginal(c) || "",
+    updatedAt:updatedOriginal(c) || "",
+    deletedAt:c.deletedAt || ""
   };
 }
 
 /* RECRIAR CRÉDITOS SE COBRANCAS ESTIVER VAZIA */
 
-function recriarCreditosPorVendas(vendas){
+function recriarCreditosPorVendas(vendas, pagamentos){
+  const listaPagamentos = (pagamentos || []).map(normalizarPagamento);
+
   return (vendas || [])
     .filter(v => {
       const forma = String(v.forma_pagamento || v.forma || "").toLowerCase();
       return forma.includes("credi") || forma.includes("fiado");
     })
-    .map(v => normalizarCredito({
-      id: "cred_" + String(v.id || ""),
-      cid: v.cid || "",
-      vid: v.id || "",
-      cliente: v.cliente || v.cliNome || "",
-      descricao: "Crediário da venda " + (v.id || ""),
-      valor: numeroSeguro(v.total),
-      status: "aberto",
-      vencimento: "",
-      data: v.data || v.createdAt || agoraISO(),
-      createdAt: v.createdAt || v.data || agoraISO(),
-      updatedAt: agoraISO(),
-      deletedAt: ""
-    }));
+    .map(v => {
+      const vendaId = String(v.id || "");
+      const pagamentosDaVenda = listaPagamentos.filter(p =>
+        String(p.vid || p.venda_id || "") === vendaId
+      );
+
+      const totalPago = pagamentosDaVenda.reduce((s, p) => s + numeroSeguro(p.valor ?? p.val), 0);
+      const totalVenda = numeroSeguro(v.total);
+      const saldo = Math.max(0, totalVenda - totalPago);
+
+      let status = "aberto";
+      if (saldo <= 0) status = "pago";
+      else if (totalPago > 0) status = "parcial";
+
+      return normalizarCredito({
+        id: "cred_" + vendaId,
+        cid: v.cid || "",
+        vid: vendaId,
+        venda_id: vendaId,
+        cliente: v.cliente || v.cliNome || "",
+        cliNome: v.cliente || v.cliNome || "",
+        descricao: "Crediário da venda " + vendaId,
+        desc: "Crediário da venda " + vendaId,
+        valor: saldo,
+        val: saldo,
+        status: status,
+        vencimento: "",
+        data: dataOriginal(v) || "",
+        createdAt: createdOriginal(v) || "",
+        updatedAt: updatedOriginal(v) || "",
+        deletedAt: ""
+      });
+    });
 }
 
 /* RESTAURAÇÃO */
@@ -310,7 +344,7 @@ async function restaurarDoServidor(opcoes){
     let creditos = (dados.cobrancas || []).map(normalizarCredito);
 
     if(!creditos.length && vendas.length){
-      creditos = recriarCreditosPorVendas(vendas);
+      creditos = recriarCreditosPorVendas(vendas, pagamentos);
       console.warn("Bela Modas: cobrancas vazia no servidor; créditos recriados pelas vendas:", creditos.length);
     }
 
