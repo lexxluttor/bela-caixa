@@ -1,10 +1,10 @@
 /*!
-Bela Modas Sheets Sync — modo seguro
-Fluxo correto:
-1) abrir sistema
-2) buscar dados da planilha
-3) preencher localStorage
-4) só depois permitir sync manual
+Bela Modas Sheets Sync — modo seguro por dia
+Fluxo:
+1) primeira abertura do dia -> buscar dados da planilha
+2) preencher localStorage
+3) durante o resto do dia -> não restaurar novamente
+4) sync manual continua liberado
 */
 
 (function () {
@@ -28,6 +28,13 @@ function agoraISO() {
     String(d.getHours()).padStart(2, "0") + ":" +
     String(d.getMinutes()).padStart(2, "0") + ":" +
     String(d.getSeconds()).padStart(2, "0");
+}
+
+function hojeStr() {
+  const d = new Date();
+  return d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
 }
 
 function numeroSeguro(v) {
@@ -377,7 +384,6 @@ async function restaurarDoServidor() {
     const pagamentos = (dados.recebimentos || []).map(normalizarPagamentoRestauracao);
     const creditos = (dados.cobrancas || []).map(normalizarCreditoRestauracao);
 
-    /* grava SEM disparar sync */
     originalSetItem.call(localStorage, "bm_clientes", JSON.stringify(clientes));
     originalSetItem.call(localStorage, "bm_produtos", JSON.stringify(produtos));
     originalSetItem.call(localStorage, "bm_vendas", JSON.stringify(vendas));
@@ -406,7 +412,7 @@ async function restaurarDoServidor() {
 
 async function enviarTudo() {
   if (bloqueioEnvio) {
-    throw new Error("Sync bloqueado até concluir a restauração inicial da planilha.");
+    throw new Error("Sync bloqueado até concluir a restauração inicial do dia.");
   }
 
   if (syncEmAndamento) return;
@@ -486,24 +492,33 @@ localStorage.setItem = function (k, v) {
   originalSetItem.call(localStorage, k, v);
 };
 
-/* INICIALIZAÇÃO CORRETA
-   SEMPRE baixa da planilha antes de liberar sync
+/* INICIALIZAÇÃO DO DIA
+   Só restaura na primeira abertura do dia
 */
 
 async function initRestauracaoObrigatoria() {
   try {
-    console.log("Bela Modas: iniciando restauração obrigatória da planilha...");
-    const ok = await restaurarDoServidor();
+    const hoje = hojeStr();
+    const ultimoDia = localStorage.getItem("bm_sync_dia");
 
-    if (ok) {
-      bloqueioEnvio = false;
-      console.log("Bela Modas: restauração concluída. Sync manual liberado.");
+    if (ultimoDia !== hoje) {
+      console.log("Bela Modas: primeira abertura do dia, restaurando da planilha...");
+      const ok = await restaurarDoServidor();
+
+      if (ok) {
+        originalSetItem.call(localStorage, "bm_sync_dia", hoje);
+        bloqueioEnvio = false;
+        console.log("Bela Modas: restauração do dia concluída. Sync liberado.");
+      } else {
+        console.warn("Bela Modas: restauração falhou. Sync continua bloqueado.");
+      }
     } else {
-      console.warn("Bela Modas: restauração falhou. Sync continua bloqueado.");
+      console.log("Bela Modas: sistema já iniciado hoje. Não restaurando novamente.");
+      bloqueioEnvio = false;
     }
   } catch (e) {
     console.error(e);
-    console.warn("Bela Modas: erro na restauração inicial. Sync continua bloqueado.");
+    console.warn("Bela Modas: erro na restauração inicial do dia. Sync continua bloqueado.");
   }
 }
 
@@ -517,16 +532,22 @@ window.BelaSheetsSync = {
     bloqueioEnvio = true;
     const ok = await restaurarDoServidor();
     if (ok) {
+      originalSetItem.call(localStorage, "bm_sync_dia", hojeStr());
       bloqueioEnvio = false;
       location.reload();
     }
     return ok;
   },
+  resetDia: function () {
+    localStorage.removeItem("bm_sync_dia");
+  },
   status: function () {
     return {
       bloqueioEnvio,
       syncEmAndamento,
-      restoreEmAndamento
+      restoreEmAndamento,
+      diaAtual: hojeStr(),
+      diaInicializado: localStorage.getItem("bm_sync_dia")
     };
   }
 };
