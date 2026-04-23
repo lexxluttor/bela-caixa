@@ -67,6 +67,21 @@ function updatedOriginal(v) {
     : "";
 }
 
+function normalizarFormaPagamento_(v) {
+  const s = String(v || "").trim().toLowerCase();
+
+  if (s === "fiado") return "crediario";
+  if (s === "crediário") return "crediario";
+  if (s === "crédito") return "credito";
+  if (s === "débito") return "debito";
+
+  return s;
+}
+
+function normalizarDescricaoCobranca_(v) {
+  return String(v || "").replace(/fiado/gi, "Crediário");
+}
+
 /* STORAGE */
 
 const originalSetItem = localStorage.setItem.bind(localStorage);
@@ -206,7 +221,7 @@ function normalizarVenda(v) {
     id: v.id,
     cid: v.cid || "",
     cliente: v.cliente || v.cliNome || "",
-    forma_pagamento: v.forma_pagamento || v.forma || "",
+    forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
     itens_json: JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     data: v.data || v.createdAt || agoraISO(),
@@ -222,7 +237,7 @@ function normalizarPagamento(p) {
     cid: p.cid || "",
     venda_id: p.venda_id || p.vid || "",
     valor: numeroSeguro(p.valor ?? p.val),
-    forma_pagamento: p.forma_pagamento || p.forma || "",
+    forma_pagamento: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
     obs: p.obs || "",
     data: p.data || p.createdAt || agoraISO(),
     createdAt: p.createdAt || p.data || agoraISO(),
@@ -237,7 +252,7 @@ function normalizarCredito(c) {
     cid: c.cid || "",
     vid: c.vid || c.venda_id || "",
     cliente: c.cliente || c.cliNome || "",
-    descricao: c.descricao || c.desc || "",
+    descricao: normalizarDescricaoCobranca_(c.descricao || c.desc || ""),
     valor: numeroSeguro(c.valor ?? c.val),
     status: c.status || "aberto",
     vencimento: c.vencimento || "",
@@ -304,8 +319,8 @@ function normalizarVendaRestauracao(v) {
     cid: v.cid || "",
     cliente: v.cliente || v.cliNome || "",
     cliNome: v.cliente || v.cliNome || "",
-    forma_pagamento: v.forma_pagamento || v.forma || "",
-    forma: v.forma_pagamento || v.forma || "",
+    forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
+    forma: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
     itens_json: typeof v.itens_json === "string" ? v.itens_json : JSON.stringify(itens),
     itens: itens,
@@ -324,8 +339,8 @@ function normalizarPagamentoRestauracao(p) {
     vid: p.venda_id || p.vid || "",
     valor: numeroSeguro(p.valor ?? p.val),
     val: numeroSeguro(p.valor ?? p.val),
-    forma_pagamento: p.forma_pagamento || p.forma || "",
-    forma: p.forma_pagamento || p.forma || "",
+    forma_pagamento: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
+    forma: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
     obs: p.obs || "",
     data: dataOriginal(p),
     createdAt: createdOriginal(p),
@@ -342,8 +357,8 @@ function normalizarCreditoRestauracao(c) {
     venda_id: c.vid || c.venda_id || "",
     cliente: c.cliente || c.cliNome || "",
     cliNome: c.cliente || c.cliNome || "",
-    descricao: c.descricao || c.desc || "",
-    desc: c.descricao || c.desc || "",
+    descricao: normalizarDescricaoCobranca_(c.descricao || c.desc || ""),
+    desc: normalizarDescricaoCobranca_(c.descricao || c.desc || ""),
     valor: numeroSeguro(c.valor ?? c.val),
     val: numeroSeguro(c.valor ?? c.val),
     status: c.status || "aberto",
@@ -459,9 +474,7 @@ async function enviarTudo(origem) {
 function agendarAutoSync(motivo) {
   if (restoreEmAndamento) return;
 
-  if (autoSyncTimer) {
-    clearTimeout(autoSyncTimer);
-  }
+  if (autoSyncTimer) clearTimeout(autoSyncTimer);
 
   autoSyncTimer = setTimeout(async function () {
     autoSyncTimer = null;
