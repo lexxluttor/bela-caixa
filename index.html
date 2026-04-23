@@ -3392,17 +3392,15 @@ function renderCrediario(){
   var mes=parseInt(document.getElementById('cr-m').value), ano=parseInt(document.getElementById('cr-a').value);
   if(isNaN(ano))return;
   var clis=DB.get('clientes');
-  // Vendas no crediario no mes selecionado
   var vendasCred=DB.get('vendas').filter(function(v){
-    var d=new Date(v.data);
-    return d.getMonth()===mes&&d.getFullYear()===ano&&v.forma==='fiado';
+    var d=new Date(v.data||v.createdAt||0);
+    var forma=String(v.forma||v.forma_pagamento||'').toLowerCase();
+    return d.getMonth()===mes&&d.getFullYear()===ano&&(forma==='fiado'||forma==='crediario'||forma==='crediário');
   });
-  var totalVendidoMes=vendasCred.reduce(function(s,v){return s+v.total;},0);
-  // Total recebido no mes
+  var totalVendidoMes=vendasCred.reduce(function(s,v){return s+Number(v.total||0);},0);
   var totalPagoMes=DB.get('pagamentos').filter(function(p){
-    var d=new Date(p.data);return d.getMonth()===mes&&d.getFullYear()===ano;
-  }).reduce(function(s,p){return s+p.val;},0);
-  // Saldo total em aberto (todos os tempos)
+    var d=new Date(p.data||p.createdAt||0);return d.getMonth()===mes&&d.getFullYear()===ano;
+  }).reduce(function(s,p){return s+Number(p.val!=null?p.val:p.valor||0);},0);
   var clientesCred=clis.filter(function(c){return saldo(c.id).sd>0.01;});
   var totalAberto=clientesCred.reduce(function(s,c){return s+saldo(c.id).sd;},0);
 
@@ -3411,23 +3409,19 @@ function renderCrediario(){
     '<div class="st str"><div class="sl">Total a Receber</div><div class="sv">'+R(totalAberto)+'</div><span class="tm">'+clientesCred.length+' clientes</span></div>'+
     '<div class="st stgo"><div class="sl">Crediário no Mês</div><div class="sv">'+R(totalVendidoMes)+'</div><span class="tm">'+vendasCred.length+' venda(s)</span></div>'+
     '<div class="st stb"><div class="sl">Recebido no Mês</div><div class="sv">'+R(totalPagoMes)+'</div></div>'+
-    '<div class="st stg"><div class="sl">Saldo Líquido</div><div class="sv">'+R(totalAberto-totalPagoMes>0?totalAberto:0)+'</div></div>';
+    '<div class="st stg"><div class="sl">Saldo Líquido</div><div class="sv">'+R(totalAberto)+'</div></div>';
 
   var tb=document.getElementById('cr-tb');
   if(!tb)return;
 
-  // Detalhe por cliente: fiados do mês + saldo geral
   var rows=clientesCred.map(function(c){
     var s=saldo(c.id), dias=diasSemPag(c.id);
     var cor=dias>=30?'var(--red2)':dias>=15?'var(--orange)':'var(--txt)';
-    // Vendas crediario deste cliente no mes
-    var vcMes=vendasCred.filter(function(v){return v.cid===c.id;}).reduce(function(s,v){return s+v.total;},0);
     var cid=c.id;
     var btReceb='<button class="btn bb xs" onclick="irCliReceb(\''+cid+'\')" title="Receber">💰</button>';
     var btWpp=c.tel?'<button class="btn bo xs" onclick="wppCobrar(\''+cid+'\')" title="WhatsApp">📱</button>':'';
     return '<tr>'+
       '<td><b>'+c.nome+'</b>'+(c.tel?'<br><span class="tm">'+c.tel+'</span>':'')+'</td>'+
-      '<td style="color:var(--gold);font-weight:800;">'+R(vcMes)+'</td>'+
       '<td style="color:var(--red2);font-weight:800;">'+R(s.tf)+'</td>'+
       '<td style="color:var(--green);font-weight:800;">'+R(s.tp)+'</td>'+
       '<td style="color:var(--red2);font-weight:800;font-size:15px;">'+R(s.sd)+'</td>'+
@@ -3435,7 +3429,7 @@ function renderCrediario(){
       '<td><span style="display:flex;gap:5px;">'+btReceb+btWpp+'</span></td></tr>';
   }).join('');
 
-  tb.innerHTML=rows||'<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum cliente com crediário em aberto 🎉</td></tr>';
+  tb.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum cliente com crediário em aberto 🎉</td></tr>';
 }
 
 function renderCaixa(){
