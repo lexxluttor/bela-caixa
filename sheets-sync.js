@@ -1,6 +1,10 @@
 /*!
-Bela Modas Sheets Sync — restaura na primeira abertura do dia
-e sincroniza automaticamente durante o dia
+Bela Modas Sheets Sync — restauração segura por dia
+Regra:
+1) primeira abertura do dia -> tenta enviar pendências locais
+2) se conseguir -> busca planilha e atualiza local
+3) se não conseguir -> NÃO sobrescreve o local
+4) durante o dia -> auto sync + sync a cada 2 min
 */
 
 (function () {
@@ -16,6 +20,7 @@ let bloqueioEnvio = true;
 
 let autoSyncTimer = null;
 let intervaloSyncAtivo = false;
+
 let ultimoHashEnviado = "";
 let ultimoErroSync = "";
 let ultimoMotivoSync = "";
@@ -23,7 +28,7 @@ let ultimoMotivoSync = "";
 const AUTO_SYNC_DELAY_MS = 4000;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
-/* DATA */
+/* ================= DATA ================= */
 
 function agoraISO() {
   const d = new Date();
@@ -66,12 +71,15 @@ function createdOriginal(v) {
 }
 
 function updatedOriginal(v) {
-  return (v && (v.updatedAt || v.createdAt || v.data)) ? (v.updatedAt || v.createdAt || v.data) : "";
+  return (v && (v.updatedAt || v.createdAt || v.data))
+    ? (v.updatedAt || v.createdAt || v.data)
+    : "";
 }
 
-/* STORAGE */
+/* ================= STORAGE ================= */
 
 const originalSetItem = localStorage.setItem.bind(localStorage);
+const originalRemoveItem = localStorage.removeItem.bind(localStorage);
 
 function lerLocal(nome) {
   try {
@@ -93,7 +101,17 @@ function salvarDeleted(nome, dados) {
   originalSetItem("bm_deleted_" + nome, JSON.stringify(dados || []));
 }
 
-/* BACKUP */
+function marcarAlteracaoLocal(motivo) {
+  originalSetItem("bm_last_local_change", agoraISO());
+  originalSetItem("bm_last_local_change_reason", motivo || "mudanca");
+}
+
+function limparAlteracaoLocal() {
+  originalRemoveItem("bm_last_local_change");
+  originalRemoveItem("bm_last_local_change_reason");
+}
+
+/* ================= BACKUP ================= */
 
 function salvarBackup() {
   originalSetItem("bm_backup", JSON.stringify({
@@ -106,7 +124,7 @@ function salvarBackup() {
   }));
 }
 
-/* HASH */
+/* ================= HASH / PENDÊNCIAS ================= */
 
 function gerarHashSync() {
   try {
@@ -127,7 +145,34 @@ function gerarHashSync() {
   }
 }
 
-/* DETECTAR REMOÇÕES */
+function temDeletedPendentes() {
+  return (
+    lerDeleted("clientes").length > 0 ||
+    lerDeleted("produtos").length > 0 ||
+    lerDeleted("vendas").length > 0 ||
+    lerDeleted("pagamentos").length > 0 ||
+    lerDeleted("creditos").length > 0
+  );
+}
+
+function temPendenciasLocais() {
+  const hashAtual = gerarHashSync();
+  const lastLocalChange = localStorage.getItem("bm_last_local_change");
+  if (temDeletedPendentes()) return true;
+  if (lastLocalChange) return true;
+  if (!ultimoHashEnviado) return false;
+  return hashAtual !== ultimoHashEnviado;
+}
+
+function limparDeletedSincronizados() {
+  salvarDeleted("clientes", []);
+  salvarDeleted("produtos", []);
+  salvarDeleted("vendas", []);
+  salvarDeleted("pagamentos", []);
+  salvarDeleted("creditos", []);
+}
+
+/* ================= DETECTAR REMOÇÕES ================= */
 
 function detectarRemovidos(nome, antes, depois) {
   const mapaDepois = new Set((depois || []).map(x => String(x.id)));
@@ -142,13 +187,14 @@ function detectarRemovidos(nome, antes, depois) {
 
   if (removidos.length) {
     const antigos = lerDeleted(nome);
-    const mapaExistentes = new Map((antigos || []).map(x => [String(x.id), x]));
-    removidos.forEach(r => mapaExistentes.set(String(r.id), r));
-    salvarDeleted(nome, Array.from(mapaExistentes.values()));
+    const mapa = new Map((antigos || []).map(x => [String(x.id), x]));
+    removidos.forEach(r => mapa.set(String(r.id), r));
+    salvarDeleted(nome, Array.from(mapa.values()));
+    marcarAlteracaoLocal("delete:" + nome);
   }
 }
 
-/* ENVIO */
+/* ================= ENVIO ================= */
 
 async function enviar(body) {
   const params = new URLSearchParams();
@@ -178,7 +224,7 @@ async function enviar(body) {
   return json;
 }
 
-/* BUSCA DO SERVIDOR */
+/* ================= BUSCA DO SERVIDOR ================= */
 
 async function buscarTudoServidor() {
   const r = await fetch(API_URL + "?action=getAll");
@@ -198,7 +244,7 @@ async function buscarTudoServidor() {
   return json;
 }
 
-/* NORMALIZAÇÃO DE ENVIO */
+/* ================= NORMALIZAÇÃO DE ENVIO ================= */
 
 function normalizarProduto(p) {
   const eanPrincipal = String(p.ean || "").trim();
@@ -292,7 +338,7 @@ function normalizarCredito(c) {
   };
 }
 
-/* NORMALIZAÇÃO DE RESTAURAÇÃO */
+/* ================= NORMALIZAÇÃO DE RESTAURAÇÃO ================= */
 
 function normalizarProdutoRestauracao(p) {
   const eanPrincipal = String(p.ean || "").trim();
@@ -399,7 +445,7 @@ function normalizarCreditoRestauracao(c) {
   };
 }
 
-/* RESTAURAÇÃO */
+/* ================= RESTAURAÇÃO ================= */
 
 async function restaurarDoServidor() {
   if (restoreEmAndamento) return false;
@@ -420,11 +466,10 @@ async function restaurarDoServidor() {
     originalSetItem("bm_pagamentos", JSON.stringify(pagamentos));
     originalSetItem("bm_creditos", JSON.stringify(creditos));
 
-    originalSetItem("bm_deleted_clientes", JSON.stringify([]));
-    originalSetItem("bm_deleted_produtos", JSON.stringify([]));
-    originalSetItem("bm_deleted_vendas", JSON.stringify([]));
-    originalSetItem("bm_deleted_pagamentos", JSON.stringify([]));
-    originalSetItem("bm_deleted_creditos", JSON.stringify([]));
+    /* IMPORTANTE:
+       NÃO limpar bm_deleted_* aqui.
+       Se existir algo pendente, precisa continuar pendente.
+    */
 
     originalSetItem("bm_last_restore", agoraISO());
     ultimoHashEnviado = gerarHashSync();
@@ -441,7 +486,7 @@ async function restaurarDoServidor() {
   }
 }
 
-/* SYNC */
+/* ================= SYNC ================= */
 
 async function enviarTudo(origem) {
   if (bloqueioEnvio) {
@@ -496,6 +541,9 @@ async function enviarTudo(origem) {
       rows: creditos.map(normalizarCredito).concat(creditosDeleted.map(normalizarCredito))
     });
 
+    limparDeletedSincronizados();
+    limparAlteracaoLocal();
+
     originalSetItem("bm_last_sync", agoraISO());
     originalSetItem("bm_last_sync_origin", origem || "manual");
 
@@ -514,7 +562,7 @@ async function enviarTudo(origem) {
   }
 }
 
-/* AUTO SYNC */
+/* ================= AUTO SYNC ================= */
 
 function agendarAutoSync(motivo) {
   if (bloqueioEnvio || restoreEmAndamento) return;
@@ -527,9 +575,7 @@ function agendarAutoSync(motivo) {
     autoSyncTimer = null;
 
     if (bloqueioEnvio || restoreEmAndamento || syncEmAndamento) return;
-
-    const hashAtual = gerarHashSync();
-    if (hashAtual === ultimoHashEnviado) return;
+    if (!temPendenciasLocais()) return;
 
     try {
       await enviarTudo("auto:" + (motivo || "mudanca"));
@@ -545,9 +591,7 @@ function iniciarSyncPeriodico() {
 
   setInterval(async function () {
     if (bloqueioEnvio || restoreEmAndamento || syncEmAndamento) return;
-
-    const hashAtual = gerarHashSync();
-    if (hashAtual === ultimoHashEnviado) return;
+    if (!temPendenciasLocais()) return;
 
     try {
       await enviarTudo("intervalo_2min");
@@ -557,7 +601,7 @@ function iniciarSyncPeriodico() {
   }, AUTO_SYNC_INTERVAL_MS);
 }
 
-/* HOOK DE localStorage COM AUTOENVIO */
+/* ================= HOOK localStorage ================= */
 
 localStorage.setItem = function (k, v) {
   const nome = String(k).replace("bm_", "");
@@ -567,6 +611,7 @@ localStorage.setItem = function (k, v) {
     originalSetItem(k, v);
     const depois = lerLocal(nome);
     detectarRemovidos(nome, antes, depois);
+    marcarAlteracaoLocal(nome);
     agendarAutoSync(nome);
     return;
   }
@@ -574,7 +619,7 @@ localStorage.setItem = function (k, v) {
   originalSetItem(k, v);
 };
 
-/* INICIALIZAÇÃO DO DIA */
+/* ================= INICIALIZAÇÃO DO DIA ================= */
 
 async function initRestauracaoObrigatoria() {
   try {
@@ -582,7 +627,25 @@ async function initRestauracaoObrigatoria() {
     const ultimoDia = localStorage.getItem("bm_sync_dia");
 
     if (ultimoDia !== hoje) {
-      console.log("Bela Modas: primeira abertura do dia, restaurando da planilha...");
+      console.log("Bela Modas: primeira abertura do dia.");
+
+      /* PASSO 1: se existir pendência local, tentar enviar primeiro */
+      if (temPendenciasLocais()) {
+        console.log("Bela Modas: há pendências locais. Tentando enviar antes da restauração...");
+        bloqueioEnvio = false;
+
+        try {
+          await enviarTudo("pre_restore");
+        } catch (e) {
+          console.warn("Bela Modas: não foi possível enviar pendências antes da restauração. Mantendo dados locais.");
+          bloqueioEnvio = false;
+          return false;
+        }
+      }
+
+      /* PASSO 2: restaurar da planilha somente depois do envio */
+      bloqueioEnvio = true;
+      console.log("Bela Modas: restaurando dados da planilha...");
       const ok = await restaurarDoServidor();
 
       if (ok) {
@@ -590,39 +653,64 @@ async function initRestauracaoObrigatoria() {
         bloqueioEnvio = false;
         ultimoHashEnviado = gerarHashSync();
         console.log("Bela Modas: restauração do dia concluída. Sync liberado.");
+        return true;
       } else {
-        console.warn("Bela Modas: restauração falhou. Sync continua bloqueado.");
+        console.warn("Bela Modas: restauração falhou. Mantendo dados locais.");
+        bloqueioEnvio = false;
+        return false;
       }
     } else {
       console.log("Bela Modas: sistema já iniciado hoje. Não restaurando novamente.");
       bloqueioEnvio = false;
+
+      /* se já existe hash salvo, assume estado atual como base enviada */
+      if (!ultimoHashEnviado && localStorage.getItem("bm_last_sync")) {
+        ultimoHashEnviado = gerarHashSync();
+      }
+
+      return true;
     }
   } catch (e) {
     console.error(e);
-    console.warn("Bela Modas: erro na restauração inicial do dia. Sync continua bloqueado.");
+    console.warn("Bela Modas: erro na inicialização do dia. Mantendo dados locais.");
+    bloqueioEnvio = false;
+    return false;
   }
 }
 
-/* START */
+/* ================= START ================= */
 
 initRestauracaoObrigatoria();
 iniciarSyncPeriodico();
 
-/* API GLOBAL */
+/* ================= API GLOBAL ================= */
 
 window.BelaSheetsSync = {
   syncNow: function () {
     return enviarTudo("manual");
   },
   restoreNow: async function () {
+    if (temPendenciasLocais()) {
+      try {
+        await enviarTudo("pre_manual_restore");
+      } catch (e) {
+        console.warn("Não foi possível enviar pendências antes do restore manual.");
+        return false;
+      }
+    }
+
     bloqueioEnvio = true;
     const ok = await restaurarDoServidor();
+
     if (ok) {
       originalSetItem("bm_sync_dia", hojeStr());
       bloqueioEnvio = false;
       ultimoHashEnviado = gerarHashSync();
       location.reload();
+    } else {
+      bloqueioEnvio = false;
     }
+
     return ok;
   },
   resetDia: function () {
@@ -639,7 +727,17 @@ window.BelaSheetsSync = {
       ultimoSync: localStorage.getItem("bm_last_sync"),
       origemUltimoSync: localStorage.getItem("bm_last_sync_origin"),
       ultimoErroSync,
-      ultimoMotivoSync
+      ultimoMotivoSync,
+      lastLocalChange: localStorage.getItem("bm_last_local_change"),
+      lastLocalChangeReason: localStorage.getItem("bm_last_local_change_reason"),
+      deletedPendentes: {
+        clientes: lerDeleted("clientes").length,
+        produtos: lerDeleted("produtos").length,
+        vendas: lerDeleted("vendas").length,
+        pagamentos: lerDeleted("pagamentos").length,
+        creditos: lerDeleted("creditos").length
+      },
+      temPendenciasLocais: temPendenciasLocais()
     };
   }
 };
