@@ -400,6 +400,27 @@ td{padding:8px 9px !important;font-size:12px !important;}
   #print-etiquetas .etq-card{box-shadow:none !important;border:1px solid #777 !important;}
 }
 
+
+/* AJUSTES XML COM CATEGORIA EDITÁVEL */
+.imp-bulk-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-top:10px;}
+.imp-row.xml-edit{grid-template-columns:1.35fr .35fr .55fr .65fr .75fr .75fr .65fr !important;}
+.imp-row.xml-edit select.fi{padding:6px 8px !important;font-size:11px !important;}
+.imp-row.xml-edit .imp-preco-input{min-width:78px;}
+@media (max-width:1280px){
+  .imp-bulk-grid{grid-template-columns:1fr 1fr;}
+  .imp-bulk-grid .btn{grid-column:1/-1;}
+  .imp-row.xml-edit{grid-template-columns:1.2fr .35fr .55fr .65fr .75fr .75fr .65fr !important;}
+}
+
+/* CARRINHO COM ROLAGEM FIXA */
+#pg-venda .vg{min-height:0 !important;}
+#pg-venda .vr{min-height:0 !important;height:100% !important;}
+#pg-venda .vr .cbox{min-height:0 !important;height:100% !important;overflow:hidden !important;}
+#pg-venda #cart{flex:1 !important;min-height:0 !important;overflow-y:auto !important;overflow-x:hidden !important;padding-right:6px !important;scroll-behavior:smooth;}
+#pg-venda .vr .cf{flex-shrink:0 !important;background:var(--s1) !important;position:relative;z-index:2;}
+#pg-venda #cart .ci{align-items:flex-start !important;}
+#pg-venda #cart .cin{line-height:1.18 !important;word-break:break-word !important;}
+
 </style>
   <link rel="stylesheet" href="./app-enhancements.css">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -1110,13 +1131,24 @@ td{padding:8px 9px !important;font-size:12px !important;}
           <button class="btn bh sm" type="button" onclick="document.getElementById('xml-file').value='';limparImportacaoXML()">Limpar</button>
         </div>
         <div class="imp-note">Selecione o XML da NF-e. O sistema vai conferir itens, fornecedor, número da nota e somar o estoque dos produtos já cadastrados ou criar novos automaticamente.</div>
+        <div class="imp-bulk-grid">
+          <div class="fg">
+            <label class="fl">Categoria principal</label>
+            <select class="fi" id="ix-cat-principal" onchange="preencherSubcatsXML(this.value)"></select>
+          </div>
+          <div class="fg">
+            <label class="fl">Subcategoria</label>
+            <select class="fi" id="ix-subcategoria"></select>
+          </div>
+          <button class="btn bb sm" type="button" onclick="aplicarCategoriasXMLTodos()">Aplicar para todos</button>
+        </div>
       </div>
       <div class="imp-head">
         <div class="imp-box"><div class="tm">Fornecedor</div><div id="ix-forn" style="font-weight:800;margin-top:4px;">—</div></div>
         <div class="imp-box"><div class="tm">Nota / Emissão</div><div id="ix-nota" style="font-weight:800;margin-top:4px;">—</div></div>
       </div>
       <div class="imp-list" id="ix-lista">
-        <div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Ação</div></div>
+        <div class="imp-row head xml-edit"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Categoria</div><div>Subcategoria</div><div>Ação</div></div>
         <div class="imp-row"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>
       </div>
     </div>
@@ -2619,17 +2651,76 @@ window.addEventListener('scroll', posSugProdutoManual, true);
 var importacaoXMLAtual=null;
 
 function abrirImportaXML(){
+  preencherCategoriasXML('CALÇADOS');
   abrirMd('mo-importa-xml');
 }
 function abrirImportaFoto(){
   abrirMd('mo-importa-foto');
+}
+function montarOptionsXML(lista, valor){
+  return (lista || []).map(function(v){
+    return '<option value="'+v+'" '+(String(v)===String(valor)?'selected':'')+'>'+v+'</option>';
+  }).join('');
+}
+function preencherCategoriasXML(valor){
+  var sel=document.getElementById('ix-cat-principal');
+  if(!sel) return;
+  var atual=valor || sel.value || 'CALÇADOS';
+  sel.innerHTML=montarOptionsXML(CATEGORIAS_PRINCIPAIS, atual);
+  sel.value=CATEGORIAS_PRINCIPAIS.indexOf(atual)>=0?atual:'CALÇADOS';
+  preencherSubcatsXML(sel.value);
+}
+function preencherSubcatsXML(grupo, valor){
+  var sel=document.getElementById('ix-subcategoria');
+  if(!sel) return;
+  var g=grupo || (document.getElementById('ix-cat-principal')||{}).value || 'CALÇADOS';
+  var lista=SUBCATEGORIAS_POR_PRINCIPAL[g] || SUBCATEGORIAS_POR_PRINCIPAL.OUTROS || ['Outros'];
+  var atual=valor || sel.value || lista[0] || 'Outros';
+  sel.innerHTML=montarOptionsXML(lista, atual);
+  sel.value=lista.indexOf(atual)>=0?atual:(lista[0]||'Outros');
+}
+function aplicarCategoriasXMLTodos(){
+  if(!importacaoXMLAtual || !importacaoXMLAtual.itens) return;
+  var grupo=(document.getElementById('ix-cat-principal')||{}).value || 'OUTROS';
+  var sub=(document.getElementById('ix-subcategoria')||{}).value || 'Outros';
+  importacaoXMLAtual.itens.forEach(function(it){
+    it.grupo=grupo;
+    it.cat=sub;
+    it.subcat=sub;
+    it.subcategoria=sub;
+    if(!it.ncm && NCM_POR_CATEGORIA[sub]) it.ncm=NCM_POR_CATEGORIA[sub];
+  });
+  renderPreviewImportacaoXML();
+  toast('✅ Categoria aplicada para todos os itens!','ok');
+}
+function alterarCategoriaXML(idx, grupo){
+  if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[idx]) return;
+  var lista=SUBCATEGORIAS_POR_PRINCIPAL[grupo] || SUBCATEGORIAS_POR_PRINCIPAL.OUTROS || ['Outros'];
+  var sub=lista[0] || 'Outros';
+  var it=importacaoXMLAtual.itens[idx];
+  it.grupo=grupo;
+  it.cat=sub;
+  it.subcat=sub;
+  it.subcategoria=sub;
+  if(NCM_POR_CATEGORIA[sub]) it.ncm=NCM_POR_CATEGORIA[sub];
+  renderPreviewImportacaoXML();
+}
+function alterarSubcategoriaXML(idx, sub){
+  if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[idx]) return;
+  var it=importacaoXMLAtual.itens[idx];
+  var grupo=categoriaPrincipalPorSubcategoria(sub);
+  it.grupo=grupo;
+  it.cat=sub;
+  it.subcat=sub;
+  it.subcategoria=sub;
+  if(NCM_POR_CATEGORIA[sub]) it.ncm=NCM_POR_CATEGORIA[sub];
 }
 function limparImportacaoXML(){
   importacaoXMLAtual=null;
   var f=document.getElementById('ix-forn'); if(f) f.textContent='—';
   var n=document.getElementById('ix-nota'); if(n) n.textContent='—';
   var l=document.getElementById('ix-lista');
-  if(l) l.innerHTML='<div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Ação</div></div><div class="imp-row"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>';
+  if(l) l.innerHTML='<div class="imp-row head xml-edit"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Categoria</div><div>Subcategoria</div><div>Ação</div></div><div class="imp-row"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>';
 }
 function txt(node, tag){
   var el = node.getElementsByTagName(tag)[0];
@@ -2686,16 +2777,29 @@ function lerArquivoXML(ev){
         var precoVenda = existente
           ? Number(existente.preco || 0)
           : Number(custo || 0);
+        var subcat = existente
+          ? (existente.subcategoria || existente.subcat || existente.cat || '')
+          : '';
+        if(!subcat || categoriaPrincipalPorSubcategoria(subcat)==='OUTROS'){
+          subcat = inferSubcategoriaPorTexto(nomeBase || nome) || 'Outros';
+        }
+        var grupo = existente
+          ? (existente.grupo || categoriaPrincipalPorSubcategoria(subcat) || inferCategoriaPorTexto(nomeBase || nome))
+          : (categoriaPrincipalPorSubcategoria(subcat) || inferCategoriaPorTexto(nomeBase || nome));
+        if(!grupo || CATEGORIAS_PRINCIPAIS.indexOf(grupo) < 0) grupo = inferCategoriaPorTexto(nomeBase || nome) || 'OUTROS';
         return {
           cod: cod || ('REF'+Math.random().toString(36).slice(2,7).toUpperCase()),
           nome: nome.trim(),
           nomeBase:nomeBase,
           ean: ean,
-          ncm: ncm,
+          ncm: ncm || NCM_POR_CATEGORIA[subcat] || '',
           qtd: q,
           custo: custo,
           precoVenda: precoVenda,
-          cat: existente ? (existente.cat||catByNCM(ncm)) : catByNCM(ncm),
+          grupo: grupo,
+          cat: subcat,
+          subcat: subcat,
+          subcategoria: subcat,
           desc2: [info.cor ? ('Cor: '+info.cor) : '', info.tam ? ('Tam: '+info.tam) : ''].filter(Boolean).join(' · '),
           existenteId: existente ? existente.id : ''
         };
@@ -2730,12 +2834,27 @@ function renderPreviewImportacaoXML(){
   document.getElementById('ix-forn').textContent = importacaoXMLAtual.fornecedor + (importacaoXMLAtual.cnpj ? ' · ' + importacaoXMLAtual.cnpj : '');
   document.getElementById('ix-nota').textContent = 'NF ' + (importacaoXMLAtual.numero||'—') + ' · Série ' + (importacaoXMLAtual.serie||'—') + (importacaoXMLAtual.emissao ? ' · ' + FD(importacaoXMLAtual.emissao) : '');
 
-  box.innerHTML = '<div class="imp-row head"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Ação</div></div>' + importacaoXMLAtual.itens.map(function(it, idx){
-    return '<div class="imp-row">'+
+  var primeiro = importacaoXMLAtual.itens[0] || {};
+  preencherCategoriasXML(primeiro.grupo || categoriaPrincipalPorSubcategoria(primeiro.subcategoria || primeiro.subcat || primeiro.cat || '') || 'CALÇADOS');
+  preencherSubcatsXML((document.getElementById('ix-cat-principal')||{}).value, primeiro.subcategoria || primeiro.subcat || primeiro.cat || '');
+
+  box.innerHTML = '<div class="imp-row head xml-edit"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Categoria</div><div>Subcategoria</div><div>Ação</div></div>' + importacaoXMLAtual.itens.map(function(it, idx){
+    var grupo = it.grupo || categoriaPrincipalPorSubcategoria(it.subcategoria || it.subcat || it.cat || '') || 'OUTROS';
+    if(CATEGORIAS_PRINCIPAIS.indexOf(grupo) < 0) grupo = 'OUTROS';
+    var sub = it.subcategoria || it.subcat || it.cat || 'Outros';
+    var listaSub = SUBCATEGORIAS_POR_PRINCIPAL[grupo] || SUBCATEGORIAS_POR_PRINCIPAL.OUTROS || ['Outros'];
+    if(listaSub.indexOf(sub) < 0) sub = listaSub[0] || 'Outros';
+    it.grupo = grupo;
+    it.cat = sub;
+    it.subcat = sub;
+    it.subcategoria = sub;
+    return '<div class="imp-row xml-edit">'+
       '<div><div class="imp-prod">'+it.nome+'</div><div class="imp-sub">'+it.cod+(it.ncm?' · NCM '+it.ncm:'')+(it.ean?' · EAN '+it.ean:'')+'</div></div>'+
       '<div>'+it.qtd+'</div>'+
       '<div>'+R(it.custo)+'</div>'+
       '<div><input class="imp-preco-input" type="number" step="0.01" min="0" value="'+Number(it.precoVenda||0).toFixed(2)+'" onchange="alterarPrecoVendaXML('+idx+', this.value)"></div>'+
+      '<div><select class="fi" onchange="alterarCategoriaXML('+idx+', this.value)">'+montarOptionsXML(CATEGORIAS_PRINCIPAIS, grupo)+'</select></div>'+
+      '<div><select class="fi" onchange="alterarSubcategoriaXML('+idx+', this.value)">'+montarOptionsXML(listaSub, sub)+'</select></div>'+
       '<div>'+(it.existenteId?'Somar estoque':'Criar produto')+'</div>'+
     '</div>';
   }).join('');
@@ -2767,8 +2886,14 @@ function confirmarImportacaoXML(){
       if(it.ean){ var listaMerge=extrairCodigosBarras((p.ean||'')+','+it.ean); p.ean = listaMerge.join(','); }
       if(it.desc2) p.desc2 = it.desc2;
       if(Number(it.precoVenda||0) > 0) p.preco = Number(it.precoVenda||0);
+      var subXML = it.subcategoria || it.subcat || it.cat || p.subcategoria || p.subcat || p.cat || 'Outros';
+      var grupoXML = it.grupo || categoriaPrincipalPorSubcategoria(subXML) || p.grupo || 'OUTROS';
+      p.grupo = grupoXML;
+      p.cat = subXML;
+      p.subcat = subXML;
+      p.subcategoria = subXML;
       p.origem = p.origem || '0';
-      p.unidade = p.unidade || (categoriaEhCalcado(p.cat||it.cat||'') ? 'PAR' : 'UN');
+      p.unidade = p.unidade || (categoriaEhCalcado(subXML) ? 'PAR' : 'UN');
       p.csosn = p.csosn || '102';
       p.cfop = p.cfop || '5102';
       p.escala = p.escala || 'S';
@@ -2780,15 +2905,18 @@ function confirmarImportacaoXML(){
         id: DB.uid(),
         cod: it.cod,
         nome: it.nome,
-        cat: it.cat || 'Outros',
+        grupo: it.grupo || categoriaPrincipalPorSubcategoria(it.subcategoria || it.subcat || it.cat || '') || 'OUTROS',
+        cat: it.subcategoria || it.subcat || it.cat || 'Outros',
+        subcat: it.subcategoria || it.subcat || it.cat || 'Outros',
+        subcategoria: it.subcategoria || it.subcat || it.cat || 'Outros',
         preco: Number(it.precoVenda||it.custo||0),
         estq: Number(it.qtd||0),
         desc2: it.desc2 || '',
         custo: Number(it.custo||0),
         ean: it.ean || it.codigo_barras || it.codBarras || it.codigoDeBarras || '',
-        ncm: it.ncm || (NCM_POR_CATEGORIA[it.cat || ''] || ''),
+        ncm: it.ncm || (NCM_POR_CATEGORIA[it.subcategoria || it.subcat || it.cat || ''] || ''),
         origem: '0',
-        unidade: categoriaEhCalcado(it.cat||'') ? 'PAR' : 'UN',
+        unidade: categoriaEhCalcado(it.subcategoria || it.subcat || it.cat || '') ? 'PAR' : 'UN',
         csosn: '102',
         cfop: '5102',
         escala: 'S',
@@ -2939,6 +3067,10 @@ function renderCart(){
   if(cdesc && document.activeElement!==cdesc){
     cdesc.value=desconto?desconto.toFixed(2).replace('.',','):'';
   }
+  setTimeout(function(){
+    var cartEl=document.getElementById('cart');
+    if(cartEl) cartEl.scrollTop = cartEl.scrollHeight;
+  }, 0);
 }
 function limparVenda(){initVenda();}
 function finVenda12(){abrirModalPagamento();}
@@ -5642,23 +5774,40 @@ document.addEventListener('DOMContentLoaded',function(){
   };
 
   window.backupNowServidor = async function(){
+    var st = el('ps-status');
+    var ub = el('ps-ultimo-backup');
+
     try{
+      if(st) st.textContent = 'Gerando backup...';
+
       if(!window.BelaSheetsSync || typeof window.BelaSheetsSync.backupServerNow !== 'function'){
         throw new Error('BelaSheetsSync.backupServerNow não encontrado.');
       }
-      toastWarn('⏳ Criando backup no Google Drive...');
+
       var res = await window.BelaSheetsSync.backupServerNow();
+
       if(!res || res.ok === false){
         throw new Error((res && res.error) || 'Falha ao criar backup no servidor.');
       }
+
       var info = salvarUltimoBackupServidor(res);
-      atualizarPainelSyncBM();
+      if(ub) ub.textContent = fmtData(info.data) + (info.nome ? ' — ' + info.nome : '');
+      if(st) st.textContent = 'Backup servidor criado';
+
       toastOk('✅ Backup criado no Google Drive!');
+
+      if(info.url){
+        window.open(info.url, '_blank');
+      }
+
+      atualizarPainelSyncBM();
       return res;
     }catch(e){
+      console.error('Erro no backup servidor:', e);
+      if(st) st.textContent = 'Falha no backup';
       atualizarPainelSyncBM();
-      toastWarn('❌ Erro no backup servidor: ' + (e && e.message ? e.message : e));
-      throw e;
+      toastWarn('❌ Falha no backup servidor: ' + (e && e.message ? e.message : e));
+      return false;
     }
   };
 
@@ -5669,14 +5818,9 @@ document.addEventListener('DOMContentLoaded',function(){
       return false;
     }
 
-    var msg = 'Tem certeza que deseja restaurar o último backup do servidor?
-
-' +
-      'Backup: ' + (b.nome || 'Backup servidor') + '
-' +
-      'Data: ' + fmtData(b.data) + '
-
-' +
+    var msg = 'Tem certeza que deseja restaurar o último backup do servidor?\n\n' +
+      'Backup: ' + (b.nome || 'Backup servidor') + '\n' +
+      'Data: ' + fmtData(b.data) + '\n\n' +
       'Atenção: use isso somente em emergência.';
 
     if(!confirm(msg)) return false;
@@ -5705,7 +5849,7 @@ document.addEventListener('DOMContentLoaded',function(){
       return false;
     }catch(e){
       toastWarn('❌ Erro ao restaurar backup: ' + (e && e.message ? e.message : e));
-      throw e;
+      return false;
     }
   };
 
