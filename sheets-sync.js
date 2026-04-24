@@ -3,10 +3,8 @@ Bela Modas Sheets Sync — modo estável
 Fluxo:
 1) sem restauração automática na abertura
 2) restore manual quando necessário
-3) exclusão física real para clientes, produtos, recebimentos e cobranças
-4) exclusão de venda remove a venda e marca nota/xml como cancelados
-5) auto sync após alterações
-6) sync de segurança a cada 2 minutos
+3) auto sync após alterações
+4) sync de segurança a cada 2 minutos
 */
 
 (function () {
@@ -20,7 +18,6 @@ let syncEmAndamento = false;
 let restoreEmAndamento = false;
 let autoSyncTimer = null;
 let intervaloSyncAtivo = false;
-let suprimirHookExclusao = false;
 
 let ultimoHashEnviado = "";
 let ultimoErroSync = "";
@@ -68,20 +65,6 @@ function updatedOriginal(v) {
   return (v && (v.updatedAt || v.createdAt || v.data))
     ? (v.updatedAt || v.createdAt || v.data)
     : "";
-}
-
-function normalizarFormaPagamento_(v) {
-  const s = String(v || "").trim().toLowerCase();
-
-  if (s === "fiado" || s === "crediario" || s === "crediário") return "fiado";
-  if (s === "crédito") return "credito";
-  if (s === "débito") return "debito";
-
-  return s;
-}
-
-function normalizarDescricaoCobranca_(v) {
-  return String(v || "").replace(/credi[aá]rio/gi, "fiado");
 }
 
 /* STORAGE */
@@ -171,21 +154,6 @@ async function buscarTudoServidor() {
   return json;
 }
 
-async function deletarFisico(sheet, id) {
-  return enviar({
-    action: "delete",
-    sheet,
-    id
-  });
-}
-
-async function deletarVendaFisico(id) {
-  return enviar({
-    action: "deleteVenda",
-    id
-  });
-}
-
 /* NORMALIZAÇÃO ENVIO */
 
 function normalizarProduto(p) {
@@ -196,57 +164,40 @@ function normalizarProduto(p) {
       : (p.codigosBarras != null ? p.codigosBarras : "")
   ).trim();
 
-  const subcat = String(p.subcat || p.subcategoria || "").trim();
-  const estoque = numeroSeguro(p.estoque ?? p.estq);
-
   return {
     id: p.id,
     cod: p.cod || "",
     nome: p.nome || "",
     cat: p.cat || "",
     grupo: p.grupo || "",
-    subcat: subcat,
-    subcategoria: subcat,
+    subcategoria: p.subcategoria || "",
     preco: numeroSeguro(p.preco),
     custo: numeroSeguro(p.custo),
-    estoque: estoque,
-    estq: estoque,
-    desc2: p.desc2 || "",
+    estoque: numeroSeguro(p.estoque),
     ean: eanPrincipal,
     codigos_barras: codigosExtras,
     ncm: p.ncm || "",
     origem: p.origem || "0",
-    unidade: p.unidade || "",
     csosn: p.csosn || "102",
     cfop: p.cfop || "5102",
-    escala: p.escala || "",
-    origem_estoque: p.origem_estoque || "",
     createdAt: p.createdAt || agoraISO(),
     updatedAt: p.updatedAt || agoraISO(),
-    deletedAt: ""
+    deletedAt: p.deletedAt || ""
   };
 }
 
 function normalizarCliente(c) {
-  const telefone = c.telefone || c.tel || "";
-  const endereco = c.endereco || c.end || "";
-  const limite = numeroSeguro(c.limite_credito ?? c.limite);
-
   return {
     id: c.id,
     nome: c.nome || "",
-    telefone: telefone,
-    tel: telefone,
+    telefone: c.telefone || c.tel || "",
     cpf: c.cpf || "",
-    endereco: endereco,
-    end: endereco,
-    limite_credito: limite,
-    limite: limite,
+    endereco: c.endereco || c.end || "",
     obs: c.obs || "",
     data: c.data || c.createdAt || agoraISO(),
     createdAt: c.createdAt || c.data || agoraISO(),
     updatedAt: c.updatedAt || c.data || agoraISO(),
-    deletedAt: ""
+    deletedAt: c.deletedAt || ""
   };
 }
 
@@ -255,13 +206,13 @@ function normalizarVenda(v) {
     id: v.id,
     cid: v.cid || "",
     cliente: v.cliente || v.cliNome || "",
-    forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
+    forma_pagamento: v.forma_pagamento || v.forma || "",
     total: numeroSeguro(v.total),
     itens_json: JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     data: v.data || v.createdAt || agoraISO(),
     createdAt: v.createdAt || v.data || agoraISO(),
     updatedAt: v.updatedAt || v.data || agoraISO(),
-    deletedAt: ""
+    deletedAt: v.deletedAt || ""
   };
 }
 
@@ -271,12 +222,12 @@ function normalizarPagamento(p) {
     cid: p.cid || "",
     venda_id: p.venda_id || p.vid || "",
     valor: numeroSeguro(p.valor ?? p.val),
-    forma_pagamento: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
+    forma_pagamento: p.forma_pagamento || p.forma || "",
     obs: p.obs || "",
     data: p.data || p.createdAt || agoraISO(),
     createdAt: p.createdAt || p.data || agoraISO(),
     updatedAt: p.updatedAt || p.data || agoraISO(),
-    deletedAt: ""
+    deletedAt: p.deletedAt || ""
   };
 }
 
@@ -286,14 +237,14 @@ function normalizarCredito(c) {
     cid: c.cid || "",
     vid: c.vid || c.venda_id || "",
     cliente: c.cliente || c.cliNome || "",
-    descricao: normalizarDescricaoCobranca_(c.descricao || c.desc || ""),
+    descricao: c.descricao || c.desc || "",
     valor: numeroSeguro(c.valor ?? c.val),
     status: c.status || "aberto",
     vencimento: c.vencimento || "",
     data: c.data || c.createdAt || agoraISO(),
     createdAt: c.createdAt || c.data || agoraISO(),
     updatedAt: c.updatedAt || c.data || agoraISO(),
-    deletedAt: ""
+    deletedAt: c.deletedAt || ""
   };
 }
 
@@ -307,57 +258,41 @@ function normalizarProdutoRestauracao(p) {
       : (p.codigosBarras != null ? p.codigosBarras : "")
   ).trim();
 
-  const subcat = String(p.subcat || p.subcategoria || "").trim();
-  const estoque = numeroSeguro(p.estoque ?? p.estq);
-
   return {
     id: p.id || "",
     cod: p.cod || "",
     nome: p.nome || "",
     cat: p.cat || "",
     grupo: p.grupo || "",
-    subcat: subcat,
-    subcategoria: subcat,
+    subcategoria: p.subcategoria || "",
+    subcat: p.subcategoria || p.subcat || p.cat || "",
     preco: numeroSeguro(p.preco),
     custo: numeroSeguro(p.custo),
-    estoque: estoque,
-    estq: estoque,
-    desc2: p.desc2 || "",
+    estoque: numeroSeguro(p.estoque),
     ean: eanPrincipal,
     codigos_barras: codigosExtras,
     ncm: p.ncm || "",
     origem: p.origem || "0",
-    unidade: p.unidade || "",
     csosn: p.csosn || "102",
     cfop: p.cfop || "5102",
-    escala: p.escala || "",
-    origem_estoque: p.origem_estoque || "",
     createdAt: createdOriginal(p),
     updatedAt: updatedOriginal(p),
-    deletedAt: ""
+    deletedAt: p.deletedAt || ""
   };
 }
 
 function normalizarClienteRestauracao(c) {
-  const telefone = c.telefone || c.tel || "";
-  const endereco = c.endereco || c.end || "";
-  const limite = numeroSeguro(c.limite_credito ?? c.limite);
-
   return {
     id: c.id || "",
     nome: c.nome || "",
-    telefone: telefone,
-    tel: telefone,
+    telefone: c.telefone || c.tel || "",
     cpf: c.cpf || "",
-    endereco: endereco,
-    end: endereco,
-    limite_credito: limite,
-    limite: limite,
+    endereco: c.endereco || c.end || "",
     obs: c.obs || "",
     data: dataOriginal(c),
     createdAt: createdOriginal(c),
     updatedAt: updatedOriginal(c),
-    deletedAt: ""
+    deletedAt: c.deletedAt || ""
   };
 }
 
@@ -369,15 +304,15 @@ function normalizarVendaRestauracao(v) {
     cid: v.cid || "",
     cliente: v.cliente || v.cliNome || "",
     cliNome: v.cliente || v.cliNome || "",
-    forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
-    forma: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
+    forma_pagamento: v.forma_pagamento || v.forma || "",
+    forma: v.forma_pagamento || v.forma || "",
     total: numeroSeguro(v.total),
     itens_json: typeof v.itens_json === "string" ? v.itens_json : JSON.stringify(itens),
     itens: itens,
     data: dataOriginal(v),
     createdAt: createdOriginal(v),
     updatedAt: updatedOriginal(v),
-    deletedAt: ""
+    deletedAt: v.deletedAt || ""
   };
 }
 
@@ -389,13 +324,13 @@ function normalizarPagamentoRestauracao(p) {
     vid: p.venda_id || p.vid || "",
     valor: numeroSeguro(p.valor ?? p.val),
     val: numeroSeguro(p.valor ?? p.val),
-    forma_pagamento: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
-    forma: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
+    forma_pagamento: p.forma_pagamento || p.forma || "",
+    forma: p.forma_pagamento || p.forma || "",
     obs: p.obs || "",
     data: dataOriginal(p),
     createdAt: createdOriginal(p),
     updatedAt: updatedOriginal(p),
-    deletedAt: ""
+    deletedAt: p.deletedAt || ""
   };
 }
 
@@ -407,8 +342,8 @@ function normalizarCreditoRestauracao(c) {
     venda_id: c.vid || c.venda_id || "",
     cliente: c.cliente || c.cliNome || "",
     cliNome: c.cliente || c.cliNome || "",
-    descricao: normalizarDescricaoCobranca_(c.descricao || c.desc || ""),
-    desc: normalizarDescricaoCobranca_(c.descricao || c.desc || ""),
+    descricao: c.descricao || c.desc || "",
+    desc: c.descricao || c.desc || "",
     valor: numeroSeguro(c.valor ?? c.val),
     val: numeroSeguro(c.valor ?? c.val),
     status: c.status || "aberto",
@@ -416,7 +351,7 @@ function normalizarCreditoRestauracao(c) {
     data: dataOriginal(c),
     createdAt: createdOriginal(c),
     updatedAt: updatedOriginal(c),
-    deletedAt: ""
+    deletedAt: c.deletedAt || ""
   };
 }
 
@@ -435,13 +370,11 @@ async function restaurarDoServidor() {
     const pagamentos = (dados.recebimentos || []).map(normalizarPagamentoRestauracao);
     const creditos = (dados.cobrancas || []).map(normalizarCreditoRestauracao);
 
-    suprimirHookExclusao = true;
     originalSetItem("bm_clientes", JSON.stringify(clientes));
     originalSetItem("bm_produtos", JSON.stringify(produtos));
     originalSetItem("bm_vendas", JSON.stringify(vendas));
     originalSetItem("bm_pagamentos", JSON.stringify(pagamentos));
     originalSetItem("bm_creditos", JSON.stringify(creditos));
-    suprimirHookExclusao = false;
 
     originalSetItem("bm_last_restore", agoraISO());
     ultimoHashEnviado = gerarHashSync();
@@ -449,7 +382,6 @@ async function restaurarDoServidor() {
 
     return true;
   } catch (e) {
-    suprimirHookExclusao = false;
     console.error("Erro ao restaurar dados do servidor:", e);
     originalSetItem("bm_last_restore_error", String(e && e.message || e));
     ultimoErroSync = String(e && e.message || e);
@@ -522,43 +454,14 @@ async function enviarTudo(origem) {
   }
 }
 
-/* EXCLUSÃO FÍSICA */
-
-function extrairRemovidos(antes, depois) {
-  const idsDepois = new Set((depois || []).map(x => String(x.id)));
-  return (antes || []).filter(x => !idsDepois.has(String(x.id)));
-}
-
-async function processarRemovidos(nome, antes, depois) {
-  if (suprimirHookExclusao) return;
-  const removidos = extrairRemovidos(antes, depois);
-  if (!removidos.length) return;
-
-  for (const item of removidos) {
-    try {
-      if (nome === "vendas") {
-        await deletarVendaFisico(item.id);
-      } else if (nome === "clientes") {
-        await deletarFisico("clientes", item.id);
-      } else if (nome === "produtos") {
-        await deletarFisico("produtos", item.id);
-      } else if (nome === "pagamentos") {
-        await deletarFisico("recebimentos", item.id);
-      } else if (nome === "creditos") {
-        await deletarFisico("cobrancas", item.id);
-      }
-    } catch (e) {
-      console.warn("Falha ao excluir fisicamente", nome, item.id, e);
-    }
-  }
-}
-
 /* AUTO SYNC */
 
 function agendarAutoSync(motivo) {
   if (restoreEmAndamento) return;
 
-  if (autoSyncTimer) clearTimeout(autoSyncTimer);
+  if (autoSyncTimer) {
+    clearTimeout(autoSyncTimer);
+  }
 
   autoSyncTimer = setTimeout(async function () {
     autoSyncTimer = null;
@@ -600,11 +503,7 @@ localStorage.setItem = function (k, v) {
   const nome = String(k).replace("bm_", "");
 
   if (["clientes", "produtos", "vendas", "pagamentos", "creditos"].includes(nome)) {
-    const antes = lerLocal(nome);
     originalSetItem(k, v);
-    const depois = lerLocal(nome);
-
-    processarRemovidos(nome, antes, depois);
     agendarAutoSync(nome);
     return;
   }
@@ -637,21 +536,6 @@ window.BelaSheetsSync = {
   backupServerNow: async function () {
     const r = await fetch(API_URL + "?action=backupAgora");
     return r.json();
-  },
-  deleteClienteNow: function (id) {
-    return deletarFisico("clientes", id);
-  },
-  deleteProdutoNow: function (id) {
-    return deletarFisico("produtos", id);
-  },
-  deleteRecebimentoNow: function (id) {
-    return deletarFisico("recebimentos", id);
-  },
-  deleteCobrancaNow: function (id) {
-    return deletarFisico("cobrancas", id);
-  },
-  deleteVendaNow: function (id) {
-    return deletarVendaFisico(id);
   },
   status: function () {
     return {
