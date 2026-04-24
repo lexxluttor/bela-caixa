@@ -1,12 +1,11 @@
 /*!
-Bela Modas Sheets Sync — modo estável
-Fluxo:
-1) sem restauração automática na abertura
-2) restore manual quando necessário
-3) exclusão física real para clientes, produtos, recebimentos e cobranças
-4) exclusão de venda remove a venda e marca nota/xml como cancelados
-5) auto sync após alterações
-6) sync de segurança a cada 2 minutos
+Bela Modas Sheets Sync — versão limpa
+Regra:
+1) Local é a base de trabalho
+2) A cada sync, envia tudo para a planilha
+3) Sync automático a cada 2 minutos
+4) Mobile apenas visualiza usando getAll
+5) Restore é manual
 */
 
 (function () {
@@ -16,20 +15,19 @@ Fluxo:
 const API_URL =
 "https://script.google.com/macros/s/AKfycbxvE2DpOpZDW1bZOvatqdN0HjSOXI3gvFdGPSj7qeUb6NF2V-K18-5tpil1KGW4O1lB/exec";
 
-let syncEmAndamento = false;
-let restoreEmAndamento = false;
-let autoSyncTimer = null;
-let intervaloSyncAtivo = false;
-let suprimirHookExclusao = false;
-
-let ultimoHashEnviado = "";
-let ultimoErroSync = "";
-let ultimoMotivoSync = "";
-
 const AUTO_SYNC_DELAY_MS = 4000;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
-/* DATA */
+let syncEmAndamento = false;
+let restoreEmAndamento = false;
+let autoSyncTimer = null;
+let ultimoHashEnviado = "";
+let ultimoErroSync = "";
+let ultimoMotivoSync = "";
+let intervaloAtivo = false;
+let ignorarHook = false;
+
+/* ================= UTIL ================= */
 
 function agoraISO() {
   const d = new Date();
@@ -49,25 +47,12 @@ function numeroSeguro(v) {
 function safeParseJson(v, fallback) {
   if (Array.isArray(v)) return v;
   if (v == null || v === "") return fallback;
+
   try {
     return JSON.parse(v);
   } catch (e) {
     return fallback;
   }
-}
-
-function dataOriginal(v) {
-  return (v && (v.data || v.createdAt)) ? (v.data || v.createdAt) : "";
-}
-
-function createdOriginal(v) {
-  return (v && (v.createdAt || v.data)) ? (v.createdAt || v.data) : "";
-}
-
-function updatedOriginal(v) {
-  return (v && (v.updatedAt || v.createdAt || v.data))
-    ? (v.updatedAt || v.createdAt || v.data)
-    : "";
 }
 
 function normalizarFormaPagamento_(v) {
@@ -76,15 +61,31 @@ function normalizarFormaPagamento_(v) {
   if (s === "fiado" || s === "crediario" || s === "crediário") return "fiado";
   if (s === "crédito") return "credito";
   if (s === "débito") return "debito";
+  if (s === "cartão crédito" || s === "cartao credito") return "credito";
+  if (s === "cartão débito" || s === "cartao debito") return "debito";
 
   return s;
 }
 
 function normalizarDescricaoCobranca_(v) {
-  return String(v || "").replace(/credi[aá]rio/gi, "fiado");
+  const s = String(v || "").trim();
+
+  if (!s) return "Venda fiado";
+
+  const lower = s.toLowerCase();
+
+  if (lower.includes("crediario") || lower.includes("crediário")) {
+    return "Venda fiado";
+  }
+
+  if (lower.startsWith("venda fiado")) {
+    return "Venda fiado";
+  }
+
+  return s;
 }
 
-/* STORAGE */
+/* ================= STORAGE ================= */
 
 const originalSetItem = localStorage.setItem.bind(localStorage);
 
@@ -96,18 +97,9 @@ function lerLocal(nome) {
   }
 }
 
-function salvarBackup() {
-  originalSetItem("bm_backup", JSON.stringify({
-    data: agoraISO(),
-    clientes: lerLocal("clientes"),
-    produtos: lerLocal("produtos"),
-    vendas: lerLocal("vendas"),
-    pagamentos: lerLocal("pagamentos"),
-    creditos: lerLocal("creditos")
-  }));
+function salvarLocal(nome, dados) {
+  originalSetItem("bm_" + nome, JSON.stringify(dados || []));
 }
-
-/* HASH */
 
 function gerarHashSync() {
   try {
@@ -123,9 +115,20 @@ function gerarHashSync() {
   }
 }
 
-/* HTTP */
+function salvarBackupLocal() {
+  originalSetItem("bm_backup", JSON.stringify({
+    data: agoraISO(),
+    clientes: lerLocal("clientes"),
+    produtos: lerLocal("produtos"),
+    vendas: lerLocal("vendas"),
+    pagamentos: lerLocal("pagamentos"),
+    creditos: lerLocal("creditos")
+  }));
+}
 
-async function enviar(body) {
+/* ================= HTTP ================= */
+
+async function post(body) {
   const params = new URLSearchParams();
   params.append("payload", JSON.stringify(body));
 
@@ -138,94 +141,61 @@ async function enviar(body) {
   });
 
   const txt = await r.text();
-  let json = {};
 
+  let json;
   try {
     json = JSON.parse(txt);
   } catch (e) {
-    throw new Error("Resposta inválida do Apps Script");
+    throw new Error("Resposta inválida do Apps Script: " + txt.substring(0, 120));
   }
 
   if (!r.ok || json.ok === false) {
-    throw new Error(json.error || "Falha ao sincronizar");
+    throw new Error(json.error || "Falha no Apps Script");
   }
 
   return json;
 }
 
-async function buscarTudoServidor() {
+async function getAll() {
   const r = await fetch(API_URL + "?action=getAll");
   const txt = await r.text();
 
-  let json = {};
+  let json;
   try {
     json = JSON.parse(txt);
   } catch (e) {
-    throw new Error("Resposta inválida ao restaurar dados");
+    throw new Error("Resposta inválida ao buscar planilha");
   }
 
   if (!r.ok || json.ok === false) {
-    throw new Error(json.error || "Falha ao buscar dados do servidor");
+    throw new Error(json.error || "Falha ao buscar planilha");
   }
 
   return json;
 }
 
-async function deletarFisico(sheet, id) {
-  return enviar({
-    action: "delete",
-    sheet,
-    id
+/* ================= AJUDAS ================= */
+
+function mapaClientesPorId() {
+  const mapa = new Map();
+
+  lerLocal("clientes").forEach(c => {
+    if (c && c.id) {
+      mapa.set(String(c.id), c);
+    }
   });
+
+  return mapa;
 }
 
-async function deletarVendaFisico(id) {
-  return enviar({
-    action: "deleteVenda",
-    id
-  });
+function nomeClientePorId(cid) {
+  if (!cid) return "";
+  const mapa = mapaClientesPorId();
+  const c = mapa.get(String(cid));
+  return c ? (c.nome || "") : "";
 }
 
-/* NORMALIZAÇÃO ENVIO */
-
-function normalizarProduto(p) {
-  const eanPrincipal = String(p.ean || "").trim();
-  const codigosExtras = String(
-    p.codigos_barras != null
-      ? p.codigos_barras
-      : (p.codigosBarras != null ? p.codigosBarras : "")
-  ).trim();
-
-  const subcat = String(p.subcat || p.subcategoria || "").trim();
-  const estoque = numeroSeguro(p.estoque ?? p.estq);
-
-  return {
-    id: p.id,
-    cod: p.cod || "",
-    nome: p.nome || "",
-    cat: p.cat || "",
-    grupo: p.grupo || "",
-    subcat: subcat,
-    subcategoria: subcat,
-    preco: numeroSeguro(p.preco),
-    custo: numeroSeguro(p.custo),
-    estoque: estoque,
-    estq: estoque,
-    desc2: p.desc2 || "",
-    ean: eanPrincipal,
-    codigos_barras: codigosExtras,
-    ncm: p.ncm || "",
-    origem: p.origem || "0",
-    unidade: p.unidade || "",
-    csosn: p.csosn || "102",
-    cfop: p.cfop || "5102",
-    escala: p.escala || "",
-    origem_estoque: p.origem_estoque || "",
-    createdAt: p.createdAt || agoraISO(),
-    updatedAt: p.updatedAt || agoraISO(),
-    deletedAt: ""
-  };
-}
+/* ================= NORMALIZAÇÃO ENVIO ================= */
 
 function normalizarCliente(c) {
   const telefone = c.telefone || c.tel || "";
@@ -235,18 +205,45 @@ function normalizarCliente(c) {
   return {
     id: c.id,
     nome: c.nome || "",
-    telefone: telefone,
-    tel: telefone,
+    telefone,
     cpf: c.cpf || "",
-    endereco: endereco,
-    end: endereco,
+    endereco,
     limite_credito: limite,
-    limite: limite,
     obs: c.obs || "",
     data: c.data || c.createdAt || agoraISO(),
     createdAt: c.createdAt || c.data || agoraISO(),
-    updatedAt: c.updatedAt || c.data || agoraISO(),
-    deletedAt: ""
+    updatedAt: c.updatedAt || agoraISO()
+  };
+}
+
+function normalizarProduto(p) {
+  const subcat = String(p.subcat || p.subcategoria || "").trim();
+  const estoque = numeroSeguro(p.estoque ?? p.estq);
+
+  return {
+    id: p.id,
+    cod: p.cod || "",
+    nome: p.nome || "",
+    cat: p.cat || "",
+    grupo: p.grupo || "",
+    subcat,
+    subcategoria: subcat,
+    preco: numeroSeguro(p.preco),
+    custo: numeroSeguro(p.custo),
+    estoque,
+    estq: estoque,
+    desc2: p.desc2 || "",
+    ean: String(p.ean || "").trim(),
+    codigos_barras: String(p.codigos_barras || p.codigosBarras || "").trim(),
+    ncm: p.ncm || "",
+    origem: p.origem || "0",
+    unidade: p.unidade || "",
+    csosn: p.csosn || "102",
+    cfop: p.cfop || "5102",
+    escala: p.escala || "",
+    origem_estoque: p.origem_estoque || "",
+    createdAt: p.createdAt || agoraISO(),
+    updatedAt: p.updatedAt || agoraISO()
   };
 }
 
@@ -254,18 +251,17 @@ function normalizarVenda(v) {
   return {
     id: v.id,
     cid: v.cid || "",
-    cliente: v.cliente || v.cliNome || "",
+    cliente: v.cliente || v.cliNome || nomeClientePorId(v.cid) || "",
     forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
     itens_json: JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     data: v.data || v.createdAt || agoraISO(),
     createdAt: v.createdAt || v.data || agoraISO(),
-    updatedAt: v.updatedAt || v.data || agoraISO(),
-    deletedAt: ""
+    updatedAt: v.updatedAt || agoraISO()
   };
 }
 
-function normalizarPagamento(p) {
+function normalizarRecebimento(p) {
   return {
     id: p.id,
     cid: p.cid || "",
@@ -275,38 +271,51 @@ function normalizarPagamento(p) {
     obs: p.obs || "",
     data: p.data || p.createdAt || agoraISO(),
     createdAt: p.createdAt || p.data || agoraISO(),
-    updatedAt: p.updatedAt || p.data || agoraISO(),
-    deletedAt: ""
+    updatedAt: p.updatedAt || agoraISO()
   };
 }
 
-function normalizarCredito(c) {
+function normalizarCobranca(c) {
+  const cid = c.cid || "";
+  const cliente = c.cliente || c.cliNome || nomeClientePorId(cid) || "";
+  const descricao = normalizarDescricaoCobranca_(c.descricao || c.desc || "");
+
   return {
     id: c.id,
-    cid: c.cid || "",
+    cid,
     vid: c.vid || c.venda_id || "",
-    cliente: c.cliente || c.cliNome || "",
-    descricao: normalizarDescricaoCobranca_(c.descricao || c.desc || ""),
+    cliente,
+    descricao,
     valor: numeroSeguro(c.valor ?? c.val),
     status: c.status || "aberto",
     vencimento: c.vencimento || "",
     data: c.data || c.createdAt || agoraISO(),
     createdAt: c.createdAt || c.data || agoraISO(),
-    updatedAt: c.updatedAt || c.data || agoraISO(),
-    deletedAt: ""
+    updatedAt: c.updatedAt || agoraISO()
   };
 }
 
-/* NORMALIZAÇÃO RESTORE */
+/* ================= NORMALIZAÇÃO RESTORE ================= */
+
+function normalizarClienteRestauracao(c) {
+  return {
+    id: c.id || "",
+    nome: c.nome || "",
+    telefone: c.telefone || c.tel || "",
+    tel: c.telefone || c.tel || "",
+    cpf: c.cpf || "",
+    endereco: c.endereco || c.end || "",
+    end: c.endereco || c.end || "",
+    limite_credito: numeroSeguro(c.limite_credito ?? c.limite),
+    limite: numeroSeguro(c.limite_credito ?? c.limite),
+    obs: c.obs || "",
+    data: c.data || c.createdAt || "",
+    createdAt: c.createdAt || c.data || "",
+    updatedAt: c.updatedAt || c.createdAt || c.data || ""
+  };
+}
 
 function normalizarProdutoRestauracao(p) {
-  const eanPrincipal = String(p.ean || "").trim();
-  const codigosExtras = String(
-    p.codigos_barras != null
-      ? p.codigos_barras
-      : (p.codigosBarras != null ? p.codigosBarras : "")
-  ).trim();
-
   const subcat = String(p.subcat || p.subcategoria || "").trim();
   const estoque = numeroSeguro(p.estoque ?? p.estq);
 
@@ -316,15 +325,15 @@ function normalizarProdutoRestauracao(p) {
     nome: p.nome || "",
     cat: p.cat || "",
     grupo: p.grupo || "",
-    subcat: subcat,
+    subcat,
     subcategoria: subcat,
     preco: numeroSeguro(p.preco),
     custo: numeroSeguro(p.custo),
-    estoque: estoque,
+    estoque,
     estq: estoque,
     desc2: p.desc2 || "",
-    ean: eanPrincipal,
-    codigos_barras: codigosExtras,
+    ean: p.ean || "",
+    codigos_barras: p.codigos_barras || "",
     ncm: p.ncm || "",
     origem: p.origem || "0",
     unidade: p.unidade || "",
@@ -332,32 +341,8 @@ function normalizarProdutoRestauracao(p) {
     cfop: p.cfop || "5102",
     escala: p.escala || "",
     origem_estoque: p.origem_estoque || "",
-    createdAt: createdOriginal(p),
-    updatedAt: updatedOriginal(p),
-    deletedAt: ""
-  };
-}
-
-function normalizarClienteRestauracao(c) {
-  const telefone = c.telefone || c.tel || "";
-  const endereco = c.endereco || c.end || "";
-  const limite = numeroSeguro(c.limite_credito ?? c.limite);
-
-  return {
-    id: c.id || "",
-    nome: c.nome || "",
-    telefone: telefone,
-    tel: telefone,
-    cpf: c.cpf || "",
-    endereco: endereco,
-    end: endereco,
-    limite_credito: limite,
-    limite: limite,
-    obs: c.obs || "",
-    data: dataOriginal(c),
-    createdAt: createdOriginal(c),
-    updatedAt: updatedOriginal(c),
-    deletedAt: ""
+    createdAt: p.createdAt || "",
+    updatedAt: p.updatedAt || ""
   };
 }
 
@@ -373,15 +358,14 @@ function normalizarVendaRestauracao(v) {
     forma: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
     itens_json: typeof v.itens_json === "string" ? v.itens_json : JSON.stringify(itens),
-    itens: itens,
-    data: dataOriginal(v),
-    createdAt: createdOriginal(v),
-    updatedAt: updatedOriginal(v),
-    deletedAt: ""
+    itens,
+    data: v.data || v.createdAt || "",
+    createdAt: v.createdAt || v.data || "",
+    updatedAt: v.updatedAt || v.createdAt || v.data || ""
   };
 }
 
-function normalizarPagamentoRestauracao(p) {
+function normalizarRecebimentoRestauracao(p) {
   return {
     id: p.id || "",
     cid: p.cid || "",
@@ -392,14 +376,13 @@ function normalizarPagamentoRestauracao(p) {
     forma_pagamento: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
     forma: normalizarFormaPagamento_(p.forma_pagamento || p.forma || ""),
     obs: p.obs || "",
-    data: dataOriginal(p),
-    createdAt: createdOriginal(p),
-    updatedAt: updatedOriginal(p),
-    deletedAt: ""
+    data: p.data || p.createdAt || "",
+    createdAt: p.createdAt || p.data || "",
+    updatedAt: p.updatedAt || p.createdAt || p.data || ""
   };
 }
 
-function normalizarCreditoRestauracao(c) {
+function normalizarCobrancaRestauracao(c) {
   return {
     id: c.id || "",
     cid: c.cid || "",
@@ -413,96 +396,33 @@ function normalizarCreditoRestauracao(c) {
     val: numeroSeguro(c.valor ?? c.val),
     status: c.status || "aberto",
     vencimento: c.vencimento || "",
-    data: dataOriginal(c),
-    createdAt: createdOriginal(c),
-    updatedAt: updatedOriginal(c),
-    deletedAt: ""
+    data: c.data || c.createdAt || "",
+    createdAt: c.createdAt || c.data || "",
+    updatedAt: c.updatedAt || c.createdAt || c.data || ""
   };
 }
 
-/* RESTORE MANUAL */
+/* ================= SYNC ================= */
 
-async function restaurarDoServidor() {
-  if (restoreEmAndamento) return false;
-  restoreEmAndamento = true;
+async function syncNow(origem) {
+  if (syncEmAndamento || restoreEmAndamento) return false;
 
-  try {
-    const dados = await buscarTudoServidor();
-
-    const clientes = (dados.clientes || []).map(normalizarClienteRestauracao);
-    const produtos = (dados.produtos || []).map(normalizarProdutoRestauracao);
-    const vendas = (dados.vendas || []).map(normalizarVendaRestauracao);
-    const pagamentos = (dados.recebimentos || []).map(normalizarPagamentoRestauracao);
-    const creditos = (dados.cobrancas || []).map(normalizarCreditoRestauracao);
-
-    suprimirHookExclusao = true;
-    originalSetItem("bm_clientes", JSON.stringify(clientes));
-    originalSetItem("bm_produtos", JSON.stringify(produtos));
-    originalSetItem("bm_vendas", JSON.stringify(vendas));
-    originalSetItem("bm_pagamentos", JSON.stringify(pagamentos));
-    originalSetItem("bm_creditos", JSON.stringify(creditos));
-    suprimirHookExclusao = false;
-
-    originalSetItem("bm_last_restore", agoraISO());
-    ultimoHashEnviado = gerarHashSync();
-    ultimoErroSync = "";
-
-    return true;
-  } catch (e) {
-    suprimirHookExclusao = false;
-    console.error("Erro ao restaurar dados do servidor:", e);
-    originalSetItem("bm_last_restore_error", String(e && e.message || e));
-    ultimoErroSync = String(e && e.message || e);
-    return false;
-  } finally {
-    restoreEmAndamento = false;
-  }
-}
-
-/* SYNC */
-
-async function enviarTudo(origem) {
-  if (syncEmAndamento) return false;
   syncEmAndamento = true;
 
   try {
-    salvarBackup();
+    salvarBackupLocal();
 
-    const clientes = lerLocal("clientes");
-    const produtos = lerLocal("produtos");
-    const vendas = lerLocal("vendas");
-    const pagamentos = lerLocal("pagamentos");
-    const creditos = lerLocal("creditos");
+    const payload = {
+      action: "syncAll",
+      origem: origem || "manual",
+      clientes: lerLocal("clientes").map(normalizarCliente),
+      produtos: lerLocal("produtos").map(normalizarProduto),
+      vendas: lerLocal("vendas").map(normalizarVenda),
+      recebimentos: lerLocal("pagamentos").map(normalizarRecebimento),
+      cobrancas: lerLocal("creditos").map(normalizarCobranca)
+    };
 
-    await enviar({
-      action: "upsert",
-      sheet: "clientes",
-      rows: clientes.map(normalizarCliente)
-    });
-
-    await enviar({
-      action: "upsert",
-      sheet: "produtos",
-      rows: produtos.map(normalizarProduto)
-    });
-
-    await enviar({
-      action: "upsert",
-      sheet: "vendas",
-      rows: vendas.map(normalizarVenda)
-    });
-
-    await enviar({
-      action: "upsert",
-      sheet: "recebimentos",
-      rows: pagamentos.map(normalizarPagamento)
-    });
-
-    await enviar({
-      action: "upsert",
-      sheet: "cobrancas",
-      rows: creditos.map(normalizarCredito)
-    });
+    const res = await post(payload);
 
     originalSetItem("bm_last_sync", agoraISO());
     originalSetItem("bm_last_sync_origin", origem || "manual");
@@ -511,52 +431,21 @@ async function enviarTudo(origem) {
     ultimoErroSync = "";
     ultimoMotivoSync = origem || "manual";
 
-    return true;
+    return res;
+
   } catch (e) {
-    console.error("Erro na sincronização Bela Modas:", e);
-    originalSetItem("bm_last_sync_error", String(e && e.message || e));
+    console.error("Erro no sync:", e);
     ultimoErroSync = String(e && e.message || e);
+    originalSetItem("bm_last_sync_error", ultimoErroSync);
     throw e;
+
   } finally {
     syncEmAndamento = false;
   }
 }
 
-/* EXCLUSÃO FÍSICA */
-
-function extrairRemovidos(antes, depois) {
-  const idsDepois = new Set((depois || []).map(x => String(x.id)));
-  return (antes || []).filter(x => !idsDepois.has(String(x.id)));
-}
-
-async function processarRemovidos(nome, antes, depois) {
-  if (suprimirHookExclusao) return;
-  const removidos = extrairRemovidos(antes, depois);
-  if (!removidos.length) return;
-
-  for (const item of removidos) {
-    try {
-      if (nome === "vendas") {
-        await deletarVendaFisico(item.id);
-      } else if (nome === "clientes") {
-        await deletarFisico("clientes", item.id);
-      } else if (nome === "produtos") {
-        await deletarFisico("produtos", item.id);
-      } else if (nome === "pagamentos") {
-        await deletarFisico("recebimentos", item.id);
-      } else if (nome === "creditos") {
-        await deletarFisico("cobrancas", item.id);
-      }
-    } catch (e) {
-      console.warn("Falha ao excluir fisicamente", nome, item.id, e);
-    }
-  }
-}
-
-/* AUTO SYNC */
-
-function agendarAutoSync(motivo) {
-  if (restoreEmAndamento) return;
+function agendarSync(motivo) {
+  if (ignorarHook || restoreEmAndamento) return;
 
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
 
@@ -569,16 +458,16 @@ function agendarAutoSync(motivo) {
     if (hashAtual === ultimoHashEnviado) return;
 
     try {
-      await enviarTudo("auto:" + (motivo || "mudanca"));
+      await syncNow("auto:" + (motivo || "mudanca"));
     } catch (e) {
       console.warn("Auto sync falhou:", e);
     }
   }, AUTO_SYNC_DELAY_MS);
 }
 
-function iniciarSyncPeriodico() {
-  if (intervaloSyncAtivo) return;
-  intervaloSyncAtivo = true;
+function iniciarSyncIntervalo() {
+  if (intervaloAtivo) return;
+  intervaloAtivo = true;
 
   setInterval(async function () {
     if (restoreEmAndamento || syncEmAndamento) return;
@@ -587,72 +476,98 @@ function iniciarSyncPeriodico() {
     if (hashAtual === ultimoHashEnviado) return;
 
     try {
-      await enviarTudo("intervalo_2min");
+      await syncNow("intervalo_2min");
     } catch (e) {
-      console.warn("Sync periódico falhou:", e);
+      console.warn("Sync 2min falhou:", e);
     }
   }, AUTO_SYNC_INTERVAL_MS);
 }
 
-/* HOOK */
+/* ================= RESTORE MANUAL ================= */
+
+async function restoreNow() {
+  if (restoreEmAndamento || syncEmAndamento) return false;
+
+  restoreEmAndamento = true;
+
+  try {
+    const dados = await getAll();
+
+    ignorarHook = true;
+
+    salvarLocal("clientes", (dados.clientes || []).map(normalizarClienteRestauracao));
+    salvarLocal("produtos", (dados.produtos || []).map(normalizarProdutoRestauracao));
+    salvarLocal("vendas", (dados.vendas || []).map(normalizarVendaRestauracao));
+    salvarLocal("pagamentos", (dados.recebimentos || []).map(normalizarRecebimentoRestauracao));
+    salvarLocal("creditos", (dados.cobrancas || []).map(normalizarCobrancaRestauracao));
+
+    ignorarHook = false;
+
+    originalSetItem("bm_last_restore", agoraISO());
+    ultimoHashEnviado = gerarHashSync();
+    ultimoErroSync = "";
+
+    location.reload();
+    return true;
+
+  } catch (e) {
+    ignorarHook = false;
+    console.error("Erro no restore:", e);
+    ultimoErroSync = String(e && e.message || e);
+    originalSetItem("bm_last_restore_error", ultimoErroSync);
+    return false;
+
+  } finally {
+    restoreEmAndamento = false;
+  }
+}
+
+/* ================= HOOK LOCALSTORAGE ================= */
 
 localStorage.setItem = function (k, v) {
+  originalSetItem(k, v);
+
+  if (ignorarHook) return;
+
   const nome = String(k).replace("bm_", "");
 
   if (["clientes", "produtos", "vendas", "pagamentos", "creditos"].includes(nome)) {
-    const antes = lerLocal(nome);
-    originalSetItem(k, v);
-    const depois = lerLocal(nome);
-
-    processarRemovidos(nome, antes, depois);
-    agendarAutoSync(nome);
-    return;
+    agendarSync(nome);
   }
-
-  originalSetItem(k, v);
 };
 
-/* START */
+/* ================= BACKUP SERVIDOR ================= */
 
-function initSync() {
+async function backupServerNow() {
+  const r = await fetch(API_URL + "?action=backupAgora");
+  return r.json();
+}
+
+/* ================= START ================= */
+
+function init() {
   if (localStorage.getItem("bm_last_sync")) {
     ultimoHashEnviado = gerarHashSync();
   }
-  iniciarSyncPeriodico();
+
+  iniciarSyncIntervalo();
+
+  console.log("BelaSheetsSync limpo iniciado.");
 }
 
-initSync();
+init();
 
-/* API GLOBAL */
+/* ================= API GLOBAL ================= */
 
 window.BelaSheetsSync = {
   syncNow: function () {
-    return enviarTudo("manual");
+    return syncNow("manual");
   },
-  restoreNow: async function () {
-    const ok = await restaurarDoServidor();
-    if (ok) location.reload();
-    return ok;
-  },
-  backupServerNow: async function () {
-    const r = await fetch(API_URL + "?action=backupAgora");
-    return r.json();
-  },
-  deleteClienteNow: function (id) {
-    return deletarFisico("clientes", id);
-  },
-  deleteProdutoNow: function (id) {
-    return deletarFisico("produtos", id);
-  },
-  deleteRecebimentoNow: function (id) {
-    return deletarFisico("recebimentos", id);
-  },
-  deleteCobrancaNow: function (id) {
-    return deletarFisico("cobrancas", id);
-  },
-  deleteVendaNow: function (id) {
-    return deletarVendaFisico(id);
-  },
+
+  restoreNow: restoreNow,
+
+  backupServerNow: backupServerNow,
+
   status: function () {
     return {
       syncEmAndamento,
@@ -660,6 +575,7 @@ window.BelaSheetsSync = {
       autoSyncPendente: !!autoSyncTimer,
       ultimoSync: localStorage.getItem("bm_last_sync"),
       origemUltimoSync: localStorage.getItem("bm_last_sync_origin"),
+      ultimoRestore: localStorage.getItem("bm_last_restore"),
       ultimoErroSync,
       ultimoMotivoSync
     };
