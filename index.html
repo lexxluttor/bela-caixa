@@ -5813,41 +5813,53 @@ document.addEventListener('DOMContentLoaded',function(){
 
   window.restaurarUltimoBackupServidor = async function(){
     var b = lerUltimoBackupServidor();
-    if(!b){
-      toastWarn('⚠️ Nenhum backup do servidor registrado neste computador. Gere um backup primeiro.');
-      return false;
-    }
-
-    var msg = 'Tem certeza que deseja restaurar o último backup do servidor?\n\n' +
-      'Backup: ' + (b.nome || 'Backup servidor') + '\n' +
-      'Data: ' + fmtData(b.data) + '\n\n' +
-      'Atenção: use isso somente em emergência.';
+    var msg = 'ATENÇÃO!\n\n' +
+      'Isso vai substituir a PLANILHA PRINCIPAL pelos dados do ÚLTIMO BACKUP salvo no Google Drive.\n\n' +
+      (b ? ('Último backup registrado neste computador:\n' +
+        'Backup: ' + (b.nome || 'Backup servidor') + '\n' +
+        'Data: ' + fmtData(b.data) + '\n\n') : '') +
+      'Depois da restauração, o sistema vai puxar automaticamente os dados restaurados para o local.\n\n' +
+      'Deseja continuar?';
 
     if(!confirm(msg)) return false;
 
+    var st = el('ps-status');
+
     try{
+      if(st) st.textContent = 'Restaurando último backup...';
+      toastWarn('⏳ Restaurando último backup do servidor...');
+
+      var url = '';
+
       if(window.BelaSheetsSync && typeof window.BelaSheetsSync.restoreLastServerBackup === 'function'){
-        var r1 = await window.BelaSheetsSync.restoreLastServerBackup(b);
-        toastOk('✅ Último backup restaurado!');
-        atualizarPainelSyncBM();
-        return r1;
-      }
-      if(window.BelaSheetsSync && typeof window.BelaSheetsSync.restoreServerBackup === 'function'){
-        var r2 = await window.BelaSheetsSync.restoreServerBackup(b);
-        toastOk('✅ Último backup restaurado!');
-        atualizarPainelSyncBM();
-        return r2;
-      }
-
-      if(b.url){
-        window.open(b.url, '_blank');
-        toastWarn('⚠️ Restauração automática ainda não está no Apps Script. Abri o backup para restauração manual.');
-        return false;
+        var r1 = await window.BelaSheetsSync.restoreLastServerBackup(b || {});
+        if(!r1 || r1.ok === false) throw new Error((r1 && r1.error) || 'Falha ao restaurar backup.');
+      }else if(window.BelaSheetsSync && typeof window.BelaSheetsSync.restoreServerBackup === 'function'){
+        var r2 = await window.BelaSheetsSync.restoreServerBackup(b || {});
+        if(!r2 || r2.ok === false) throw new Error((r2 && r2.error) || 'Falha ao restaurar backup.');
+      }else{
+        url = (window.BELA_SHEETS_API_URL || window.BELA_APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbxvE2DpOpZDW1bZOvatqdN0HjSOXI3gvFdGPSj7qeUb6NF2V-K18-5tpil1KGW4O1lB/exec');
+        var resp = await fetch(url + '?action=restaurarUltimoBackup');
+        var json = await resp.json();
+        if(!resp.ok || !json || json.ok === false){
+          throw new Error((json && json.error) || 'Falha ao restaurar último backup no Apps Script.');
+        }
       }
 
-      toastWarn('⚠️ Backup encontrado, mas sem URL para abrir.');
-      return false;
+      if(st) st.textContent = 'Backup restaurado. Atualizando dados locais...';
+      toastWarn('⏳ Backup restaurado. Atualizando sistema local...');
+
+      if(window.BelaSheetsSync && typeof window.BelaSheetsSync.restoreNow === 'function'){
+        await window.BelaSheetsSync.restoreNow();
+      }else{
+        location.reload();
+      }
+
+      return true;
     }catch(e){
+      console.error('Erro ao restaurar último backup servidor:', e);
+      if(st) st.textContent = 'Falha ao restaurar backup';
+      atualizarPainelSyncBM();
       toastWarn('❌ Erro ao restaurar backup: ' + (e && e.message ? e.message : e));
       return false;
     }
