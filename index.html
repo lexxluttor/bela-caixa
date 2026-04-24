@@ -4892,10 +4892,10 @@ document.addEventListener('DOMContentLoaded',function(){
         <div class="ct">Ações</div>
         <div class="fr" style="flex-wrap:wrap;gap:8px;">
           <button class="btn bb sm" onclick="syncNow()">🔄 Sincronizar agora</button>
-          <button class="btn bg2 sm" onclick="backupNowServidor()">☁️ Backup servidor</button>
-          <button class="btn bh sm" onclick="exportarBackup()">💾 Backup local</button>
+          <button class="btn bg2 sm" onclick="backupNowServidor()">☁️ Backup servidor (Google Drive)</button>
+          <button class="btn bo sm" onclick="restaurarUltimoBackupServidor()">♻️ Restaurar último backup do servidor</button>
         </div>
-        <div class="tm" style="margin-top:8px;">PC e mobile trocam dados a cada 10 minutos. Em caso de emergência, use também o backup local.</div>
+        <div class="tm" style="margin-top:8px;">Sincronização automática a cada 2 minutos. Use a restauração do backup somente em emergência.</div>
       </div>
     </div>
   </div>
@@ -5555,6 +5555,164 @@ document.addEventListener('DOMContentLoaded',function(){
     }
     window.open(venda.nfce_xml_url, '_blank');
   };
+})();
+</script>
+
+
+<script>
+/* PATCH SEGURO — Painel de Sincronização / Backup servidor */
+(function(){
+  function el(id){ return document.getElementById(id); }
+  function setText(id, txt){ var x=el(id); if(x) x.textContent = txt || '—'; }
+  function toastOk(msg){ if(typeof toast==='function') toast(msg,'ok'); else alert(msg); }
+  function toastWarn(msg){ if(typeof toast==='function') toast(msg); else alert(msg); }
+  function fmtData(v){
+    if(!v) return '—';
+    try{
+      var d = new Date(v);
+      if(isNaN(d.getTime())) return String(v);
+      return d.toLocaleDateString('pt-BR') + ', ' + d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    }catch(e){ return String(v); }
+  }
+  function lerUltimoBackupServidor(){
+    try{ return JSON.parse(localStorage.getItem('bm_last_server_backup') || 'null'); }
+    catch(e){ return null; }
+  }
+  function salvarUltimoBackupServidor(res){
+    var info = {
+      data: new Date().toISOString(),
+      nome: (res && (res.nome || res.backupName || res.name)) || 'Backup servidor',
+      url: (res && (res.url || res.backupUrl)) || '',
+      id: (res && (res.id || res.backupId)) || ''
+    };
+    localStorage.setItem('bm_last_server_backup', JSON.stringify(info));
+    return info;
+  }
+  function atualizarPainelSyncBM(){
+    var online = navigator.onLine !== false;
+    setText('ps-status', online ? 'Online — usando dados locais' : 'Offline — usando dados locais');
+    setText('ps-modo', online ? 'Online' : 'Offline');
+
+    var ultimoSync = localStorage.getItem('bm_last_sync') || '';
+    try{
+      if(window.BelaSheetsSync && typeof window.BelaSheetsSync.status === 'function'){
+        var st = window.BelaSheetsSync.status() || {};
+        ultimoSync = st.ultimoSync || ultimoSync;
+      }
+    }catch(e){}
+    setText('ps-ultimo-sync', fmtData(ultimoSync));
+
+    var b = lerUltimoBackupServidor();
+    setText('ps-ultimo-backup', b ? (fmtData(b.data) + (b.nome ? ' — ' + b.nome : '')) : '—');
+  }
+
+  window.openSyncPanel = function(){
+    var ov = el('ov-sync');
+    if(ov) ov.classList.add('on');
+    atualizarPainelSyncBM();
+  };
+
+  window.closeSyncPanel = function(){
+    var ov = el('ov-sync');
+    if(ov) ov.classList.remove('on');
+  };
+
+  var syncOriginal = window.syncNow;
+  window.syncNow = async function(){
+    try{
+      if(typeof setSS === 'function') setSS('sync','Sincronizando...');
+      var r;
+      if(window.BelaSheetsSync && typeof window.BelaSheetsSync.syncNow === 'function'){
+        r = await window.BelaSheetsSync.syncNow();
+      }else if(typeof syncOriginal === 'function'){
+        r = await syncOriginal();
+      }else{
+        throw new Error('BelaSheetsSync.syncNow não encontrado.');
+      }
+      if(typeof setSS === 'function') setSS('ok','Sincronizado');
+      atualizarPainelSyncBM();
+      toastOk('✅ Sincronização concluída!');
+      return r;
+    }catch(e){
+      if(typeof setSS === 'function') setSS('err','Erro no sync');
+      atualizarPainelSyncBM();
+      toastWarn('❌ Erro ao sincronizar: ' + (e && e.message ? e.message : e));
+      throw e;
+    }
+  };
+
+  window.backupNowServidor = async function(){
+    try{
+      if(!window.BelaSheetsSync || typeof window.BelaSheetsSync.backupServerNow !== 'function'){
+        throw new Error('BelaSheetsSync.backupServerNow não encontrado.');
+      }
+      toastWarn('⏳ Criando backup no Google Drive...');
+      var res = await window.BelaSheetsSync.backupServerNow();
+      if(!res || res.ok === false){
+        throw new Error((res && res.error) || 'Falha ao criar backup no servidor.');
+      }
+      var info = salvarUltimoBackupServidor(res);
+      atualizarPainelSyncBM();
+      toastOk('✅ Backup criado no Google Drive!');
+      return res;
+    }catch(e){
+      atualizarPainelSyncBM();
+      toastWarn('❌ Erro no backup servidor: ' + (e && e.message ? e.message : e));
+      throw e;
+    }
+  };
+
+  window.restaurarUltimoBackupServidor = async function(){
+    var b = lerUltimoBackupServidor();
+    if(!b){
+      toastWarn('⚠️ Nenhum backup do servidor registrado neste computador. Gere um backup primeiro.');
+      return false;
+    }
+
+    var msg = 'Tem certeza que deseja restaurar o último backup do servidor?
+
+' +
+      'Backup: ' + (b.nome || 'Backup servidor') + '
+' +
+      'Data: ' + fmtData(b.data) + '
+
+' +
+      'Atenção: use isso somente em emergência.';
+
+    if(!confirm(msg)) return false;
+
+    try{
+      if(window.BelaSheetsSync && typeof window.BelaSheetsSync.restoreLastServerBackup === 'function'){
+        var r1 = await window.BelaSheetsSync.restoreLastServerBackup(b);
+        toastOk('✅ Último backup restaurado!');
+        atualizarPainelSyncBM();
+        return r1;
+      }
+      if(window.BelaSheetsSync && typeof window.BelaSheetsSync.restoreServerBackup === 'function'){
+        var r2 = await window.BelaSheetsSync.restoreServerBackup(b);
+        toastOk('✅ Último backup restaurado!');
+        atualizarPainelSyncBM();
+        return r2;
+      }
+
+      if(b.url){
+        window.open(b.url, '_blank');
+        toastWarn('⚠️ Restauração automática ainda não está no Apps Script. Abri o backup para restauração manual.');
+        return false;
+      }
+
+      toastWarn('⚠️ Backup encontrado, mas sem URL para abrir.');
+      return false;
+    }catch(e){
+      toastWarn('❌ Erro ao restaurar backup: ' + (e && e.message ? e.message : e));
+      throw e;
+    }
+  };
+
+  document.addEventListener('DOMContentLoaded', atualizarPainelSyncBM);
+  window.addEventListener('online', atualizarPainelSyncBM);
+  window.addEventListener('offline', atualizarPainelSyncBM);
+  setInterval(atualizarPainelSyncBM, 15000);
 })();
 </script>
 
