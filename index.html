@@ -2208,8 +2208,33 @@ function numBM(v){
 }
 function estoqueProdBM(p){
   if(!p) return 0;
-  var v = (p.estoque!=null && p.estoque!=='') ? p.estoque : p.estq;
-  return numBM(v);
+  var estq = numBM(p.estq);
+  var estoque = numBM(p.estoque);
+
+  // No index, o campo editável principal é estq.
+  // Alguns produtos ficaram com estoque=0 e estq correto; por isso estq vira prioridade.
+  if(p.estq!=null && p.estq!=='' && estq!==estoque) return estq;
+  if(p.estoque!=null && p.estoque!=='') return estoque;
+  return estq;
+}
+
+function normalizarEstoqueProdutoBM(p){
+  var e = estoqueProdBM(p);
+  p.estq = e;
+  p.estoque = e;
+  return p;
+}
+
+function normalizarEstoquesProdutosBM(){
+  var lista = DB.get('produtos') || [];
+  var mudou = false;
+  lista.forEach(function(p){
+    var antesEstq = String(p.estq == null ? '' : p.estq);
+    var antesEstoque = String(p.estoque == null ? '' : p.estoque);
+    normalizarEstoqueProdutoBM(p);
+    if(String(p.estq) !== antesEstq || String(p.estoque) !== antesEstoque) mudou = true;
+  });
+  if(mudou) DB.set('produtos', lista);
 }
 function textoBuscaProdBM(p){
   return [
@@ -2229,6 +2254,7 @@ function textoBuscaProdBM(p){
 
 // PRODUTOS
 function renderProds(){
+  normalizarEstoquesProdutosBM();
   var inp=document.getElementById('p-sc');
   var q=(inp?inp.value:'').trim().toLowerCase();
   var prods=(DB.get('produtos')||[]).filter(function(p){
@@ -2265,7 +2291,7 @@ function abrirMdProd(id){
     var grupoSalvo=p.grupo||categoriaPrincipalPorSubcategoria(subcatSalva);
     preencherCategoriasProduto(grupoSalvo, subcatSalva);
     document.getElementById('prod-preco').value=p.preco||'';
-    document.getElementById('prod-estq').value=p.estq||0;document.getElementById('prod-desc2').value=p.desc2||'';
+    document.getElementById('prod-estq').value=estoqueProdBM(p);document.getElementById('prod-desc2').value=p.desc2||'';
     document.getElementById('prod-custo').value=p.custo!=null?p.custo:'';
     document.getElementById('prod-ean').value=(p.ean||'');
     document.getElementById('prod-ncm').value=p.ncm||'';
@@ -2408,6 +2434,7 @@ function salvarProd(){
     grupo:grupo,
     preco:preco,
     estq:parseInt(document.getElementById('prod-estq').value)||0,
+    estoque:parseInt(document.getElementById('prod-estq').value)||0,
     desc2:document.getElementById('prod-desc2').value,
     custo:parseFloat(document.getElementById('prod-custo').value)||0,
     ean:eanFinal,
@@ -2721,6 +2748,7 @@ function selVTab(btn,tab){
   if(tab==='catalogo')renderPGrid();
 }
 function renderPGrid(){
+  normalizarEstoquesProdutosBM();
   var el=document.getElementById('pgrid');if(!el)return;
   var q=(document.getElementById('v-psrch')?document.getElementById('v-psrch').value||'':'').trim().toLowerCase();
   var prods=(DB.get('produtos')||[]).filter(function(p){return !q||textoBuscaProdBM(p).includes(q);});
@@ -2762,7 +2790,7 @@ function addProd(pid){
       origem:p.origem||'0',
       desc:p.nome,
       nome:p.nome,
-      preco:Number(p.preco||0),
+      preco:numBM(p.preco),
       qty:1
     });
   }
@@ -2785,12 +2813,13 @@ function selecionarProdutoManual(pid){
   var p=(DB.get('produtos')||[]).find(function(x){return String(x.id)===String(pid);});
   if(!p)return;
   document.getElementById('v-desc').value=p.nome||'';
-  document.getElementById('v-preco').value=Number(p.preco||0).toFixed(2);
+  document.getElementById('v-preco').value=numBM(p.preco).toFixed(2);
   document.getElementById('v-qty').value='1';
   limparBuscaProdutoManual();
   document.getElementById('v-qty').focus();
 }
 function buscarProdutoManual(){
+  normalizarEstoquesProdutosBM();
   var inp=document.getElementById('v-desc');
   var sg=document.getElementById('v-desc-sg');
   if(!inp||!sg)return;
@@ -2811,7 +2840,7 @@ function buscarProdutoManual(){
     var cls=estq<=0?'zero':(estq<=3?'low':'');
     return '<div class="v-sug-item" onclick="selecionarProdutoManual(\''+p.id+'\')">'+
       '<div class="v-sug-nome">'+(p.nome||'')+'</div>'+
-      '<div class="v-sug-meta"><span>'+(p.cod||'')+'</span><span>'+R(Number(p.preco||0))+'</span><span class="v-sug-estq '+cls+'">Estoque: '+estq+'</span></div>'+
+      '<div class="v-sug-meta"><span>'+(p.cod||'')+'</span><span>'+R(numBM(p.preco))+'</span><span class="v-sug-estq '+cls+'">Estoque: '+estq+'</span></div>'+
     '</div>';
   }).join('');
   posSugProdutoManual();
@@ -6311,6 +6340,19 @@ function balExportarCsv(){
   a.href=URL.createObjectURL(blob); a.download='balanco_conferencia_'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
 }
+
+
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(function(){
+    try{
+      if(typeof normalizarEstoquesProdutosBM === 'function'){
+        normalizarEstoquesProdutosBM();
+        if(typeof renderProds === 'function') renderProds();
+        if(typeof renderPGrid === 'function') renderPGrid();
+      }
+    }catch(e){}
+  }, 400);
+});
 
 </script>
 
