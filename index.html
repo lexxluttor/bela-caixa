@@ -421,6 +421,23 @@ td{padding:8px 9px !important;font-size:12px !important;}
 #pg-venda #cart .ci{align-items:flex-start !important;}
 #pg-venda #cart .cin{line-height:1.18 !important;word-break:break-word !important;}
 
+
+/* BALANÇO DE ESTOQUE — MODO TESTE */
+.bal-alert{background:#fff3cd;border:1px solid #d6a400;color:#6b4b00;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:800;margin-bottom:10px;}
+.bal-grid{display:grid;grid-template-columns:1.2fr .45fr auto auto;gap:10px;align-items:end;}
+.bal-found{margin-top:8px;font-size:12px;color:var(--txt2);}
+.bal-found strong{color:var(--txt);}
+.bal-table-wrap{max-height:390px;overflow:auto;border:1px solid var(--bdr);border-radius:10px;background:var(--s1);}
+.bal-table-wrap table thead th{position:sticky;top:0;z-index:2;background:var(--s2);}
+.bal-diff-neg{color:var(--red2);font-weight:900;}
+.bal-diff-pos{color:var(--green);font-weight:900;}
+.bal-diff-zero{color:var(--txt2);font-weight:800;}
+.bal-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.bal-mini{font-size:11px;color:var(--txt2);line-height:1.45;}
+@media (max-width:1280px){
+  .bal-grid{grid-template-columns:1fr .45fr;}
+  .bal-grid .btn{width:100%;justify-content:center;}
+}
 </style>
   <link rel="stylesheet" href="./app-enhancements.css">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -445,6 +462,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
     <div class="nav-sec">Cadastros</div>
     <div class="nv" onclick="ir('clientes')">👥 Clientes</div>
     <div class="nv" onclick="ir('produtos')">👗 Produtos</div>
+    <div class="nv" onclick="ir('balanco')">📦 Balanço</div>
     <div class="nav-sec">Financeiro</div>
     <div class="nv" onclick="ir('caixa')">🗃️ Caixa do Dia</div>
     <div class="nv" onclick="ir('crediario')">💳 Crediário</div>
@@ -674,6 +692,93 @@ td{padding:8px 9px !important;font-size:12px !important;}
   </div>
 </div>
 
+
+<!-- BALANÇO DE ESTOQUE — MODO REAL -->
+<div class="pg" id="pg-balanco">
+  <div class="ph">
+    <div class="ph-t">📦 Balanço de Estoque — Modo Real</div>
+    <span class="tm">Atualiza estoque ao finalizar</span>
+  </div>
+  <div class="pb">
+    <div class="bal-alert">⚠️ MODO REAL: ao finalizar com senha, o estoque será atualizado. Produto não lido ficará com estoque 0.</div>
+
+    <div class="stats" id="bal-stats"></div>
+
+    <div class="card">
+      <div class="ct">📲 Leitura de código de barras</div>
+      <div class="bal-grid">
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl">Código de barras / referência</label>
+          <input class="fi" id="bal-cod" placeholder="Bipe ou digite o código..." autocomplete="off">
+        </div>
+        <div class="fg" style="margin-bottom:0">
+          <label class="fl">Qtd opcional</label>
+          <input class="fi" id="bal-qtd" type="number" min="0" step="1" placeholder="+1">
+        </div>
+        <button class="btn br" type="button" onclick="balAdicionarLeitura()">➕ Adicionar</button>
+        <button class="btn bh" type="button" onclick="balLimparCampos()">🧹 Limpar</button>
+      </div>
+      <div class="bal-found" id="bal-found">Bipe um produto para iniciar a contagem.</div>
+      <div class="bal-mini" style="margin-top:8px;">Dica: cada bipe soma automaticamente. Se a quantidade ficar vazia, soma +1. Para produtos em lote, informe a quantidade primeiro, exemplo: 30, e depois bipe o código. A quantidade limpa após a leitura.</div>
+    </div>
+
+    <div class="card">
+      <div class="fs" style="gap:10px;align-items:flex-start;">
+        <div>
+          <div class="ct">🧾 Itens lidos no balanço</div>
+          <div class="tm">Códigos extras do mesmo produto somam no mesmo item.</div>
+        </div>
+        <div class="bal-actions">
+          <button class="btn br sm" type="button" onclick="balFinalizarReal()">✅ Finalizar Balanço</button>
+          <button class="btn bb sm" type="button" onclick="balGerarConferencia()">📊 Conferir Diferenças</button>
+          <button class="btn bd2 sm" type="button" onclick="balResetarBalanco()">🗑️ Limpar Balanço</button>
+        </div>
+      </div>
+      <div class="tw" style="margin-top:10px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Código usado</th>
+              <th>Estoque sistema</th>
+              <th>Contado</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody id="bal-lidos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="bal-simulacao-card" style="display:none">
+      <div class="fs" style="gap:10px;align-items:flex-start;">
+        <div>
+          <div class="ct">📊 Conferência do balanço</div>
+          <div class="tm">Conferência antes de aplicar. O estoque só muda ao clicar em Finalizar Balanço e confirmar a senha.</div>
+        </div>
+        <div class="bal-actions">
+          <button class="btn bh sm" type="button" onclick="balExportarCsv()">⬇️ Exportar CSV</button>
+        </div>
+      </div>
+      <div id="bal-resumo" class="stats" style="margin-top:10px;"></div>
+      <div class="bal-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>EAN / Código</th>
+              <th>Estoque sistema</th>
+              <th>Contado</th>
+              <th>Diferença</th>
+            </tr>
+          </thead>
+          <tbody id="bal-simulacao"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- CAIXA -->
 <div class="pg" id="pg-caixa">
   <div class="ph">
@@ -737,6 +842,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
     <div class="vtabs" style="margin-bottom:14px;">
       <button class="vtab on" id="rl-tab-mensal" type="button" onclick="trocarAbaRelatorio('mensal')">📈 Relatório mensal</button>
       <button class="vtab" id="rl-tab-categorias" type="button" onclick="trocarAbaRelatorio('categorias')">🧩 Categorias</button>
+      <button class="vtab" id="rl-tab-estoque" type="button" onclick="trocarAbaRelatorio('estoque')">📦 Estoque</button>
     </div>
 
     <div class="vtab-panel on" id="rl-panel-mensal" style="display:block;">
@@ -768,6 +874,31 @@ td{padding:8px 9px !important;font-size:12px !important;}
       <div class="card">
         <div class="ct">🧾 Subcategorias</div>
         <div id="rl-subcats"></div>
+      </div>
+    </div>
+
+    <div class="vtab-panel" id="rl-panel-estoque">
+      <div class="card" style="border-color:var(--gold);">
+        <div class="ct">📦 Relatório de Estoque</div>
+        <div class="tm">Valores calculados com base no estoque atual dos produtos cadastrados. Não altera dados.</div>
+      </div>
+      <div class="stats" id="rl-est-st"></div>
+      <div class="g2" style="margin-bottom:14px;">
+        <div class="card">
+          <div class="ct">📊 Estoque por categoria</div>
+          <div id="rl-est-cat"></div>
+        </div>
+        <div class="card">
+          <div class="ct">⚠️ Atenção</div>
+          <div id="rl-est-alertas"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="ct">🧾 Produtos em estoque</div>
+        <div class="tw" style="max-height:360px;overflow:auto;"><table>
+          <thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Custo</th><th>Venda</th><th>Margem</th></tr></thead>
+          <tbody id="rl-est-prod"></tbody>
+        </table></div>
       </div>
     </div>
   </div>
@@ -1925,9 +2056,14 @@ function tick(){
 }
 setInterval(tick,1000);tick();
 
-var _navMap={'dash':0,'venda':1,'receb':2,'cobranca':3,'clientes':4,'produtos':5,'caixa':6,'crediario':7,'vendas':8,'relatorio':9,'config':10};
+var _navMap={'dash':0,'venda':1,'receb':2,'cobranca':3,'clientes':4,'produtos':5,'balanco':6,'caixa':7,'crediario':8,'vendas':9,'relatorio':10,'config':11};
+var _relatorioLiberado=false;
 
 function ir(pg){
+  if(pg==='relatorio' && !_relatorioLiberado){
+    pedirSenha(function(){ _relatorioLiberado=true; ir('relatorio'); });
+    return;
+  }
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.nv').forEach(function(n){n.classList.remove('on');});
   var pgEl=document.getElementById('pg-'+pg);
@@ -1943,6 +2079,7 @@ function ir(pg){
   if(pg==='cobranca')renderCobranca();
   if(pg==='clientes')renderClis();
   if(pg==='produtos')renderProds();
+  if(pg==='balanco')initBalancoReal();
   if(pg==='caixa')renderCaixa();
   if(pg==='crediario')renderCrediario();
   if(pg==='vendas'){setTimeout(renderVendas,50);}
@@ -2057,23 +2194,61 @@ function delCli(id){
   });
 }
 
+
+function numBM(v){
+  if(v==null || v==='') return 0;
+  if(typeof v==='number') return Number.isFinite(v)?v:0;
+  var s=String(v).trim()
+    .replace(/R\$/gi,'')
+    .replace(/\s/g,'')
+    .replace(/\./g,'')
+    .replace(',', '.');
+  var n=Number(s);
+  return Number.isFinite(n)?n:0;
+}
+function estoqueProdBM(p){
+  if(!p) return 0;
+  var v = (p.estoque!=null && p.estoque!=='') ? p.estoque : p.estq;
+  return numBM(v);
+}
+function textoBuscaProdBM(p){
+  return [
+    p && p.nome,
+    p && p.cod,
+    p && p.codigo,
+    p && p.ean,
+    p && p.codigos_barras,
+    p && p.codigosBarras,
+    p && p.desc2,
+    p && p.cat,
+    p && p.grupo,
+    p && p.subcat,
+    p && p.subcategoria
+  ].map(function(v){return String(v||'').toLowerCase();}).join(' ');
+}
+
 // PRODUTOS
 function renderProds(){
-  var q=(document.getElementById('p-sc').value||'').toLowerCase();
-  var prods=DB.get('produtos').filter(function(p){return p.nome.toLowerCase().includes(q)||(p.cod&&p.cod.toLowerCase().includes(q));});
+  var inp=document.getElementById('p-sc');
+  var q=(inp?inp.value:'').trim().toLowerCase();
+  var prods=(DB.get('produtos')||[]).filter(function(p){
+    return !q || textoBuscaProdBM(p).includes(q);
+  });
   var rows=prods.map(function(p){
-    return '<tr><td><b style="color:var(--gold);">'+p.cod+'</b></td>'+
-      '<td><b>'+p.nome+'</b>'+(p.desc2?'<br><span class="tm">'+p.desc2+'</span>':'')+'</td>'+
+    var est=estoqueProdBM(p);
+    return '<tr><td><b style="color:var(--gold);">'+(p.cod||p.codigo||'')+'</b></td>'+
+      '<td><b>'+(p.nome||'')+'</b>'+(p.desc2?'<br><span class="tm">'+p.desc2+'</span>':'')+'</td>'+
       '<td><b>'+(p.grupo||categoriaPrincipalPorSubcategoria(p.subcategoria||p.subcat||p.cat||''))+'</b><br><span class="tm">'+(p.subcategoria||p.subcat||p.cat||'—')+'</span></td>'+
-      '<td class="txt-go">'+R(p.preco)+'</td>'+
-      '<td>'+(p.estq||0)+'</td>'+
+      '<td class="txt-go">'+R(numBM(p.preco))+'</td>'+
+      '<td>'+est+'</td>'+
       '<td><span style="display:flex;gap:4px;">'+
         '<button class="btn bb xs" onclick="abrirModalEtiquetas(\''+p.id+'\')">🏷️</button>'+
         '<button class="btn bh xs" onclick="abrirMdProd(\''+p.id+'\')">✏️</button>'+
         '<button class="btn bd2 xs" onclick="delProd(\''+p.id+'\')">🗑️</button>'+
       '</span></td></tr>';
   }).join('');
-  document.getElementById('p-tb').innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto cadastrado</td></tr>';
+  var tb=document.getElementById('p-tb');
+  if(tb) tb.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto cadastrado</td></tr>';
 }
 function abrirMdProd(id){
   preencherCategoriasProduto('ROUPAS', 'Vestido');
@@ -2278,9 +2453,9 @@ var etqFormato='6x4';
 var etqModoImpressao='a4';
 
 function getProdutosFiltradosLista(){
-  var q=((document.getElementById('p-sc')||{}).value||'').toLowerCase();
+  var q=((document.getElementById('p-sc')||{}).value||'').trim().toLowerCase();
   return (DB.get('produtos')||[]).filter(function(p){
-    return !q || String(p.nome||'').toLowerCase().includes(q) || String(p.cod||'').toLowerCase().includes(q);
+    return !q || textoBuscaProdBM(p).includes(q);
   });
 }
 
@@ -2547,15 +2722,17 @@ function selVTab(btn,tab){
 }
 function renderPGrid(){
   var el=document.getElementById('pgrid');if(!el)return;
-  var q=(document.getElementById('v-psrch')?document.getElementById('v-psrch').value||'':'').toLowerCase();
-  var prods=DB.get('produtos').filter(function(p){return !q||p.nome.toLowerCase().includes(q)||p.cod.toLowerCase().includes(q);});
+  var q=(document.getElementById('v-psrch')?document.getElementById('v-psrch').value||'':'').trim().toLowerCase();
+  var prods=(DB.get('produtos')||[]).filter(function(p){return !q||textoBuscaProdBM(p).includes(q);});
   var catIco={Vestidos:'👗',Blusas:'👚',Calças:'👖',Saias:'👘',Acessórios:'💍',Calçados:'👠',Lingerie:'🩱',Outros:'🛍️'};
   el.innerHTML=prods.map(function(p){
+    var est=estoqueProdBM(p);
     return '<div class="pcard" onclick="addProd(\''+p.id+'\')">'+
       '<div style="font-size:22px;">'+(catIco[p.cat]||'🛍️')+'</div>'+
-      '<div class="pcard-c">'+p.cod+'</div>'+
-      '<div class="pcard-n">'+p.nome+'</div>'+
-      '<div class="pcard-p">'+R(p.preco)+'</div>'+
+      '<div class="pcard-c">'+(p.cod||p.codigo||'')+'</div>'+
+      '<div class="pcard-n">'+(p.nome||'')+'</div>'+
+      '<div class="pcard-p">'+R(numBM(p.preco))+'</div>'+
+      '<div class="pcard-c">Estoque: '+est+'</div>'+
     '</div>';
   }).join('')||'<div style="color:var(--txt2);padding:16px;font-size:13px;">Nenhum produto cadastrado</div>';
 }
@@ -2630,7 +2807,7 @@ function buscarProdutoManual(){
   if(!res.length){limparBuscaProdutoManual();return;}
 
   sg.innerHTML=res.map(function(p){
-    var estq=Number(p.estoque!=null?p.estoque:(p.estq||0));
+    var estq=estoqueProdBM(p);
     var cls=estq<=0?'zero':(estq<=3?'low':'');
     return '<div class="v-sug-item" onclick="selecionarProdutoManual(\''+p.id+'\')">'+
       '<div class="v-sug-nome">'+(p.nome||'')+'</div>'+
@@ -3732,7 +3909,7 @@ function excluirRecebCaixa(pid){
 
 // RELATÓRIO
 function trocarAbaRelatorio(aba){
-  var tabs=['mensal','categorias'];
+  var tabs=['mensal','categorias','estoque'];
   tabs.forEach(function(nome){
     var tab=document.getElementById('rl-tab-'+nome);
     var panel=document.getElementById('rl-panel-'+nome);
@@ -3845,6 +4022,89 @@ function renderRel(){
     return '<tr><td>'+FD(v.data)+'</td><td>'+v.cliNome+'</td><td style="font-size:12px;">'+v.itens.map(function(i){return i.desc+' x'+i.qty;}).join(', ')+'</td><td>'+FF(v.forma)+'</td><td style="color:var(--gold);font-weight:800;">'+R(v.total)+'</td></tr>';
   }).join('');
   document.getElementById('rl-tb').innerHTML=rows||'<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--txt2)">Sem vendas</td></tr>';
+  renderRelEstoque();
+}
+
+function parseNumRelEstoque(v){
+  if(v==null || v==='') return 0;
+  if(typeof v==='number') return Number.isFinite(v)?v:0;
+  var s=String(v).trim()
+    .replace(/R\$/gi,'')
+    .replace(/\s/g,'')
+    .replace(/\./g,'')
+    .replace(',', '.');
+  var n=Number(s);
+  return Number.isFinite(n)?n:0;
+}
+
+function produtoSemCustoCadastrado_(p){
+  var c = p && p.custo;
+  if(c==null) return true;
+  var s = String(c).trim();
+  if(!s) return true;
+  return parseNumRelEstoque(c) <= 0;
+}
+
+function renderRelEstoque(){
+  var prods=DB.get('produtos')||[];
+  var itens=prods.map(function(p){
+    var est=parseNumRelEstoque(p.estoque!=null?p.estoque:p.estq);
+    var preco=parseNumRelEstoque(p.preco);
+    var custo=parseNumRelEstoque(p.custo);
+    var venda=est*preco;
+    var entrada=est*custo;
+    var lucro=venda-entrada;
+    var margem=venda>0?(lucro/venda*100):0;
+    var subcat=p.subcategoria||p.subcat||p.cat||'Outros';
+    var grupo=p.grupo||categoriaPrincipalPorSubcategoria(subcat)||inferCategoriaPorTexto(p.nome||'')||'OUTROS';
+    return {p:p, est:est, preco:preco, custo:custo, venda:venda, entrada:entrada, lucro:lucro, margem:margem, grupo:grupo, subcat:subcat};
+  });
+  var totalProdutos=prods.length;
+  var totalPecas=itens.reduce(function(s,x){return s+x.est;},0);
+  var valorVenda=itens.reduce(function(s,x){return s+x.venda;},0);
+  var valorEntrada=itens.reduce(function(s,x){return s+x.entrada;},0);
+  var lucro=valorVenda-valorEntrada;
+  var margemMedia=valorVenda>0?(lucro/valorVenda*100):0;
+  var st=document.getElementById('rl-est-st');
+  if(st) st.innerHTML=
+    '<div class="st stb"><div class="sl">Produtos cadastrados</div><div class="sv">'+totalProdutos+'</div></div>'+
+    '<div class="st stgo"><div class="sl">Peças em estoque</div><div class="sv">'+totalPecas+'</div></div>'+
+    '<div class="st stg"><div class="sl">Valor venda estoque</div><div class="sv">'+R(valorVenda)+'</div></div>'+
+    '<div class="st sto"><div class="sl">Valor entrada/custo</div><div class="sv">'+R(valorEntrada)+'</div></div>'+
+    '<div class="st str"><div class="sl">Lucro estimado</div><div class="sv">'+R(lucro)+'</div><span class="tm">Margem média: '+margemMedia.toFixed(1).replace('.',',')+'%</span></div>';
+
+  var grupos={};
+  itens.forEach(function(x){
+    if(!grupos[x.grupo]) grupos[x.grupo]={pecas:0,venda:0,entrada:0,lucro:0};
+    grupos[x.grupo].pecas+=x.est;
+    grupos[x.grupo].venda+=x.venda;
+    grupos[x.grupo].entrada+=x.entrada;
+    grupos[x.grupo].lucro+=x.lucro;
+  });
+  var catRows=Object.entries(grupos).sort(function(a,b){return b[1].venda-a[1].venda;}).map(function(e){
+    var m=e[1].venda>0?(e[1].lucro/e[1].venda*100):0;
+    return '<tr><td><b>'+e[0]+'</b></td><td style="text-align:center">'+e[1].pecas+'</td><td style="text-align:right">'+R(e[1].entrada)+'</td><td style="text-align:right;color:var(--gold);font-weight:800">'+R(e[1].venda)+'</td><td style="text-align:right">'+m.toFixed(1).replace('.',',')+'%</td></tr>';
+  }).join('');
+  var cat=document.getElementById('rl-est-cat');
+  if(cat) cat.innerHTML=catRows?'<div class="tw"><table><thead><tr><th>Categoria</th><th>Peças</th><th>Custo</th><th>Venda</th><th>Margem</th></tr></thead><tbody>'+catRows+'</tbody></table></div>':'<div class="empty">Sem produtos cadastrados</div>';
+
+  var semCustoTotal=itens.filter(function(x){return produtoSemCustoCadastrado_(x.p);}).length;
+  var semCustoEstoque=itens.filter(function(x){return x.est>0 && produtoSemCustoCadastrado_(x.p);}).length;
+  var estoqueZero=itens.filter(function(x){return x.est<=0;}).length;
+  var margemBaixa=itens.filter(function(x){return x.est>0 && x.venda>0 && x.custo>0 && x.margem<30;}).length;
+  var alertas=document.getElementById('rl-est-alertas');
+  if(alertas) alertas.innerHTML=
+    '<div style="padding:9px 0;border-bottom:1px solid var(--bdr);"><b>Produtos sem custo cadastrados:</b> <span class="txt-o">'+semCustoTotal+'</span></div>'+
+    '<div style="padding:9px 0;border-bottom:1px solid var(--bdr);"><b>Produtos sem custo com estoque:</b> <span class="txt-o">'+semCustoEstoque+'</span></div>'+
+    '<div style="padding:9px 0;border-bottom:1px solid var(--bdr);"><b>Produtos com estoque zerado:</b> <span class="txt-r">'+estoqueZero+'</span></div>'+
+    '<div style="padding:9px 0;"><b>Produtos com margem abaixo de 30%:</b> <span class="txt-o">'+margemBaixa+'</span></div>'+
+    '<div class="tm" style="margin-top:10px;line-height:1.4;">Agora o relatório separa produtos sem custo cadastrados de produtos sem custo que ainda têm estoque positivo.</div>';
+
+  var prodRows=itens.filter(function(x){return x.est>0;}).sort(function(a,b){return b.venda-a.venda;}).slice(0,200).map(function(x){
+    return '<tr><td><b>'+esc(x.p.nome||'')+'</b><br><span class="tm">'+esc(x.p.cod||x.p.ean||'')+'</span></td><td>'+esc(x.grupo)+'<br><span class="tm">'+esc(x.subcat)+'</span></td><td style="text-align:center">'+x.est+'</td><td style="text-align:right">'+R(x.entrada)+'</td><td style="text-align:right;color:var(--gold);font-weight:800">'+R(x.venda)+'</td><td style="text-align:right">'+x.margem.toFixed(1).replace('.',',')+'%</td></tr>';
+  }).join('');
+  var tb=document.getElementById('rl-est-prod');
+  if(tb) tb.innerHTML=prodRows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2)">Sem estoque positivo</td></tr>';
 }
 
 // INIT
@@ -5870,6 +6130,188 @@ document.addEventListener('DOMContentLoaded',function(){
   window.addEventListener('offline', atualizarPainelSyncBM);
   setInterval(atualizarPainelSyncBM, 15000);
 })();
+
+/* ================= BALANÇO DE ESTOQUE — MODO REAL ================= */
+var BAL_KEY = 'bm_balanco_real_aberto';
+var balUltimaConferencia = [];
+var balAutoAddTimer = null;
+
+function balNovoEstado(){
+  return {id:'BAL-'+Date.now(),data:new Date().toISOString(),contagens:{},codigos:{},leituras:[]};
+}
+function balGet(){try{return JSON.parse(localStorage.getItem(BAL_KEY)||'null')||balNovoEstado();}catch(e){return balNovoEstado();}}
+function balSet(st){localStorage.setItem(BAL_KEY,JSON.stringify(st||balNovoEstado()));}
+function balNormalizarCodigo(v){return String(v==null?'':v).replace(/\s+/g,'').trim();}
+function balCodigosProduto(p){
+  var bruto=[p&&p.ean,p&&p.codigo_barras,p&&p.codBarras,p&&p.codigoDeBarras,p&&p.codigos_barras,p&&p.codigosBarras].filter(Boolean).join(',');
+  var arr=String(bruto).split(/[\n,;|]+/).map(function(x){return balNormalizarCodigo(x);}).filter(Boolean);
+  var ref=balNormalizarCodigo(p&&(p.cod||p.codigo||'')); if(ref) arr.push(ref);
+  return arr.filter(function(v,i,a){return a.indexOf(v)===i;});
+}
+function balBuscarProduto(codigo){
+  var alvo=balNormalizarCodigo(codigo); if(!alvo) return null;
+  return (DB.get('produtos')||[]).find(function(p){return balCodigosProduto(p).indexOf(alvo)>=0;})||null;
+}
+function balEstoqueProduto(p){var n=Number(String((p&&(p.estoque!=null?p.estoque:p.estq))||0).replace(',','.'));return Number.isFinite(n)?n:0;}
+function balNomeProduto(p){return (p&&(p.nome||p.descricao||p.desc))||'Produto sem nome';}
+function balFmt(n){n=Number(n||0);return n.toLocaleString('pt-BR',{maximumFractionDigits:2});}
+
+function initBalancoReal(){
+  balRender();
+  setTimeout(function(){var c=document.getElementById('bal-cod');if(c)c.focus();},80);
+  var cod=document.getElementById('bal-cod');
+  if(cod&&!cod.dataset.boundBal){
+    cod.dataset.boundBal='1';
+    cod.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        if(balAutoAddTimer){clearTimeout(balAutoAddTimer);balAutoAddTimer=null;}
+        balAdicionarLeitura();
+      }
+    });
+    cod.addEventListener('input',function(){
+      var valorAtual=balNormalizarCodigo(this.value);
+      var p=balBuscarProduto(this.value), el=document.getElementById('bal-found'); if(!el)return;
+      if(p) el.innerHTML='Encontrado: <strong>'+balNomeProduto(p)+'</strong> · estoque atual: <strong>'+balFmt(balEstoqueProduto(p))+'</strong>';
+      else el.textContent=this.value.trim()?'Nenhum produto encontrado para este código.':'Bipe um produto para iniciar a contagem.';
+
+      if(balAutoAddTimer){clearTimeout(balAutoAddTimer);balAutoAddTimer=null;}
+      // MODO TESTE: leitura automática. Scanners normalmente enviam Enter; este timer cobre leitores que só digitam o código.
+      // Só dispara automático para códigos numéricos longos, evitando adicionar enquanto alguém digita referência curta manualmente.
+      if(/^\d{6,}$/.test(valorAtual)){
+        balAutoAddTimer=setTimeout(function(){
+          var campo=document.getElementById('bal-cod');
+          if(campo && balNormalizarCodigo(campo.value)===valorAtual){
+            balAdicionarLeitura();
+          }
+        },260);
+      }
+    });
+  }
+}
+function balAdicionarLeitura(){
+  if(balAutoAddTimer){clearTimeout(balAutoAddTimer);balAutoAddTimer=null;}
+  var codEl=document.getElementById('bal-cod'), qtdEl=document.getElementById('bal-qtd');
+  var codigo=balNormalizarCodigo(codEl&&codEl.value);
+  var qtdTxt=String((qtdEl&&qtdEl.value)||'').trim();
+  var qtd=qtdTxt?Number(qtdTxt.replace(',','.')):1;
+  if(!codigo){if(typeof toast==='function')toast('Informe ou bipe um código.');return;}
+  if(!Number.isFinite(qtd)||qtd<=0){if(typeof toast==='function')toast('Quantidade inválida.');return;}
+  var prod=balBuscarProduto(codigo);
+  if(!prod){if(typeof toast==='function')toast('Produto não encontrado para o código: '+codigo);return;}
+  var id=String(prod.id||prod.cod||codigo), st=balGet();
+  st.contagens[id]=Number(st.contagens[id]||0)+qtd;
+  st.codigos[id]=codigo;
+  st.leituras.push({produto_id:id,codigo:codigo,qtd:qtd,data:new Date().toISOString(),produto_nome:balNomeProduto(prod)});
+  balSet(st);
+  if(codEl)codEl.value=''; if(qtdEl)qtdEl.value='';
+  var found=document.getElementById('bal-found');
+  if(found)found.innerHTML='Adicionado: <strong>'+balNomeProduto(prod)+'</strong> · quantidade: <strong>'+balFmt(qtd)+'</strong>';
+  balRender();
+  setTimeout(function(){if(codEl)codEl.focus();},50);
+}
+function balLimparCampos(){var cod=document.getElementById('bal-cod'),qtd=document.getElementById('bal-qtd');if(cod)cod.value='';if(qtd)qtd.value='';var f=document.getElementById('bal-found');if(f)f.textContent='Bipe um produto para iniciar a contagem.';if(cod)cod.focus();}
+function balProdutoPorId(id){id=String(id);return (DB.get('produtos')||[]).find(function(p){return String(p.id||p.cod||'')===id;})||null;}
+function balRemoverItem(id){var st=balGet();delete st.contagens[String(id)];delete st.codigos[String(id)];st.leituras=(st.leituras||[]).filter(function(l){return String(l.produto_id)!==String(id);});balSet(st);balRender();}
+function balAlterarQtd(id,val){var qtd=Number(String(val||'').replace(',','.')), st=balGet(); if(!Number.isFinite(qtd)||qtd<0)return; if(qtd===0){delete st.contagens[String(id)];delete st.codigos[String(id)];}else st.contagens[String(id)]=qtd; balSet(st);balRenderStats();}
+function balResetarBalanco(){if(!confirm('Limpar todo o balanço aberto? Nenhum estoque será alterado agora.'))return;localStorage.removeItem(BAL_KEY);balUltimaConferencia=[];var card=document.getElementById('bal-simulacao-card');if(card)card.style.display='none';balRender();}
+function balRenderStats(){
+  var st=balGet(), produtos=DB.get('produtos')||[], ids=Object.keys(st.contagens||{});
+  var totalContado=ids.reduce(function(s,id){return s+Number(st.contagens[id]||0);},0);
+  var stats=[['Produtos cadastrados',produtos.length,'stb'],['Produtos lidos',ids.length,'stg'],['Peças contadas',balFmt(totalContado),'stgo'],['Leituras feitas',(st.leituras||[]).length,'sto']];
+  var el=document.getElementById('bal-stats'); if(el)el.innerHTML=stats.map(function(x){return '<div class="st '+x[2]+'"><div class="sl">'+x[0]+'</div><div class="sv">'+x[1]+'</div></div>';}).join('');
+}
+function balRender(){
+  balRenderStats();
+  var st=balGet(), ids=Object.keys(st.contagens||{}), tb=document.getElementById('bal-lidos');
+  if(tb){
+    if(!ids.length) tb.innerHTML='<tr><td colspan="5" class="empty">Nenhum produto lido ainda.</td></tr>';
+    else tb.innerHTML=ids.map(function(id){
+      var p=balProdutoPorId(id), nome=p?balNomeProduto(p):'Produto não encontrado', est=p?balEstoqueProduto(p):0, contado=Number(st.contagens[id]||0), codigo=st.codigos[id]||'';
+      var safe=String(id).replace(/'/g,"\\'");
+      return '<tr><td><strong>'+nome+'</strong><div class="tm">ID: '+id+'</div></td><td>'+codigo+'</td><td>'+balFmt(est)+'</td><td><input class="fi" style="max-width:95px" type="number" min="0" step="1" value="'+contado+'" onchange="balAlterarQtd(\''+safe+'\', this.value)"></td><td><button class="btn bd2 xs" type="button" onclick="balRemoverItem(\''+safe+'\')">Remover</button></td></tr>';
+    }).join('');
+  }
+}
+function balGerarConferencia(){
+  var st=balGet(), produtos=DB.get('produtos')||[];
+  var linhas=produtos.map(function(p){
+    var id=String(p.id||p.cod||''), sistema=balEstoqueProduto(p), contado=Number((st.contagens||{})[id]||0), diff=contado-sistema;
+    return {id:id,nome:balNomeProduto(p),codigo:(balCodigosProduto(p)[0]||''),sistema:sistema,contado:contado,diff:diff};
+  });
+  linhas.sort(function(a,b){if(a.diff!==0&&b.diff===0)return-1;if(a.diff===0&&b.diff!==0)return 1;return a.nome.localeCompare(b.nome);});
+  balUltimaConferencia=linhas;
+  var card=document.getElementById('bal-simulacao-card'); if(card)card.style.display='block';
+  var comDiff=linhas.filter(function(x){return x.diff!==0;}), zerados=linhas.filter(function(x){return x.sistema!==0&&x.contado===0;});
+  var pos=linhas.reduce(function(s,x){return s+(x.diff>0?x.diff:0);},0), neg=linhas.reduce(function(s,x){return s+(x.diff<0?x.diff:0);},0);
+  var resumo=[['Produtos com diferença',comDiff.length,'str'],['Zerados por não leitura',zerados.length,'sto'],['Ajustes positivos','+'+balFmt(pos),'stg'],['Ajustes negativos',balFmt(neg),'str']];
+  var r=document.getElementById('bal-resumo'); if(r)r.innerHTML=resumo.map(function(x){return '<div class="st '+x[2]+'"><div class="sl">'+x[0]+'</div><div class="sv">'+x[1]+'</div></div>';}).join('');
+  var tb=document.getElementById('bal-simulacao');
+  if(tb)tb.innerHTML=linhas.map(function(x){var cls=x.diff>0?'bal-diff-pos':(x.diff<0?'bal-diff-neg':'bal-diff-zero');return '<tr><td><strong>'+x.nome+'</strong><div class="tm">ID: '+x.id+'</div></td><td>'+x.codigo+'</td><td>'+balFmt(x.sistema)+'</td><td>'+balFmt(x.contado)+'</td><td class="'+cls+'">'+(x.diff>0?'+':'')+balFmt(x.diff)+'</td></tr>';}).join('');
+  setTimeout(function(){if(card)card.scrollIntoView({behavior:'smooth',block:'start'});},50);
+}
+function balFinalizarReal(){
+  var st=balGet();
+  var produtos=DB.get('produtos')||[];
+  var ids=Object.keys(st.contagens||{});
+  if(!produtos.length){if(typeof toast==='function')toast('Nenhum produto cadastrado.');return;}
+  if(!ids.length){if(typeof toast==='function')toast('Nenhum produto lido no balanço.');return;}
+
+  balGerarConferencia();
+
+  pedirSenha(function(){
+    var msg='ATENÇÃO: isso vai atualizar o estoque REAL de todos os produtos.\n\n'+
+            'Produtos não lidos ficarão com estoque 0.\n'+
+            'Produtos lidos receberão a quantidade contada.\n\n'+
+            'Deseja finalizar e aplicar o balanço agora?';
+    if(!confirm(msg))return;
+
+    var agora=new Date().toISOString();
+    var contagens=st.contagens||{};
+    var totalProdutos=0, totalZerados=0, totalAlterados=0;
+
+    produtos=produtos.map(function(p){
+      var id=String(p.id||p.cod||'');
+      var antigo=balEstoqueProduto(p);
+      var contado=Number(contagens[id]||0);
+      if(!Number.isFinite(contado)||contado<0)contado=0;
+      var novo=Object.assign({}, p);
+      novo.estoque=contado;
+      novo.estq=contado;
+      novo.updatedAt=agora;
+      totalProdutos++;
+      if(contado===0 && antigo!==0)totalZerados++;
+      if(contado!==antigo)totalAlterados++;
+      return novo;
+    });
+
+    try{
+      localStorage.setItem('bm_backup_produtos_antes_balanco_'+Date.now(), JSON.stringify(DB.get('produtos')||[]));
+    }catch(e){}
+
+    DB.set('produtos', produtos);
+    localStorage.removeItem(BAL_KEY);
+    balUltimaConferencia=[];
+
+    try{renderProds();}catch(e){}
+    try{renderRelEstoque();}catch(e){}
+    balRender();
+
+    if(typeof toast==='function')toast('✅ Balanço aplicado: '+totalAlterados+' produtos alterados. Sincronize para salvar na planilha.','ok');
+    alert('Balanço aplicado com sucesso!\n\nProdutos analisados: '+totalProdutos+'\nProdutos alterados: '+totalAlterados+'\nProdutos zerados por não leitura: '+totalZerados+'\n\nAgora clique em Sincronizar agora para enviar o estoque real para a planilha.');
+  });
+}
+
+function balExportarCsv(){
+  if(!balUltimaConferencia||!balUltimaConferencia.length)balGerarConferencia();
+  var linhas=[['Produto','Codigo','Estoque sistema','Contado','Diferenca']];
+  (balUltimaConferencia||[]).forEach(function(x){linhas.push([x.nome,x.codigo,x.sistema,x.contado,x.diff]);});
+  var csv=linhas.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(';');}).join('\n');
+  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}), a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download='balanco_conferencia_'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
+}
+
 </script>
 
 </body>
