@@ -383,13 +383,54 @@ td{padding:8px 9px !important;font-size:12px !important;}
 .etq-card.size-6x4 .etq-price{font-size:16pt;font-weight:900;line-height:1;margin:1.8mm 0 1.2mm;}
 .etq-card.size-6x4 .etq-barcode{width:34mm;height:10mm;}
 .etq-card.size-6x4 .etq-code{display:block;font-size:5.7pt;letter-spacing:.5px;line-height:1;margin-top:.6mm;}
-.etq-card.size-6x2{padding:1.3mm 2mm;width:60mm;height:20mm;justify-content:center;}
+.etq-card.size-6x2{padding:1mm 1.6mm;width:60mm;height:20mm;justify-content:flex-start;}
 .etq-card.size-6x2 .etq-brand,.etq-card.size-6x2 .etq-line{display:none;}
 .etq-card.size-6x2 .etq-name{font-size:7.2pt;min-height:auto;font-weight:800;line-height:1.05;max-height:6mm;overflow:hidden;}
 .etq-card.size-6x2 .etq-ref{display:none;}
 .etq-card.size-6x2 .etq-price{font-size:11.5pt;font-weight:900;line-height:1;margin:.6mm 0 .5mm;}
 .etq-card.size-6x2 .etq-barcode{width:32mm;height:5.5mm;}
 .etq-card.size-6x2 .etq-code{display:none;}
+
+/* ETIQUETA 6x2 OTIMIZADA — 3 COLUNAS, CÓDIGO LEGÍVEL E NÚMERO VISÍVEL */
+.etq-card.size-6x2 .etq-brand,
+.etq-card.size-6x2 .etq-line{display:none !important;}
+.etq-card.size-6x2 .etq-name{
+  font-size:7pt !important;
+  min-height:3.8mm !important;
+  height:3.8mm !important;
+  max-height:3.8mm !important;
+  font-weight:900 !important;
+  line-height:1.05 !important;
+  white-space:nowrap !important;
+  overflow:hidden !important;
+  text-overflow:ellipsis !important;
+  width:100% !important;
+}
+.etq-card.size-6x2 .etq-ref{display:none !important;}
+.etq-card.size-6x2 .etq-price{
+  font-size:13.5pt !important;
+  font-weight:900 !important;
+  line-height:1 !important;
+  margin:.3mm 0 .7mm !important;
+}
+.etq-card.size-6x2 .etq-barcode-wrap{
+  margin-top:0 !important;
+  width:100% !important;
+}
+.etq-card.size-6x2 .etq-barcode{
+  width:48mm !important;
+  height:7.2mm !important;
+}
+.etq-card.size-6x2 .etq-code{
+  display:block !important;
+  font-size:5.8pt !important;
+  letter-spacing:.2px !important;
+  line-height:1 !important;
+  margin-top:.2mm !important;
+  max-height:2.3mm !important;
+  overflow:hidden !important;
+}
+
 @page{size:A4 portrait;margin:10mm;}
 @media print{
   body{background:#fff !important;overflow:visible !important;}
@@ -2952,12 +2993,12 @@ function renderBarcodeSvgs(root){
     var cfg = cls.indexOf('6x2')>=0 ? {w13:0.72,w128:0.66,h:16} : {w13:0.9,w128:0.8,h:26};
     try{
       if(code.length===13){
-        JsBarcode(svg, code, {format:'EAN13', displayValue:false, margin:0, width:cfg.w13, height:cfg.h});
+        JsBarcode(svg, code, {format:'EAN13', displayValue:true, fontSize:8, margin:0, width:0.9, height:22});
       }else{
-        JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:cfg.w128, height:cfg.h});
+        JsBarcode(svg, code, {format:'CODE128', displayValue:true, fontSize:8, margin:0, width:0.9, height:22});
       }
     }catch(e){
-      try{ JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:Math.max(0.55,cfg.w128-0.05), height:cfg.h}); }catch(_e){}
+      try{ JsBarcode(svg, code, {format:'CODE128', displayValue:true, fontSize:8, margin:0, width:0.9, height:22}); }catch(_e){}
     }
   });
 }
