@@ -371,9 +371,9 @@ td{padding:8px 9px !important;font-size:12px !important;}
 .etq-barcode{width:34mm;height:10mm;}
 .etq-code{font-size:5.7pt;letter-spacing:.5px;line-height:1;margin-top:.6mm;}
 #print-etiquetas{display:none;}
-#print-etiquetas .a4-grid{display:grid;justify-content:center;padding:8mm;box-sizing:border-box;}
+#print-etiquetas .a4-grid{display:grid;justify-content:center;align-content:start;padding:6mm;box-sizing:border-box;}
 #print-etiquetas .a4-grid.size-6x4{grid-template-columns:repeat(3, 60mm);grid-auto-rows:40mm;gap:4mm;}
-#print-etiquetas .a4-grid.size-6x2{grid-template-columns:repeat(3, 60mm);grid-auto-rows:20mm;gap:4mm;}
+#print-etiquetas .a4-grid.size-6x2{grid-template-columns:repeat(3, 60mm);grid-auto-rows:20mm;gap:3mm;}
 #print-etiquetas .termica-list{display:flex;flex-direction:column;gap:3mm;align-items:flex-start;padding:4mm;box-sizing:border-box;}
 .etq-card.size-6x4{padding:3mm;width:60mm;height:40mm;justify-content:flex-start;}
 .etq-card.size-6x4 .etq-brand{display:block;}
@@ -383,7 +383,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
 .etq-card.size-6x4 .etq-price{font-size:16pt;font-weight:900;line-height:1;margin:1.8mm 0 1.2mm;}
 .etq-card.size-6x4 .etq-barcode{width:34mm;height:10mm;}
 .etq-card.size-6x4 .etq-code{display:block;font-size:5.7pt;letter-spacing:.5px;line-height:1;margin-top:.6mm;}
-.etq-card.size-6x2{padding:1mm 1.6mm;width:60mm;height:20mm;justify-content:flex-start;}
+.etq-card.size-6x2{padding:1mm 1.4mm;width:60mm;height:20mm;justify-content:flex-start;}
 .etq-card.size-6x2 .etq-brand,.etq-card.size-6x2 .etq-line{display:none;}
 .etq-card.size-6x2 .etq-name{font-size:7.2pt;min-height:auto;font-weight:800;line-height:1.05;max-height:6mm;overflow:hidden;}
 .etq-card.size-6x2 .etq-ref{display:none;}
@@ -391,44 +391,40 @@ td{padding:8px 9px !important;font-size:12px !important;}
 .etq-card.size-6x2 .etq-barcode{width:32mm;height:5.5mm;}
 .etq-card.size-6x2 .etq-code{display:none;}
 
-/* ETIQUETA 6x2 OTIMIZADA — 3 COLUNAS, CÓDIGO LEGÍVEL E NÚMERO VISÍVEL */
-.etq-card.size-6x2 .etq-brand,
-.etq-card.size-6x2 .etq-line{display:none !important;}
-.etq-card.size-6x2 .etq-name{
-  font-size:7pt !important;
-  min-height:3.8mm !important;
-  height:3.8mm !important;
-  max-height:3.8mm !important;
-  font-weight:900 !important;
-  line-height:1.05 !important;
-  white-space:nowrap !important;
-  overflow:hidden !important;
-  text-overflow:ellipsis !important;
-  width:100% !important;
+/* ETIQUETA 6x2 FINAL — 3 COLUNAS / CÓDIGO MAIS ESPAÇADO / NÚMERO VISÍVEL */
+.etq-card.size-6x2{
+  width:60mm !important;height:20mm !important;padding:1mm 1.4mm .8mm !important;
+  border:1px solid #777 !important;border-radius:0 !important;background:#fff !important;color:#111 !important;
+  display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:flex-start !important;
+  text-align:center !important;box-sizing:border-box !important;overflow:hidden !important;
 }
-.etq-card.size-6x2 .etq-ref{display:none !important;}
+.etq-card.size-6x2 .etq-brand,.etq-card.size-6x2 .etq-line,.etq-card.size-6x2 .etq-ref{display:none !important;}
+.etq-card.size-6x2 .etq-name{
+  width:100% !important;height:4mm !important;min-height:4mm !important;max-height:4mm !important;
+  display:block !important;font-family:Arial,sans-serif !important;font-size:7.1pt !important;font-weight:900 !important;
+  line-height:4mm !important;white-space:nowrap !important;overflow:hidden !important;text-overflow:ellipsis !important;
+  text-align:center !important;margin:0 !important;padding:0 !important;
+}
 .etq-card.size-6x2 .etq-price{
-  font-size:13.5pt !important;
-  font-weight:900 !important;
-  line-height:1 !important;
-  margin:.3mm 0 .7mm !important;
+  width:100% !important;display:block !important;font-family:Arial,sans-serif !important;font-size:14.5pt !important;
+  font-weight:900 !important;line-height:5.2mm !important;height:5.2mm !important;margin:0 0 .6mm !important;
+  padding:0 !important;text-align:center !important;
 }
 .etq-card.size-6x2 .etq-barcode-wrap{
-  margin-top:0 !important;
-  width:100% !important;
+  width:100% !important;height:8.8mm !important;margin:0 !important;padding:0 !important;
+  display:flex !important;flex-direction:column !important;align-items:center !important;justify-content:flex-start !important;
 }
-.etq-card.size-6x2 .etq-barcode{
-  width:48mm !important;
-  height:7.2mm !important;
-}
+.etq-card.size-6x2 .etq-barcode{width:52mm !important;height:6.4mm !important;display:block !important;margin:0 auto !important;padding:0 !important;}
 .etq-card.size-6x2 .etq-code{
-  display:block !important;
-  font-size:5.8pt !important;
-  letter-spacing:.2px !important;
-  line-height:1 !important;
-  margin-top:.2mm !important;
-  max-height:2.3mm !important;
-  overflow:hidden !important;
+  display:block !important;width:100% !important;height:2.3mm !important;max-height:2.3mm !important;
+  font-family:Arial,sans-serif !important;font-size:5.8pt !important;font-weight:700 !important;line-height:2.1mm !important;
+  letter-spacing:.45px !important;margin:.1mm 0 0 !important;padding:0 !important;text-align:center !important;overflow:hidden !important;
+}
+@media print{
+  #print-etiquetas .a4-grid.size-6x2{
+    grid-template-columns:repeat(3,60mm) !important;grid-auto-rows:20mm !important;gap:3mm !important;
+    justify-content:center !important;align-content:start !important;padding:6mm !important;
+  }
 }
 
 @page{size:A4 portrait;margin:10mm;}
@@ -436,7 +432,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
   body{background:#fff !important;overflow:visible !important;}
   .shell,#fkbar,.ov,#toast,#pz{display:none !important;}
   #print-etiquetas{display:block !important;}
-  #print-etiquetas .a4-grid{display:grid !important;}
+  #print-etiquetas .a4-grid{display:grid;justify-content:center;align-content:start;padding:6mm;box-sizing:border-box;}
   #print-etiquetas .termica-list{display:flex !important;}
   #print-etiquetas .etq-card{box-shadow:none !important;border:1px solid #777 !important;}
 }
@@ -2993,12 +2989,12 @@ function renderBarcodeSvgs(root){
     var cfg = cls.indexOf('6x2')>=0 ? {w13:0.72,w128:0.66,h:16} : {w13:0.9,w128:0.8,h:26};
     try{
       if(code.length===13){
-        JsBarcode(svg, code, {format:'EAN13', displayValue:true, fontSize:8, margin:0, width:0.9, height:22});
+        JsBarcode(svg, code, {format:'EAN13', displayValue:false, margin:0, width:1.25, height:24});
       }else{
-        JsBarcode(svg, code, {format:'CODE128', displayValue:true, fontSize:8, margin:0, width:0.9, height:22});
+        JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:1.25, height:24});
       }
     }catch(e){
-      try{ JsBarcode(svg, code, {format:'CODE128', displayValue:true, fontSize:8, margin:0, width:0.9, height:22}); }catch(_e){}
+      try{ JsBarcode(svg, code, {format:'CODE128', displayValue:false, margin:0, width:1.25, height:24}); }catch(_e){}
     }
   });
 }
