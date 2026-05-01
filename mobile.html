@@ -525,116 +525,71 @@ function statusDebtByDue(venc){
   return {text:'Em aberto', cls:'ok'};
 }
 
+function getCreditoValor(c){
+  return Number(c.valor != null ? c.valor : (c.val != null ? c.val : 0));
+}
+function getCreditoNome(c){
+  const cid=String(c.cid||'');
+  return c.cliente || c.cliNome || resolveNomeClientePorCid(cid) || 'Cliente';
+}
+function getCreditoData(c){
+  return ymdFromAny(c.data || c.createdAt || c.updatedAt || '');
+}
+function getCreditoVencimento(c){
+  return ymdFromAny(c.vencimento || c.dataVencimento || c.proximoVencimento || '');
+}
+function isCreditoAberto(c){
+  const st=String(c.status||'aberto').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  if(c.deletedAt) return false;
+  if(['pago','quitado','cancelado','excluido','excluida','finalizado','fechado'].includes(st)) return false;
+  return getCreditoValor(c) > 0.009;
+}
+
 function buildDebtEntries(){
-  const salesCred = DATA.vendas.filter(isCrediarioVenda);
-  const payByVid = new Map();
-  const payByCid = new Map();
-
-  DATA.recebimentos.forEach(r=>{
-    const valor=Number(r.valor||0);
-    if(valor<=0) return;
-    const vid=String(r.venda_id||'');
-    if(vid && !vid.startsWith('cid:')){
-      if(!payByVid.has(vid)) payByVid.set(vid, []);
-      payByVid.get(vid).push({valor, data:ymdFromAny(r.data||r.createdAt||r.updatedAt), stamp:rowStamp(r), raw:r});
-    }
-    let cid='';
-    if(vid.startsWith('cid:')) cid=vid.slice(4);
-    if(!cid && r.cid) cid=String(r.cid);
-    if(cid){
-      if(!payByCid.has(cid)) payByCid.set(cid, []);
-      payByCid.get(cid).push({valor, data:ymdFromAny(r.data||r.createdAt||r.updatedAt), stamp:rowStamp(r), raw:r});
-    }
-  });
-
-  const rawRows = [];
-  salesCred.forEach(v=>{
-    const vid=String(v.id||'');
-    const cid=String(v.cid||'');
-    const nome=v.cliente || resolveNomeClientePorCid(cid) || 'Cliente';
-    const dataCompra=ymdFromAny(v.data||v.createdAt||v.updatedAt);
-    const listaPag = vid && payByVid.has(vid) ? payByVid.get(vid).slice().sort((a,b)=>a.stamp-b.stamp)
-                    : (cid && payByCid.has(cid) ? payByCid.get(cid).slice().sort((a,b)=>a.stamp-b.stamp) : []);
-    const totalPago = listaPag.reduce((s,p)=>s+Number(p.valor||0),0);
-    const saldo = Number(v.total||0) - totalPago;
-    if(saldo <= 0.009) return;
-
-    const ultimoPagamento = listaPag.length ? listaPag[listaPag.length-1].data : '';
-    const proximoVencimento = ultimoPagamento ? addMonthsKeepDay(ultimoPagamento, 1) : addMonthsKeepDay(dataCompra, 1);
-    const diasParaFiltro = diffDays(dataCompra, todayStr());
-
-    rawRows.push({
-      vid, cid, nome,
-      telefone: resolveTelefoneCliente(nome, cid),
-      valorOriginal: Number(v.total||0),
-      totalPago,
-      saldo,
-      dataCompra,
-      ultimoPagamento,
-      proximoVencimento,
-      diasBaseCompra: diasParaFiltro,
-      origem: 'venda'
-    });
-  });
-
-  DATA.cobrancas.forEach(c=>{
-    const st=String(c.status||'aberto').toLowerCase();
-    if(st==='pago') return;
-    const valor=Number(c.valor||0);
-    if(valor<=0) return;
-    const vid=String(c.vid||'');
-    if(vid && rawRows.some(r=>r.vid===vid)) return;
-    const cid=String(c.cid||'');
-    const nome=c.cliente || resolveNomeClientePorCid(cid) || 'Cliente';
-    const dataBase=ymdFromAny(c.data||c.createdAt||c.updatedAt);
-    const proximoVencimento=ymdFromAny(c.vencimento||'') || addMonthsKeepDay(dataBase,1);
-
-    rawRows.push({
-      vid, cid, nome,
-      telefone: resolveTelefoneCliente(nome,cid),
-      valorOriginal: valor,
-      totalPago: 0,
-      saldo: valor,
-      dataCompra: dataBase,
-      ultimoPagamento: '',
-      proximoVencimento,
-      diasBaseCompra: diffDays(dataBase, todayStr()),
-      origem: 'cobranca'
-    });
-  });
-
+  /*
+    Regra nova:
+    A tela mobile de Cobranças agora usa a aba DATA.cobrancas como fonte principal,
+    igual ao desktop/sync. Não recalcula saldo por vendas - recebimentos, para evitar
+    divergência e abatimento duplicado quando recebimentos vêm por cid.
+  */
   const grouped = new Map();
-  rawRows.forEach(r=>{
-    const key = String(r.cid || '').trim() ? 'cid:' + String(r.cid).trim() : 'nome:' + String(r.nome || '').trim().toLowerCase();
+
+  DATA.cobrancas.filter(isCreditoAberto).forEach(c=>{
+    const cid=String(c.cid||'');
+    const vid=String(c.vid||c.venda_id||'');
+    const nome=getCreditoNome(c);
+    const valor=getCreditoValor(c);
+    const dataCompra=getCreditoData(c);
+    const venc=getCreditoVencimento(c) || addMonthsKeepDay(dataCompra, 1);
+    const key = cid.trim() ? 'cid:' + cid.trim() : 'nome:' + String(nome||'').trim().toLowerCase();
+
     if(!grouped.has(key)){
       grouped.set(key, {
-        cid: r.cid,
-        nome: r.nome,
-        telefone: r.telefone,
+        cid,
+        nome,
+        telefone: resolveTelefoneCliente(nome, cid),
         valorOriginal: 0,
         totalPago: 0,
         saldo: 0,
-        dataCompra: r.dataCompra || '',
-        ultimoPagamento: r.ultimoPagamento || '',
-        proximoVencimento: r.proximoVencimento || '',
-        diasBaseCompra: r.diasBaseCompra || 0,
+        dataCompra: dataCompra || '',
+        ultimoPagamento: '',
+        proximoVencimento: venc || '',
+        diasBaseCompra: diffDays(venc || dataCompra, todayStr()),
         compras: 0,
         vids: []
       });
     }
 
-    const g = grouped.get(key);
-    g.valorOriginal += Number(r.valorOriginal || 0);
-    g.totalPago += Number(r.totalPago || 0);
-    g.saldo += Number(r.saldo || 0);
+    const g=grouped.get(key);
+    g.valorOriginal += valor;
+    g.saldo += valor;
     g.compras += 1;
-    if(r.vid) g.vids.push(r.vid);
-
-    if(r.dataCompra && (!g.dataCompra || r.dataCompra < g.dataCompra)) g.dataCompra = r.dataCompra;
-    if(r.ultimoPagamento && (!g.ultimoPagamento || r.ultimoPagamento > g.ultimoPagamento)) g.ultimoPagamento = r.ultimoPagamento;
-    if(r.proximoVencimento && (!g.proximoVencimento || r.proximoVencimento < g.proximoVencimento)) g.proximoVencimento = r.proximoVencimento;
-    if(Number(r.diasBaseCompra || 0) > Number(g.diasBaseCompra || 0)) g.diasBaseCompra = Number(r.diasBaseCompra || 0);
-    if(!g.telefone && r.telefone) g.telefone = r.telefone;
+    if(vid) g.vids.push(vid);
+    if(dataCompra && (!g.dataCompra || dataCompra < g.dataCompra)) g.dataCompra = dataCompra;
+    if(venc && (!g.proximoVencimento || venc < g.proximoVencimento)) g.proximoVencimento = venc;
+    const dias = diffDays(venc || dataCompra, todayStr());
+    if(Number(dias || 0) > Number(g.diasBaseCompra || 0)) g.diasBaseCompra = Number(dias || 0);
+    if(!g.telefone) g.telefone = resolveTelefoneCliente(nome, cid);
   });
 
   return [...grouped.values()].filter(r => Number(r.saldo || 0) > 0.009);
