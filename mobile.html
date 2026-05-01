@@ -58,7 +58,51 @@
     .fbtn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:10px 12px;font-weight:800;cursor:pointer}
     .fbtn.active{background:var(--brand);color:#fff;border-color:var(--brand)}
     @media (min-width:760px){.grid.cards{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+
+/* ETIQUETAS MOBILE */
+.etq-mobile-panel{display:none;margin-top:10px;background:#fff;border:1px solid var(--line);border-radius:16px;padding:12px}
+.etq-mobile-panel.active{display:block}
+.etq-preview-wrap{margin-top:10px;background:#faf6f4;border:1px dashed var(--line);border-radius:14px;padding:12px;display:flex;justify-content:center;overflow:auto}
+.etq-card{background:#fff;color:#111;border:1px solid #777;border-radius:0;padding:3mm;width:60mm;height:40mm;box-shadow:0 2px 10px rgba(0,0,0,.08);display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;box-sizing:border-box;break-inside:avoid;page-break-inside:avoid;overflow:hidden}
+.etq-brand{font-size:9.5pt;font-weight:900;line-height:1.05;margin-bottom:1mm}
+.etq-line{width:100%;border-top:1px solid #111;margin-bottom:2.2mm}
+.etq-name{font-size:7.4pt;font-weight:900;line-height:1.1;min-height:8.5mm;display:flex;align-items:center;justify-content:center;max-width:100%;overflow:hidden}
+.etq-ref{font-size:5.3pt;line-height:1.1;margin-top:.6mm}
+.etq-price{font-size:16pt;font-weight:900;line-height:1;margin:1.8mm 0 1.2mm}
+.etq-barcode-wrap{margin-top:auto;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;width:100%}
+.etq-barcode{width:34mm;height:10mm}
+.etq-code{font-size:5.7pt;letter-spacing:.5px;line-height:1;margin-top:.6mm}
+.etq-card.size-6x2{width:60mm!important;height:20mm!important;padding:1mm 1.4mm .8mm!important;justify-content:flex-start!important}
+.etq-card.size-6x2 .etq-brand,.etq-card.size-6x2 .etq-line,.etq-card.size-6x2 .etq-ref{display:none!important}
+.etq-card.size-6x2 .etq-name{width:100%!important;height:4mm!important;min-height:4mm!important;max-height:4mm!important;display:block!important;font-family:Arial,sans-serif!important;font-size:7.1pt!important;font-weight:900!important;line-height:4mm!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;text-align:center!important;margin:0!important;padding:0!important}
+.etq-card.size-6x2 .etq-price{width:100%!important;display:block!important;font-family:Arial,sans-serif!important;font-size:14.5pt!important;font-weight:900!important;line-height:5.2mm!important;height:5.2mm!important;margin:0 0 .6mm!important;padding:0!important;text-align:center!important}
+.etq-card.size-6x2 .etq-barcode-wrap{width:100%!important;height:8.8mm!important;margin:0!important;padding:0!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:flex-start!important}
+.etq-card.size-6x2 .etq-barcode{width:52mm!important;height:6.4mm!important;display:block!important;margin:0 auto!important;padding:0!important}
+.etq-card.size-6x2 .etq-code{display:block!important;width:100%!important;height:2.3mm!important;max-height:2.3mm!important;font-family:Arial,sans-serif!important;font-size:5.8pt!important;font-weight:700!important;line-height:2.1mm!important;letter-spacing:.45px!important;margin:.1mm 0 0!important;padding:0!important;text-align:center!important;overflow:hidden!important}
+#print-etiquetas-mobile{display:none}
+#print-etiquetas-mobile .a4-grid{display:grid;justify-content:center;align-content:start;padding:6mm;box-sizing:border-box}
+#print-etiquetas-mobile .a4-grid.size-6x4{grid-template-columns:repeat(3,60mm);grid-auto-rows:40mm;gap:4mm}
+#print-etiquetas-mobile .a4-grid.size-6x2{grid-template-columns:repeat(3,60mm);grid-auto-rows:20mm;gap:3mm}
+
+/* MODAL ETIQUETAS IGUAL INDEX */
+.etq-modal{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:80;display:none;align-items:flex-start;justify-content:center;padding:18px;overflow:auto}
+.etq-modal.active{display:flex}
+.etq-modal-card{width:min(100%,820px);background:#fff;border:1px solid var(--line);border-radius:22px;box-shadow:var(--shadow);max-height:92vh;overflow:auto}
+.etq-modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px;border-bottom:1px solid var(--line)}
+.etq-modal-body{padding:14px}.etq-modal-foot{display:flex;gap:8px;justify-content:flex-end;padding:14px;border-top:1px solid var(--line);position:sticky;bottom:0;background:#fff}
+.etq-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.etq-search{display:flex;gap:8px;align-items:center;flex-wrap:wrap;flex:1}.etq-search input{min-width:220px}
+.etq-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff;max-height:245px}.etq-table-wrap table{min-width:650px}.etq-table-wrap input[type="checkbox"]{width:auto}.etq-table-wrap input[type="number"]{width:86px;padding:8px;border-radius:10px}
+.etq-preview{background:#faf6f4;border:1px dashed var(--line);border-radius:14px;padding:14px;display:flex;justify-content:center;align-items:center;min-height:72mm;overflow:auto}
+#print-etiquetas-mobile .termica-list{display:flex;flex-direction:column;gap:3mm;align-items:flex-start;padding:4mm;box-sizing:border-box}
+@media (max-width:760px){.etq-modal{padding:8px}.etq-modal-card{border-radius:16px}.etq-table-wrap table{min-width:560px}.etq-modal-body{padding:10px}}
+@media print{#print-etiquetas-mobile .termica-list{display:flex!important}.etq-modal{display:none!important}}
+
+@page{size:A4 portrait;margin:10mm}
+@media print{body{background:#fff!important;overflow:visible!important}.app,.scanner-modal{display:none!important}#print-etiquetas-mobile{display:block!important}#print-etiquetas-mobile .etq-card{box-shadow:none!important;border:1px solid #777!important}}
+
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 </head>
 <body>
 <div class="app">
@@ -140,12 +184,86 @@
         <button class="pill secondary" id="btnScannerProduto" type="button">Ler código</button>
       </div>
       <div class="small muted">Você pode pesquisar digitando ou usar a câmera do celular para ler o código de barras.</div>
+      <div class="actions" style="margin-top:10px">
+        <button class="btn light" id="btnAbrirEtiquetaMobile" type="button">🏷️ Gerar etiquetas</button>
+      </div>
       <div class="result-box" id="scannerStatusBox" style="display:none"></div>
     </div>
     <div class="grid cards" id="produtosCards"></div>
     <div class="card"><h3 style="margin:0 0 10px">Lista de produtos</h3><div class="list" id="listaProdutosMobile"></div></div>
   </section>
 </div>
+<div id="print-etiquetas-mobile"></div>
+
+<div class="etq-modal" id="etqModalMobile" aria-hidden="true">
+  <div class="etq-modal-card">
+    <div class="etq-modal-head">
+      <div>
+        <h3 style="margin:0">🏷️ Imprimir Etiquetas</h3>
+        <div class="small muted">Igual ao index: escolha produtos, quantidades, tamanho e modo de impressão.</div>
+      </div>
+      <button class="pill secondary" id="btnFecharEtiquetaMobile" type="button">Fechar</button>
+    </div>
+    <div class="etq-modal-body">
+      <div class="etq-actions">
+        <div class="etq-search">
+          <input id="etqBuscaMobile" placeholder="Digite o nome, ref ou código de barras do produto" />
+          <button class="btn light" id="btnLimparEtiquetasMobile" type="button">Limpar</button>
+        </div>
+      </div>
+      <div class="detail-month-grid" style="margin-bottom:10px">
+        <div>
+          <label class="small muted">Tamanho da etiqueta</label>
+          <select id="etqFormatoMobile">
+            <option value="6x4">Padrão 6 x 4 cm</option>
+            <option value="6x2">Horizontal 6 x 2 cm</option>
+          </select>
+        </div>
+        <div>
+          <label class="small muted">Modo de impressão</label>
+          <select id="etqModoMobile">
+            <option value="a4">Folha A4</option>
+            <option value="termica">Avulsa / térmica</option>
+          </select>
+        </div>
+      </div>
+      <div class="small muted" style="margin:-2px 0 10px 0">O formato 6 x 2 cm usa o mesmo layout espaçado do desktop, com número embaixo do código.</div>
+
+      <div class="card" style="margin-bottom:10px;box-shadow:none">
+        <div class="row" style="margin-bottom:8px;gap:10px;flex-wrap:wrap">
+          <h3 style="margin:0">Resultados da busca</h3>
+          <button class="btn" id="btnAdicionarSelecionadosMobile" type="button">Adicionar selecionados</button>
+        </div>
+        <div class="etq-table-wrap">
+          <table>
+            <thead><tr><th style="width:50px">Sel.</th><th>Produto</th><th>Ref</th><th>Preço</th><th style="width:120px">Qtd.</th></tr></thead>
+            <tbody id="etqBuscaTbMobile"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:10px;box-shadow:none">
+        <h3 style="margin:0 0 10px">Produtos selecionados</h3>
+        <div class="etq-table-wrap">
+          <table>
+            <thead><tr><th>Produto</th><th>Ref</th><th>Preço</th><th>Qtd. etiquetas</th><th>Ação</th></tr></thead>
+            <tbody id="etqTbMobile"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" style="box-shadow:none">
+        <h3 style="margin:0 0 10px">Prévia</h3>
+        <div class="etq-preview" id="etqPreviewMobile"></div>
+      </div>
+    </div>
+    <div class="etq-modal-foot">
+      <button class="btn light" id="btnCancelarEtiquetaMobile" type="button">Cancelar</button>
+      <button class="btn" id="btnImprimirEtiquetasMobile" type="button">🖨️ Imprimir</button>
+    </div>
+  </div>
+</div>
+
 
 <div class="scanner-modal" id="scannerModal" aria-hidden="true">
   <div class="scanner-card">
@@ -206,7 +324,23 @@ function rowStamp(row){
   const d=parseAnyDate(row.updatedAt||row.data||row.createdAt||0);
   return d ? d.getTime() : 0;
 }
-function activeRows(rows){return (rows||[]).filter(r=>!r.deletedAt)}
+function activeRows(rows){
+  return (rows||[]).filter(r=>r && !r.deletedAt);
+}
+function activeClientes(rows){
+  return activeRows(rows).filter(c=>{
+    const id=String(c.id||'').trim();
+    const nome=String(c.nome||'').trim();
+    return id && nome;
+  });
+}
+function activeProdutos(rows){
+  return activeRows(rows).filter(p=>{
+    const id=String(p.id||'').trim();
+    const nome=String(p.nome||'').trim();
+    return id && nome;
+  });
+}
 function ymdFromAny(v){
   const d=parseAnyDate(v);
   return d ? d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate()) : '';
@@ -233,8 +367,8 @@ async function carregarDados(){
     const raw=safeJson(text,null);
     if(!raw) throw new Error('Resposta inválida do servidor');
     if(raw.ok===false) throw new Error(raw.error||'Erro retornado pelo servidor');
-    DATA.clientes=activeRows(raw.clientes||[]);
-    DATA.produtos=activeRows(raw.produtos||[]);
+    DATA.clientes=activeClientes(raw.clientes||[]);
+    DATA.produtos=activeProdutos(raw.produtos||[]);
     DATA.vendas=activeRows(raw.vendas||[]);
     DATA.recebimentos=activeRows(raw.recebimentos||[]);
     DATA.cobrancas=activeRows(raw.cobrancas||[]);
@@ -256,13 +390,13 @@ function isCrediarioVenda(v){
 function isVistaVenda(v){ return !isCrediarioVenda(v); }
 
 function buildCaixa(dateStr){
-  const vendasDia=DATA.vendas.filter(v=>ymdFromAny(v.data||v.createdAt||v.updatedAt)===dateStr);
-  const recebDia=DATA.recebimentos.filter(r=>ymdFromAny(r.data||r.createdAt||r.updatedAt)===dateStr);
+  const vendasDia=vendasValidasMobile().filter(v=>ymdFromAny(v.data||v.createdAt||v.updatedAt)===dateStr);
+  const recebDia=pagamentosValidosMobile().filter(r=>ymdFromAny(r.data||r.createdAt||r.updatedAt)===dateStr);
   const vendasVista=vendasDia.filter(isVistaVenda);
   const novasCred=vendasDia.filter(isCrediarioVenda);
-  const totalVendasVista=vendasVista.reduce((s,v)=>s+Number(v.total||0),0);
-  const totalRecebCred=recebDia.reduce((s,r)=>s+Number(r.valor||0),0);
-  const totalNovoCred=novasCred.reduce((s,v)=>s+Number(v.total||0),0);
+  const totalVendasVista=vendasVista.reduce((s,v)=>s+getValorLancamento(v),0);
+  const totalRecebCred=recebDia.reduce((s,r)=>s+getValorLancamento(r),0);
+  const totalNovoCred=novasCred.reduce((s,v)=>s+getValorLancamento(v),0);
   const totalCaixa=totalVendasVista+totalRecebCred;
 
   const formas={};
@@ -278,31 +412,31 @@ function buildCaixa(dateStr){
       else if(f==='pix') forma='Pix';
       else if(f==='dinheiro') forma='Dinheiro';
     }
-    ensureForma(forma).vendas += Number(v.total||0);
+    ensureForma(forma).vendas += getValorLancamento(v);
   });
 
   recebDia.forEach(r=>{
-    let forma=String(r.forma_pagamento||'').trim()||'Recebimento';
-    const f=forma.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+    let forma=String(r.forma_pagamento||r.forma||'').trim()||'Recebimento';
+    const f=formaPag(r);
     if(f==='credito') forma='Crédito';
     else if(f==='debito') forma='Débito';
     else if(f==='pix') forma='Pix';
     else if(f==='dinheiro') forma='Dinheiro';
-    ensureForma(forma).recebimentos += Number(r.valor||0);
+    ensureForma(forma).recebimentos += getValorLancamento(r);
   });
 
   const movs=[];
   vendasDia.forEach(v=>{
     movs.push({
-      tipo:'Venda', nome:v.cliente||'Balcão', hora:hmFromAny(v.data||v.createdAt||v.updatedAt)||'--:--',
-      forma:String(v.forma_pagamento||v.forma||'-'), valor:Number(v.total||0), stamp:rowStamp(v),
-      detalheItens:(()=>{const itens=safeJson(v.itens_json||'[]',[]); if(!Array.isArray(itens)||!itens.length)return ''; return itens.map(i=>`${i.qtd||1}x ${i.desc||i.nome||'Item'}`).slice(0,3).join(', ')})()
+      tipo:'Venda', nome:v.cliente||v.cliNome||resolveNomeClientePorCid(v.cid)||'Balcão', hora:hmFromAny(v.data||v.createdAt||v.updatedAt)||'--:--',
+      forma:String(v.forma_pagamento||v.forma||'-'), valor:getValorLancamento(v), stamp:rowStamp(v),
+      detalheItens:(()=>{const itens=safeJson(v.itens_json||'[]',v.itens||[]); if(!Array.isArray(itens)||!itens.length)return ''; return itens.map(i=>`${i.qtd||1}x ${i.desc||i.nome||'Item'}`).slice(0,3).join(', ')})()
     })
   });
   recebDia.forEach(r=>{
     movs.push({
       tipo:'Recebimento', nome:resolveClienteDeRecebimento(r), hora:hmFromAny(r.data||r.createdAt||r.updatedAt)||'--:--',
-      forma:String(r.forma_pagamento||'Recebimento'), valor:Number(r.valor||0), stamp:rowStamp(r), detalheItens:r.obs||''
+      forma:String(r.forma_pagamento||r.forma||'Recebimento'), valor:getValorLancamento(r), stamp:rowStamp(r), detalheItens:r.obs||''
     })
   });
   movs.sort((a,b)=>b.stamp-a.stamp);
@@ -337,22 +471,20 @@ function resolveClienteDeRecebimento(r){
 }
 function renderRelatorios(){
   const mes=todayStr().slice(0,7);
-  const vendasMes=DATA.vendas.filter(v=>ymdFromAny(v.data||v.createdAt||v.updatedAt).startsWith(mes));
-  const recebimentosMes=DATA.recebimentos.filter(r=>ymdFromAny(r.data||r.createdAt||r.updatedAt).startsWith(mes));
+  const vendasMes=vendasValidasMobile().filter(v=>ymdFromAny(v.data||v.createdAt||v.updatedAt).startsWith(mes));
+  const recebimentosMes=pagamentosValidosMobile().filter(r=>ymdFromAny(r.data||r.createdAt||r.updatedAt).startsWith(mes));
+  const creditosMes=creditosValidosMobile().filter(c=>ymdFromAny(c.data||c.createdAt||c.updatedAt).startsWith(mes));
 
   const vendasVistaMes=vendasMes.filter(isVistaVenda);
-  const vendasCredMes=vendasMes.filter(isCrediarioVenda);
-
-  const totalVistaMes=vendasVistaMes.reduce((s,v)=>s+Number(v.total||0),0);
-  const totalCredMes=vendasCredMes.reduce((s,v)=>s+Number(v.total||0),0);
-  const recebidoMes=recebimentosMes.reduce((s,r)=>s+Number(r.valor||0),0);
-  const totalMes=totalVistaMes + totalCredMes;
+  const totalVistaMes=vendasVistaMes.reduce((s,v)=>s+getValorLancamento(v),0);
+  const totalCredMes=creditosMes.reduce((s,c)=>s+getValorLancamento(c),0);
+  const recebidoMes=recebimentosMes.reduce((s,r)=>s+getValorLancamento(r),0);
   const entradasMes=totalVistaMes + recebidoMes;
 
   const porVista={pix:0,dinheiro:0,cartaoCredito:0,cartaoDebito:0};
   vendasVistaMes.forEach(v=>{
     const f=normalizeFormaVenda(v);
-    const valor=Number(v.total||0);
+    const valor=getValorLancamento(v);
     if(f==='pix') porVista.pix += valor;
     else if(f==='dinheiro') porVista.dinheiro += valor;
     else if(f==='credito') porVista.cartaoCredito += valor;
@@ -361,7 +493,7 @@ function renderRelatorios(){
 
   document.getElementById('relatorioCards').innerHTML=[
     cardMetric('À vista no mês',brMoney(totalVistaMes),`${vendasVistaMes.length} venda(s)`,'green'),
-    cardMetric('Crediário no mês',brMoney(totalCredMes),`${vendasCredMes.length} venda(s)`,'blue'),
+    cardMetric('Crediário no mês',brMoney(totalCredMes),`${creditosMes.length} compra(s)`,'blue'),
     cardMetric('Recebido no mês',brMoney(recebidoMes),`${recebimentosMes.length} recebimento(s)`,'gold'),
     cardMetric('Entradas no mês',brMoney(entradasMes),'Venda à vista + recebimentos','red')
   ].join('');
@@ -376,8 +508,8 @@ function renderRelatorios(){
   }
   const porReceb={pix:0,dinheiro:0,cartaoCredito:0,cartaoDebito:0};
   recebimentosMes.forEach(r=>{
-    const f=String(r.forma_pagamento||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-    const valor=Number(r.valor||0);
+    const f=formaPag(r);
+    const valor=getValorLancamento(r);
     if(f==='pix') porReceb.pix += valor;
     else if(f==='dinheiro') porReceb.dinheiro += valor;
     else if(f==='credito') porReceb.cartaoCredito += valor;
@@ -407,14 +539,14 @@ function renderRelatorios(){
   `;
 
   const topClientes=new Map();
-  vendasMes.forEach(v=>{ const nome=String(v.cliente||'Balcão'); topClientes.set(nome,(topClientes.get(nome)||0)+Number(v.total||0)); });
+  vendasMes.concat(creditosMes).forEach(v=>{ const nome=String(v.cliente||v.cliNome||resolveNomeClientePorCid(v.cid)||'Balcão'); topClientes.set(nome,(topClientes.get(nome)||0)+getValorLancamento(v)); });
   const topClientesList=[...topClientes.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topClientes').innerHTML=topClientesList.length
     ? topClientesList.map(([nome,valor],idx)=>`<div class="item"><div class="row"><div><strong>${idx+1}. ${escapeHtml(nome)}</strong></div><div class="highlight">${escapeHtml(brMoney(valor))}</div></div></div>`).join('')
     : '<div class="empty">Sem dados suficientes no mês atual.</div>';
 
   const topProdutos=new Map();
-  vendasMes.forEach(v=>{ const itens=safeJson(v.itens_json||'[]',[]); if(!Array.isArray(itens)) return; itens.forEach(i=>{ const nome=String(i.desc||i.nome||'Produto'); const qtd=Number(i.qtd||1); topProdutos.set(nome,(topProdutos.get(nome)||0)+qtd); }); });
+  vendasMes.forEach(v=>{ const itens=safeJson(v.itens_json||'[]',v.itens||[]); if(!Array.isArray(itens)) return; itens.forEach(i=>{ const nome=String(i.desc||i.nome||'Produto'); const qtd=Number(i.qtd||1); topProdutos.set(nome,(topProdutos.get(nome)||0)+qtd); }); });
   const topProdutosList=[...topProdutos.entries()].sort((a,b)=>b[1]-a[1]).slice(0,5);
   document.getElementById('topProdutos').innerHTML=topProdutosList.length
     ? topProdutosList.map(([nome,qtd],idx)=>`<div class="item"><div class="row"><div><strong>${idx+1}. ${escapeHtml(nome)}</strong></div><div class="highlight">${qtd} un.</div></div></div>`).join('')
@@ -525,74 +657,148 @@ function statusDebtByDue(venc){
   return {text:'Em aberto', cls:'ok'};
 }
 
-function getCreditoValor(c){
-  return Number(c.valor != null ? c.valor : (c.val != null ? c.val : 0));
+function moneyNum(v){
+  if(v == null || v === '') return 0;
+  if(typeof v === 'number') return isFinite(v) ? v : 0;
+  let s=String(v).trim();
+  if(!s) return 0;
+  s=s.replace(/[R$\s]/g,'');
+  if(s.includes(',') && s.includes('.')){
+    s=s.replace(/\./g,'').replace(',', '.');
+  }else if(s.includes(',')){
+    s=s.replace(',', '.');
+  }
+  const n=Number(s);
+  return isFinite(n) ? n : 0;
 }
-function getCreditoNome(c){
-  const cid=String(c.cid||'');
-  return c.cliente || c.cliNome || resolveNomeClientePorCid(cid) || 'Cliente';
+function getValorLancamento(row){
+  return moneyNum(
+    row.val != null ? row.val :
+    row.valor != null ? row.valor :
+    row.total != null ? row.total :
+    row.saldo != null ? row.saldo :
+    0
+  );
 }
-function getCreditoData(c){
-  return ymdFromAny(c.data || c.createdAt || c.updatedAt || '');
+function vendaIdsSetMobile(){
+  return new Set((DATA.vendas||[]).filter(v=>!v.deletedAt).map(v=>String(v.id||'')));
 }
-function getCreditoVencimento(c){
-  return ymdFromAny(c.vencimento || c.dataVencimento || c.proximoVencimento || '');
+function creditosValidosMobile(){
+  const ids=vendaIdsSetMobile();
+  return (DATA.cobrancas||[]).filter(c=>{
+    if(!c || c.deletedAt) return false;
+    const vid=String(c.vid || c.venda_id || '');
+    if(!vid) return true;
+    return ids.has(vid);
+  });
 }
-function isCreditoAberto(c){
-  const st=String(c.status||'aberto').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
-  if(c.deletedAt) return false;
-  if(['pago','quitado','cancelado','excluido','excluida','finalizado','fechado'].includes(st)) return false;
-  return getCreditoValor(c) > 0.009;
+function cidPagamentoMobile(p){
+  if(!p) return '';
+  if(p.cid) return String(p.cid);
+  const vid=String(p.vid || p.venda_id || '');
+  if(vid.startsWith('cid:')) return vid.slice(4);
+  const venda=DATA.vendas.find(v=>String(v.id||'')===vid);
+  return venda ? String(venda.cid||'') : '';
+}
+function pagamentosValidosMobile(){
+  const ids=vendaIdsSetMobile();
+  return (DATA.recebimentos||[]).filter(p=>{
+    if(!p || p.deletedAt) return false;
+    const vid=String(p.vid || p.venda_id || '');
+    if(!vid) return true;
+    if(vid.startsWith('cid:')) return true;
+    return ids.has(vid);
+  }).map(p=>Object.assign({}, p, {cid: cidPagamentoMobile(p)}));
+}
+function vendasValidasMobile(){
+  return (DATA.vendas||[]).filter(v=>v && !v.deletedAt);
+}
+function produtosValidosMobile(){
+  return activeProdutos(DATA.produtos||[]);
+}
+function clientesValidosMobile(){
+  return activeClientes(DATA.clientes||[]);
+}
+function formaPag(row){
+  return String(row.forma || row.forma_pagamento || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+}
+function saldoMobile(cid){
+  const id=String(cid||'');
+  const tf=creditosValidosMobile()
+    .filter(c=>String(c.cid||'')===id)
+    .reduce((s,c)=>s+getValorLancamento(c),0);
+  const tp=pagamentosValidosMobile()
+    .filter(p=>String(p.cid||'')===id)
+    .reduce((s,p)=>s+getValorLancamento(p),0);
+  return {tf, tp, sd: Math.max(0, tf - tp)};
+}
+function diasSemPagMobile(cid){
+  const id=String(cid||'');
+  const pgs=pagamentosValidosMobile().filter(p=>String(p.cid||'')===id);
+  const crds=creditosValidosMobile().filter(c=>String(c.cid||'')===id);
+  if(!crds.length) return 0;
+  if(!pgs.length){
+    const tempos=crds.map(c=>parseAnyDate(c.data||c.createdAt||c.updatedAt)).filter(Boolean).map(d=>d.getTime());
+    if(!tempos.length) return 0;
+    const prim=new Date(Math.min(...tempos));
+    return Math.floor((new Date()-prim)/(1000*60*60*24));
+  }
+  const tempos=pgs.map(p=>parseAnyDate(p.data||p.createdAt||p.updatedAt)).filter(Boolean).map(d=>d.getTime());
+  if(!tempos.length) return 0;
+  const ultima=new Date(Math.max(...tempos));
+  return Math.floor((new Date()-ultima)/(1000*60*60*24));
+}
+function primeiraDataCreditoMobile(cid){
+  const id=String(cid||'');
+  const crds=creditosValidosMobile().filter(c=>String(c.cid||'')===id);
+  const datas=crds.map(c=>ymdFromAny(c.data||c.createdAt||c.updatedAt)).filter(Boolean).sort();
+  return datas[0] || '';
+}
+function ultimaDataPagamentoMobile(cid){
+  const id=String(cid||'');
+  const pgs=pagamentosValidosMobile().filter(p=>String(p.cid||'')===id);
+  const datas=pgs.map(p=>ymdFromAny(p.data||p.createdAt||p.updatedAt)).filter(Boolean).sort();
+  return datas.length ? datas[datas.length-1] : '';
+}
+function proximoVencimentoMobile(cid){
+  const ultima=ultimaDataPagamentoMobile(cid);
+  if(ultima) return addMonthsKeepDay(ultima, 1);
+  const primeira=primeiraDataCreditoMobile(cid);
+  return primeira ? addMonthsKeepDay(primeira, 1) : '';
 }
 
 function buildDebtEntries(){
   /*
-    Regra nova:
-    A tela mobile de Cobranças agora usa a aba DATA.cobrancas como fonte principal,
-    igual ao desktop/sync. Não recalcula saldo por vendas - recebimentos, para evitar
-    divergência e abatimento duplicado quando recebimentos vêm por cid.
+    Espelho do desktop:
+    saldo = total de créditos - total de pagamentos.
+    No desktop isso vem de creditosValidos() e pagamentosValidos(), sem depender do
+    status da aba cobranças. Assim cliente quitado, como Adriana, some quando os
+    recebimentos cobrem o total dos créditos.
   */
-  const grouped = new Map();
+  return clientesValidosMobile().map(cli=>{
+    const cid=String(cli.id||'');
+    const s=saldoMobile(cid);
+    const dataCompra=primeiraDataCreditoMobile(cid);
+    const ultimoPagamento=ultimaDataPagamentoMobile(cid);
+    const proximoVencimento=proximoVencimentoMobile(cid);
+    const compras=creditosValidosMobile().filter(c=>String(c.cid||'')===cid).length;
+    const dias=diasSemPagMobile(cid);
 
-  DATA.cobrancas.filter(isCreditoAberto).forEach(c=>{
-    const cid=String(c.cid||'');
-    const vid=String(c.vid||c.venda_id||'');
-    const nome=getCreditoNome(c);
-    const valor=getCreditoValor(c);
-    const dataCompra=getCreditoData(c);
-    const venc=getCreditoVencimento(c) || addMonthsKeepDay(dataCompra, 1);
-    const key = cid.trim() ? 'cid:' + cid.trim() : 'nome:' + String(nome||'').trim().toLowerCase();
-
-    if(!grouped.has(key)){
-      grouped.set(key, {
-        cid,
-        nome,
-        telefone: resolveTelefoneCliente(nome, cid),
-        valorOriginal: 0,
-        totalPago: 0,
-        saldo: 0,
-        dataCompra: dataCompra || '',
-        ultimoPagamento: '',
-        proximoVencimento: venc || '',
-        diasBaseCompra: diffDays(venc || dataCompra, todayStr()),
-        compras: 0,
-        vids: []
-      });
-    }
-
-    const g=grouped.get(key);
-    g.valorOriginal += valor;
-    g.saldo += valor;
-    g.compras += 1;
-    if(vid) g.vids.push(vid);
-    if(dataCompra && (!g.dataCompra || dataCompra < g.dataCompra)) g.dataCompra = dataCompra;
-    if(venc && (!g.proximoVencimento || venc < g.proximoVencimento)) g.proximoVencimento = venc;
-    const dias = diffDays(venc || dataCompra, todayStr());
-    if(Number(dias || 0) > Number(g.diasBaseCompra || 0)) g.diasBaseCompra = Number(dias || 0);
-    if(!g.telefone) g.telefone = resolveTelefoneCliente(nome, cid);
-  });
-
-  return [...grouped.values()].filter(r => Number(r.saldo || 0) > 0.009);
+    return {
+      cid,
+      nome: cli.nome || resolveNomeClientePorCid(cid) || 'Cliente',
+      telefone: resolveTelefoneCliente(cli.nome, cid),
+      valorOriginal: s.tf,
+      totalPago: s.tp,
+      saldo: s.sd,
+      dataCompra,
+      ultimoPagamento,
+      proximoVencimento,
+      diasBaseCompra: dias,
+      compras,
+      vids: creditosValidosMobile().filter(c=>String(c.cid||'')===cid).map(c=>String(c.vid||c.venda_id||'')).filter(Boolean)
+    };
+  }).filter(r=>Number(r.saldo||0)>0.009);
 }
 
 function filterDebts(rows){
@@ -678,7 +884,7 @@ function setScannerStatus(html){
 function findProductByCode(code){
   const raw=String(code||'').trim();
   const digits=digitsOnly(raw);
-  return onlyActive(DATA.produtos).find(p=>{
+  return produtosValidosMobile().find(p=>{
     const codRaw=String(p.cod||'').trim();
     const eanRaw=String(p.ean||'').trim();
     const codDigits=digitsOnly(codRaw);
@@ -708,7 +914,7 @@ function applyProductSearch(code){
 
 function renderClientes(){
   const q=normText(document.getElementById('buscaClienteMobile')?.value);
-  let rows=onlyActive(DATA.clientes);
+  let rows=clientesValidosMobile();
   if(q){
     rows=rows.filter(c=>{
       const nome=normText(c.nome);
@@ -742,6 +948,7 @@ function renderClientes(){
         <div class="small muted">${escapeHtml(cpf)}</div>
       </div>
       <div class="small muted" style="margin-top:8px">Endereço: ${escapeHtml(endereco)}</div>
+      <div class="small muted" style="margin-top:6px">Saldo crediário: <strong>${escapeHtml(brMoney(saldoMobile(c.id).sd))}</strong></div>
       ${obs?`<div class="small muted" style="margin-top:6px">Obs: ${escapeHtml(obs)}</div>`:''}
     </div>`;
   }).join('') : '<div class="empty">Nenhum cliente encontrado.</div>';
@@ -750,7 +957,7 @@ function renderClientes(){
 function renderProdutos(){
   const q=normText(document.getElementById('buscaProdutoMobile')?.value);
   const qDigits=digitsOnly(q);
-  let rows=onlyActive(DATA.produtos);
+  let rows=produtosValidosMobile();
   if(q){
     rows=rows.filter(p=>{
       const nome=normText(p.nome);
@@ -763,16 +970,7 @@ function renderProdutos(){
   }
   rows.sort((a,b)=>normText(a.nome).localeCompare(normText(b.nome),'pt-BR'));
 
-  document.getElementById('produtosCards').innerHTML = rows.length ? rows.slice(0,8).map(p=>{
-    const estq=productStockValue(p);
-    const color=estq<=0?'red':(estq<=3?'gold':'green');
-    return `<div class="card metric ${color}">
-      <div class="label">${escapeHtml(p.cat||'Produto')}</div>
-      <div class="value" style="font-size:18px">${escapeHtml(p.nome||'Sem nome')}</div>
-      <div class="subline">Preço: ${escapeHtml(brMoney(p.preco||0))}</div>
-      <div class="subline">Estoque: ${escapeHtml(String(estq))}</div>
-    </div>`;
-  }).join('') : '<div class="empty">Nenhum produto encontrado.</div>';
+  document.getElementById('produtosCards').innerHTML = '';
 
   document.getElementById('listaProdutosMobile').innerHTML = rows.length ? rows.map(p=>{
     const estq=productStockValue(p);
@@ -789,8 +987,191 @@ function renderProdutos(){
       </div>
       <div class="small muted" style="margin-top:8px">Categoria: ${escapeHtml(p.cat||'-')}</div>
       ${p.desc2?`<div class="small muted" style="margin-top:6px">${escapeHtml(p.desc2)}</div>`:''}
+      <div class="actions"><button class="btn light" type="button" onclick='selecionarProdutoEtiqueta(${JSON.stringify({id:p.id||'',nome:p.nome||'',cod:p.cod||'',ean:p.ean||'',preco:p.preco||0})})'>Etiqueta</button></div>
     </div>`;
   }).join('') : '<div class="empty">Nenhum produto encontrado.</div>';
+}
+
+
+
+let etiquetasSelecaoMobile=[];
+let etqBuscaListaMobile=[];
+let etqFormatoMobile='6x4';
+let etqModoImpressaoMobile='a4';
+
+function RMobile(v){return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+function produtosEtiquetaMobile(){return produtosValidosMobile().slice().sort((a,b)=>normText(a.nome).localeCompare(normText(b.nome),'pt-BR'));}
+function obterEanPrincipalProdutoMobile(p){
+  const candidatos=[p&&p.ean,p&&p.codigos_barras,p&&p.codigosBarras,p&&p.cod,p&&p.id].filter(Boolean).map(String);
+  for(const c of candidatos){
+    const parts=String(c).split(/[;,\s]+/).map(x=>x.trim()).filter(Boolean);
+    for(const part of parts){ if(part) return part; }
+  }
+  return '000000';
+}
+function getEtiquetaSearchResultsMobile(q){
+  const txt=normText(q); const dig=digitsOnly(q);
+  const lista=produtosEtiquetaMobile().filter(p=>{
+    if(!txt && !dig) return true;
+    return normText(p.nome).includes(txt) || normText(p.cod).includes(txt) || normText(p.ean).includes(txt) || normText(p.cat).includes(txt) ||
+      (dig && (digitsOnly(p.cod).includes(dig) || digitsOnly(p.ean).includes(dig) || digitsOnly(p.codigos_barras).includes(dig)));
+  });
+  return lista.slice(0,120);
+}
+function abrirModalEtiquetasMobile(pid){
+  if(pid){
+    const p=produtosEtiquetaMobile().find(x=>String(x.id)===String(pid));
+    etiquetasSelecaoMobile = p ? [{pid:String(p.id), qty:1}] : [];
+  }else{
+    etiquetasSelecaoMobile=[];
+  }
+  const busca=document.getElementById('etqBuscaMobile'); if(busca) busca.value='';
+  etqBuscaListaMobile=getEtiquetaSearchResultsMobile('');
+  renderEtiquetaBuscaMobile();
+  renderEtiquetaModalMobile();
+  const modal=document.getElementById('etqModalMobile');
+  if(modal){modal.classList.add('active'); modal.setAttribute('aria-hidden','false');}
+  setTimeout(()=>{const b=document.getElementById('etqBuscaMobile'); if(b) b.focus();},120);
+}
+function fecharModalEtiquetasMobile(){
+  const modal=document.getElementById('etqModalMobile');
+  if(modal){modal.classList.remove('active'); modal.setAttribute('aria-hidden','true');}
+}
+function buscarEtiquetasPorNomeMobile(q){
+  etqBuscaListaMobile=getEtiquetaSearchResultsMobile(q);
+  renderEtiquetaBuscaMobile();
+}
+function limparEtiquetasMobile(){
+  etiquetasSelecaoMobile=[];
+  const busca=document.getElementById('etqBuscaMobile'); if(busca) busca.value='';
+  etqBuscaListaMobile=getEtiquetaSearchResultsMobile('');
+  renderEtiquetaBuscaMobile();
+  renderEtiquetaModalMobile();
+}
+function adicionarSelecionadosMobile(){
+  const checks=document.querySelectorAll('#etqBuscaTbMobile .etq-add-check:checked');
+  if(!checks.length){alert('Selecione pelo menos um produto.'); return;}
+  const mapa=new Map(etiquetasSelecaoMobile.map(i=>[String(i.pid),{pid:String(i.pid),qty:Number(i.qty||0)}]));
+  checks.forEach(ch=>{
+    const tr=ch.closest('tr'); if(!tr) return;
+    const pid=String(tr.getAttribute('data-id')||'');
+    const inp=tr.querySelector('.etq-add-qty');
+    const qtd=Math.max(1, parseInt((inp&&inp.value)||1,10)||1);
+    if(mapa.has(pid)) mapa.get(pid).qty += qtd;
+    else mapa.set(pid,{pid,qty:qtd});
+  });
+  etiquetasSelecaoMobile=Array.from(mapa.values());
+  renderEtiquetaModalMobile();
+  renderEtiquetaBuscaMobile();
+}
+function renderEtiquetaBuscaMobile(){
+  const tb=document.getElementById('etqBuscaTbMobile'); if(!tb) return;
+  const selecionados=new Set(etiquetasSelecaoMobile.map(i=>String(i.pid)));
+  tb.innerHTML=(etqBuscaListaMobile||[]).map(p=>{
+    const ja=selecionados.has(String(p.id));
+    return `<tr data-id="${escapeHtml(String(p.id||''))}">
+      <td><input type="checkbox" class="etq-add-check" ${ja?'disabled':''}></td>
+      <td>${escapeHtml(p.nome||'')}${ja?' <span class="small muted">(já adicionado)</span>':''}</td>
+      <td>${escapeHtml(p.cod||'')}</td>
+      <td>${escapeHtml(RMobile(p.preco||0))}</td>
+      <td><input class="etq-add-qty" type="number" min="1" step="1" value="1" ${ja?'disabled':''}></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto encontrado</td></tr>';
+}
+function removerEtiquetaItemMobile(pid){
+  etiquetasSelecaoMobile=etiquetasSelecaoMobile.filter(i=>String(i.pid)!==String(pid));
+  renderEtiquetaModalMobile();
+  renderEtiquetaBuscaMobile();
+}
+function atualizarQtdEtiquetaMobile(pid,val){
+  let n=parseInt(val,10); if(!isFinite(n)||n<0)n=0;
+  etiquetasSelecaoMobile=etiquetasSelecaoMobile.map(i=>String(i.pid)===String(pid)?{pid:i.pid,qty:n}:i);
+  renderEtiquetaModalMobile();
+}
+function alterarFormatoEtiquetaMobile(v){
+  etqFormatoMobile=String(v||'6x4');
+  renderEtiquetaModalMobile();
+}
+function alterarModoEtiquetaMobile(v){
+  etqModoImpressaoMobile=String(v||'a4');
+}
+function getEtiquetaFormatoCfgMobile(fmt){
+  fmt=String(fmt||etqFormatoMobile||'6x4');
+  if(fmt==='6x2') return {cls:'size-6x2'};
+  return {cls:'size-6x4'};
+}
+function etiquetaCardHTMLMobile(p,idx,formato){
+  const cfg=getEtiquetaFormatoCfgMobile(formato);
+  const preco='R$ '+Number(p.preco||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const ref=p.cod||'';
+  const code=String(obterEanPrincipalProdutoMobile(p)||p.cod||'').replace(/\s+/g,'') || '000000';
+  return `<div class="etq-card ${cfg.cls}">
+    <div class="etq-brand">Bela Modas</div>
+    <div class="etq-line"></div>
+    <div class="etq-name">${escapeHtml(p.nome||'')}${ref?' Ref '+escapeHtml(ref):''}</div>
+    <div class="etq-ref">Ref: ${escapeHtml(ref)}</div>
+    <div class="etq-price">${escapeHtml(preco)}</div>
+    <div class="etq-barcode-wrap"><svg class="etq-barcode" id="etq-bar-mobile-${idx}" data-formatocfg="${cfg.cls}" data-code="${escapeHtml(code)}"></svg><div class="etq-code">${escapeHtml(code)}</div></div>
+  </div>`;
+}
+function renderBarcodeSvgsMobile(root){
+  if(typeof JsBarcode==='undefined') return;
+  (root||document).querySelectorAll('.etq-barcode').forEach(svg=>{
+    let code=String(svg.getAttribute('data-code')||'').replace(/\D/g,'');
+    if(!code) code='000000000000';
+    try{
+      if(code.length===13) JsBarcode(svg,code,{format:'EAN13',displayValue:false,margin:0,width:1.25,height:24});
+      else JsBarcode(svg,code,{format:'CODE128',displayValue:false,margin:0,width:1.25,height:24});
+    }catch(e){try{JsBarcode(svg,code,{format:'CODE128',displayValue:false,margin:0,width:1.25,height:24});}catch(_e){}}
+  });
+}
+function renderEtiquetaModalMobile(){
+  const tb=document.getElementById('etqTbMobile');
+  const pv=document.getElementById('etqPreviewMobile');
+  if(!tb||!pv) return;
+  const prods=produtosEtiquetaMobile();
+  const itens=etiquetasSelecaoMobile.map(i=>{
+    const p=prods.find(x=>String(x.id)===String(i.pid));
+    return p?{prod:p,qty:Number(i.qty||0)}:null;
+  }).filter(Boolean);
+  tb.innerHTML=itens.map(it=>{
+    const p=it.prod;
+    return `<tr>
+      <td>${escapeHtml(p.nome||'')}</td>
+      <td>${escapeHtml(p.cod||'')}</td>
+      <td>${escapeHtml(RMobile(p.preco||0))}</td>
+      <td><input type="number" min="0" step="1" value="${escapeHtml(String(it.qty))}" oninput="atualizarQtdEtiquetaMobile('${escapeHtml(String(p.id||''))}', this.value)"></td>
+      <td><button class="btn light" type="button" onclick="removerEtiquetaItemMobile('${escapeHtml(String(p.id||''))}')">✕</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted);">Nenhum produto selecionado</td></tr>';
+  const formatoSel=document.getElementById('etqFormatoMobile'); if(formatoSel) formatoSel.value=etqFormatoMobile;
+  const modoSel=document.getElementById('etqModoMobile'); if(modoSel) modoSel.value=etqModoImpressaoMobile;
+  const primeiro=itens.find(it=>it.qty>0);
+  pv.innerHTML=primeiro?etiquetaCardHTMLMobile(primeiro.prod,0,etqFormatoMobile):'<div class="small muted">Selecione pelo menos um produto para visualizar a etiqueta.</div>';
+  renderBarcodeSvgsMobile(pv);
+}
+function imprimirEtiquetasMobile(){
+  const prods=produtosEtiquetaMobile();
+  const lista=[];
+  etiquetasSelecaoMobile.forEach(it=>{
+    const p=prods.find(x=>String(x.id)===String(it.pid));
+    const qtd=Math.max(0,parseInt(it.qty,10)||0);
+    if(!p||!qtd) return;
+    for(let i=0;i<qtd;i++) lista.push(p);
+  });
+  if(!lista.length){alert('Selecione pelo menos uma etiqueta para imprimir.'); return;}
+  const host=document.getElementById('print-etiquetas-mobile'); if(!host) return;
+  if(etqModoImpressaoMobile==='termica'){
+    host.innerHTML='<div class="termica-list">'+lista.map((p,idx)=>etiquetaCardHTMLMobile(p,idx,etqFormatoMobile)).join('')+'</div>';
+  }else{
+    host.innerHTML='<div class="a4-grid size-'+escapeHtml(etqFormatoMobile)+'">'+lista.map((p,idx)=>etiquetaCardHTMLMobile(p,idx,etqFormatoMobile)).join('')+'</div>';
+  }
+  renderBarcodeSvgsMobile(host);
+  setTimeout(()=>window.print(),160);
+}
+function selecionarProdutoEtiqueta(p){
+  const pid=String((p&&p.id)||'');
+  abrirModalEtiquetasMobile(pid);
 }
 
 function openScannerFileFallback(message){
@@ -929,6 +1310,15 @@ function bindEvents(){
   document.getElementById('buscaCobranca').addEventListener('input', renderCobrancas);
   document.getElementById('buscaClienteMobile').addEventListener('input', renderClientes);
   document.getElementById('buscaProdutoMobile').addEventListener('input', e=>applyProductSearch(e.target.value));
+  document.getElementById('btnAbrirEtiquetaMobile').addEventListener('click', ()=>abrirModalEtiquetasMobile());
+  document.getElementById('btnFecharEtiquetaMobile').addEventListener('click', fecharModalEtiquetasMobile);
+  document.getElementById('btnCancelarEtiquetaMobile').addEventListener('click', fecharModalEtiquetasMobile);
+  document.getElementById('btnLimparEtiquetasMobile').addEventListener('click', limparEtiquetasMobile);
+  document.getElementById('btnAdicionarSelecionadosMobile').addEventListener('click', adicionarSelecionadosMobile);
+  document.getElementById('btnImprimirEtiquetasMobile').addEventListener('click', imprimirEtiquetasMobile);
+  document.getElementById('etqBuscaMobile').addEventListener('input', e=>buscarEtiquetasPorNomeMobile(e.target.value));
+  document.getElementById('etqFormatoMobile').addEventListener('change', e=>alterarFormatoEtiquetaMobile(e.target.value));
+  document.getElementById('etqModoMobile').addEventListener('change', e=>alterarModoEtiquetaMobile(e.target.value));
   document.getElementById('btnScannerProduto').addEventListener('click', startScanner);
   document.getElementById('btnFecharScanner').addEventListener('click', stopScanner);
   document.getElementById('btnAplicarCodigoManual').addEventListener('click', ()=>{ applyProductSearch(document.getElementById('codigoManualScanner').value); stopScanner(); });
