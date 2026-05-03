@@ -649,7 +649,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
       <div class="card">
         <div class="ct">📋 Histórico de Crediário</div>
         <div class="tw"><table>
-          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th></tr></thead>
+          <thead><tr><th>Data</th><th>Descrição</th><th>Valor</th><th style="text-align:right;">Ações</th></tr></thead>
           <tbody id="r-tb"></tbody>
         </table></div>
       </div>
@@ -709,7 +709,8 @@ td{padding:8px 9px !important;font-size:12px !important;}
   </div>
   <div class="pb">
     <div class="fr" style="margin-bottom:14px;">
-      <input class="fi" id="c-sc" placeholder="🔍 Buscar por nome ou CPF..." oninput="renderClis()" style="max-width:340px;">
+      <input class="fi" id="c-sc" placeholder="🔍 Buscar por nome ou CPF..." oninput="renderClisDebounced()" style="max-width:340px;">
+      <span class="tm" id="c-status"></span>
     </div>
     <div class="card">
       <div class="tw" style="max-height:calc(100vh - 240px);overflow-y:auto;"><table>
@@ -733,7 +734,8 @@ td{padding:8px 9px !important;font-size:12px !important;}
   </div>
   <div class="pb">
     <div class="fr" style="margin-bottom:14px;">
-      <input class="fi" id="p-sc" placeholder="🔍 Buscar por nome ou código..." oninput="renderProds()" style="max-width:340px;">
+      <input class="fi" id="p-sc" placeholder="🔍 Buscar por nome ou código..." oninput="renderProdsDebounced()" style="max-width:340px;">
+      <span class="tm" id="p-status"></span>
     </div>
     <div class="card">
       <div class="tw"><table>
@@ -2461,21 +2463,56 @@ function limiteHintClienteHTML(c){
 }
 
 
-// CLIENTES
-function renderClis(){
-  var q=(document.getElementById('c-sc').value||'').toLowerCase();
-  var clis=DB.get('clientes').filter(function(c){
-    return c.nome.toLowerCase().includes(q)||(c.cpf&&c.cpf.includes(q));
+// CLIENTES — versão otimizada para não travar ao digitar
+var _timerRenderClis=null;
+function renderClisDebounced(){
+  clearTimeout(_timerRenderClis);
+  _timerRenderClis=setTimeout(renderClis, 180);
+}
+function montarMapaSaldoClientes(){
+  var mapa={};
+  (creditosValidos()||[]).forEach(function(f){
+    var id=String(f.cid||'');
+    if(!id) return;
+    if(!mapa[id]) mapa[id]={tf:0,tp:0,sd:0};
+    mapa[id].tf += Number(f.val||0);
   });
-  var rows=clis.map(function(c){
-    var sd=saldo(c.id).sd;
+  (pagamentosValidos()||[]).forEach(function(p){
+    var id=String(p.cid||'');
+    if(!id) return;
+    if(!mapa[id]) mapa[id]={tf:0,tp:0,sd:0};
+    mapa[id].tp += Number(p.val||0);
+  });
+  Object.keys(mapa).forEach(function(id){ mapa[id].sd=Math.max(0, mapa[id].tf-mapa[id].tp); });
+  return mapa;
+}
+function textoBuscaClienteBM(c){
+  return String([c&&c.nome,c&&c.cpf,c&&c.tel,c&&c.end,c&&c.obs].join(' ')).toLowerCase();
+}
+function renderClis(){
+  var inp=document.getElementById('c-sc');
+  var q=(inp?inp.value:'').trim().toLowerCase();
+  var todos=DB.get('clientes')||[];
+  var limite=q ? 120 : 180;
+  var filtrados=[];
+  for(var i=0;i<todos.length;i++){
+    var c=todos[i]||{};
+    if(!q || textoBuscaClienteBM(c).includes(q)){
+      filtrados.push(c);
+      if(filtrados.length>=limite) break;
+    }
+  }
+  var mapaSaldo=montarMapaSaldoClientes();
+  var rows=filtrados.map(function(c){
+    var sd=(mapaSaldo[String(c.id||'')]||{sd:0}).sd;
     var cid=c.id;
+    var lim=limiteClienteValor(c);
     return '<tr>'+
       '<td><b>'+c.nome+'</b>'+(c.obs?'<br><span class="tm">'+c.obs+'</span>':'')+'</td>'+
       '<td>'+(c.cpf||'—')+'</td>'+
       '<td>'+(c.tel||'—')+'</td>'+
       '<td style="font-size:13px;">'+(c.end||'—')+'</td>'+
-      '<td><b style="color:'+(limiteClienteValor(c)>0.01?'var(--gold)':'var(--txt2)')+'">'+(limiteClienteValor(c)>0.01?R(limiteClienteValor(c)):'—')+'</b>'+limiteHintClienteHTML(c)+'</td>'+
+      '<td><b style="color:'+(lim>0.01?'var(--gold)':'var(--txt2)')+'">'+(lim>0.01?R(lim):'—')+'</b>'+limiteHintClienteHTML(c)+'</td>'+
       '<td><b style="color:'+(sd>0.01?'var(--red2)':'var(--green)')+'">'+R(sd)+'</b></td>'+
       '<td><span style="display:flex;gap:5px;flex-wrap:wrap;">'+
         '<button class="btn br xs" onclick="irCliVenda(\''+cid+'\')" title="Nova Venda" style="padding:5px 9px;font-size:12px;">🛒 Venda</button>'+
@@ -2484,8 +2521,13 @@ function renderClis(){
         '<button class="btn bd2 xs" onclick="delCli(\''+cid+'\')" style="padding:5px 8px;">🗑️</button>'+
       '</span></td></tr>';
   }).join('');
-  document.getElementById('c-tb').innerHTML=rows||
-    '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum cliente cadastrado</td></tr>';
+  var tb=document.getElementById('c-tb');
+  if(tb) tb.innerHTML=rows || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum cliente encontrado</td></tr>';
+  var st=document.getElementById('c-status');
+  if(st){
+    var totalMatch = q ? todos.filter(function(c){return textoBuscaClienteBM(c||{}).includes(q);}).length : todos.length;
+    st.textContent = totalMatch>limite ? 'Mostrando '+limite+' de '+totalMatch+' resultados. Continue digitando para filtrar.' : totalMatch+' resultado(s)';
+  }
 }
 
 function irCliVenda(cid){
@@ -2593,14 +2635,30 @@ function textoBuscaProdBM(p){
   ].map(function(v){return String(v||'').toLowerCase();}).join(' ');
 }
 
-// PRODUTOS
+// PRODUTOS — versão otimizada para busca rápida
+var _timerRenderProds=null;
+var _estoquesNormalizadosUmaVez=false;
+function renderProdsDebounced(){
+  clearTimeout(_timerRenderProds);
+  _timerRenderProds=setTimeout(renderProds, 180);
+}
 function renderProds(){
-  normalizarEstoquesProdutosBM();
+  if(!_estoquesNormalizadosUmaVez){
+    normalizarEstoquesProdutosBM();
+    _estoquesNormalizadosUmaVez=true;
+  }
   var inp=document.getElementById('p-sc');
   var q=(inp?inp.value:'').trim().toLowerCase();
-  var prods=(DB.get('produtos')||[]).filter(function(p){
-    return !q || textoBuscaProdBM(p).includes(q);
-  });
+  var todos=DB.get('produtos')||[];
+  var limite=q ? 150 : 220;
+  var prods=[];
+  for(var i=0;i<todos.length;i++){
+    var p=todos[i]||{};
+    if(!q || textoBuscaProdBM(p).includes(q)){
+      prods.push(p);
+      if(prods.length>=limite) break;
+    }
+  }
   var rows=prods.map(function(p){
     var est=estoqueProdBM(p);
     return '<tr><td><b style="color:var(--gold);">'+(p.cod||p.codigo||'')+'</b></td>'+
@@ -2615,7 +2673,12 @@ function renderProds(){
       '</span></td></tr>';
   }).join('');
   var tb=document.getElementById('p-tb');
-  if(tb) tb.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto cadastrado</td></tr>';
+  if(tb) tb.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto encontrado</td></tr>';
+  var st=document.getElementById('p-status');
+  if(st){
+    var totalMatch = q ? todos.filter(function(p){return textoBuscaProdBM(p||{}).includes(q);}).length : todos.length;
+    st.textContent = totalMatch>limite ? 'Mostrando '+limite+' de '+totalMatch+' resultados. Continue digitando para filtrar.' : totalMatch+' resultado(s)';
+  }
 }
 function abrirMdProd(id){
   preencherCategoriasProduto('ROUPAS', 'Vestido');
@@ -3895,6 +3958,9 @@ function obterMovimentacoesCli(cid){
     return String((f && f.cid) || '') === String(cid || '');
   }).forEach(function(f){
     movs.push({
+      id:f.id || f.vendaId || f.sid || '',
+      tipoMov:'compra',
+      origem:f,
       tipo:'Compra',
       data:f.data || f.createdAt || '',
       descricao:f.desc || f.descricao || 'Compra no crediário',
@@ -3913,6 +3979,9 @@ function obterMovimentacoesCli(cid){
     if(forma) desc += ' • ' + forma.toUpperCase();
     if(obs) desc += ' • ' + obs;
     movs.push({
+      id:p.id || '',
+      tipoMov:'recebimento',
+      origem:p,
       tipo:'Recebimento',
       data:p.data || p.createdAt || '',
       descricao:desc,
@@ -3946,12 +4015,19 @@ function renderMovimentacoesCliModal(){
   var movs = obterMovimentacoesCli(rCli.id);
 
   tb.innerHTML = movs.map(function(m){
+    var acao = '';
+    if(m.id){
+      acao = '<button class="btn bo xs" onclick="reenviarComprovanteMovCli(\'' + String(m.id).replace(/'/g,'\\\'') + '\',\'' + (m.tipoMov||'') + '\')" title="Reenviar comprovante no WhatsApp">📱 Reenviar</button>';
+    }else{
+      acao = '<span class="tm">—</span>';
+    }
     return '<tr>' +
       '<td>' + FD(m.data) + '</td>' +
       '<td><b>' + m.tipo + '</b><span class="tm">' + m.descricao + '</span></td>' +
       '<td class="' + m.classe + '">' + R(m.valor) + '</td>' +
+      '<td style="text-align:right;">' + acao + '</td>' +
     '</tr>';
-  }).join('') || '<tr><td colspan="3" style="text-align:center;padding:14px;color:var(--txt2);">Sem movimentação</td></tr>';
+  }).join('') || '<tr><td colspan="4" style="text-align:center;padding:14px;color:var(--txt2);">Sem movimentação</td></tr>';
 }
 
 function abrirMovimentacoesCli(){
@@ -4179,10 +4255,14 @@ function renderCaixa(){
         btns+='<button class="btn bo xs" onclick="abrirNotaXml(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Abrir XML da nota">XML</button>';
       }
       btns+='<button class="btn bd2 xs" onclick="pedirSenhaECancelar(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Cancelar">🚫</button>';
+      btns+='<button class="btn bh xs" onclick="reimprimirMovCaixa(\''+m.sid+'\',\''+m.tipo+'\')" style="padding:4px 8px;font-size:12px;" title="Reimprimir comprovante">🖨️</button>';
+      btns+='<button class="btn bo xs" onclick="reenviarMovWhatsappCaixa(\''+m.sid+'\',\''+m.tipo+'\')" style="padding:4px 8px;font-size:12px;" title="Reenviar no WhatsApp">📱</button>';
     }
     if(m.tipo==='pag'){
       btns+='<button class="btn bh xs" onclick="editarRecebCaixa(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Corrigir recebimento">✏️</button>';
       btns+='<button class="btn bd2 xs" onclick="excluirRecebCaixa(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Excluir recebimento">🗑️</button>';
+      btns+='<button class="btn bh xs" onclick="reimprimirMovCaixa(\''+m.sid+'\',\''+m.tipo+'\')" style="padding:4px 8px;font-size:12px;" title="Reimprimir recibo">🖨️</button>';
+      btns+='<button class="btn bo xs" onclick="reenviarMovWhatsappCaixa(\''+m.sid+'\',\''+m.tipo+'\')" style="padding:4px 8px;font-size:12px;" title="Reenviar no WhatsApp">📱</button>';
     }
     btns+='</span>';
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--bdr);gap:8px;">'+
@@ -6049,7 +6129,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="tw">
         <table class="mov-modal-tb">
           <thead>
-            <tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>
+            <tr><th>Data</th><th>Descrição</th><th>Valor</th><th style="text-align:right;">Ações</th></tr>
           </thead>
           <tbody id="mov-cli-tb"></tbody>
         </table>
@@ -6695,6 +6775,132 @@ document.addEventListener('DOMContentLoaded', function(){
   }, 400);
 });
 
+
+
+/* =========================================================
+   CORREÇÃO WHATSAPP + REENVIO DE COMPROVANTES
+   - Corrige abertura do WhatsApp em cobranças e comprovantes
+   - Adiciona reenvio pela tela de Movimentações do cliente
+   - Adiciona reenvio/reimpressão nas movimentações do Caixa do dia
+========================================================= */
+function bmOnlyDigits(v){ return String(v||'').replace(/\D/g,''); }
+function bmNumeroWhatsApp(tel){
+  var num=bmOnlyDigits(tel);
+  if(!num) return '';
+  if(num.length===10 || num.length===11) num='55'+num;
+  return num;
+}
+function bmAbrirWhatsApp(tel,msg){
+  var num=bmNumeroWhatsApp(tel);
+  if(!num){ toast('⚠️ Cliente sem telefone/WhatsApp!'); return false; }
+  var url='https://wa.me/'+num+'?text='+encodeURIComponent(msg||'');
+  try{
+    var a=document.createElement('a');
+    a.href=url;
+    a.target='_blank';
+    a.rel='noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ try{document.body.removeChild(a);}catch(e){} },300);
+  }catch(e){
+    window.open(url,'_blank');
+  }
+  return true;
+}
+function bmClienteById(cid){
+  return (DB.get('clientes')||[]).find(function(c){ return String(c.id)===String(cid); }) || null;
+}
+function bmVendaById(id){
+  return (DB.get('vendas')||[]).find(function(v){ return String(v.id)===String(id); }) || null;
+}
+function bmPagById(id){
+  return (DB.get('pagamentos')||[]).find(function(p){ return String(p.id)===String(id); }) || null;
+}
+function bmCreditoById(id){
+  var lista=[];
+  try{ lista=creditosValidos(); }catch(e){ lista=DB.get('creditos')||[]; }
+  return lista.find(function(f){ return String(f.id||f.vendaId||f.sid||'')===String(id); }) || null;
+}
+function bmMsgVenda(v,cli){
+  var itens=(v.itens||[]).map(function(i){return '• '+(i.desc||i.nome||'Item')+' x'+(i.qty||i.qtd||1)+' = '+R(Number(i.preco||0)*Number(i.qty||i.qtd||1));}).join('\n');
+  var tpl=getCfg('msgComp')||getCfg('msg_rec')||MSG_REC_PAD||'👗 *Bela Modas*\n\nOlá, {nome}! 😊\n\n*Comprovante de Venda*\n{itens}\n\n💰 *Total: {total}*\nPagamento: {forma}\nData: {data}\n\nObrigada pela preferência! 💕';
+  return tpl.replace(/{nome}/g,(cli&&cli.nome)||v.cliNome||'Cliente')
+            .replace(/{itens}/g,itens||'')
+            .replace(/{total}/g,R(v.total||v.val||0))
+            .replace(/{forma}/g,FF(v.forma||v.forma_pagamento||''))
+            .replace(/{data}/g,FDT(v.data||v.createdAt||''));
+}
+function bmMsgPagamento(p,cli){
+  var tpl=getCfg('msgPag')||'👗 *Bela Modas*\n\nOlá, {nome}! 😊\n\n*Recibo de Pagamento*\nValor pago: *{valor}*\nForma: {forma}\nData: {data}\n\nObrigada! 💕\n📞 31 99733-7304';
+  return tpl.replace(/{nome}/g,(cli&&cli.nome)||p.cliNome||'Cliente')
+            .replace(/{valor}/g,R(p.val||p.valor||0))
+            .replace(/{forma}/g,FF(p.forma||p.forma_pagamento||''))
+            .replace(/{data}/g,FDT(p.data||p.createdAt||''));
+}
+function bmMsgCompraCrediario(f,cli){
+  return '👗 *Bela Modas*\n\nOlá, '+((cli&&cli.nome)||f.cliNome||'Cliente')+'! 😊\n\n*Comprovante de compra no crediário*\nData: '+FDT(f.data||f.createdAt||'')+'\nDescrição: '+(f.desc||f.descricao||'Compra')+'\nValor: *'+R(f.val||f.valor||0)+'*\n\nObrigada pela preferência! 💕';
+}
+
+/* Sobrescreve cobrança para usar abertura mais compatível */
+wppCobrar=function(cid){
+  var c=bmClienteById(cid);
+  if(!c||!c.tel){toast('⚠️ Cliente sem telefone!');return;}
+  var s=saldo(c.id),dias=diasSemPag(c.id);
+  var defMsg='Olá, {nome}! 😊\n\nAqui é a *Bela Modas*! 👗\n\nVocê tem um crediário em aberto de *{saldo}* há {dias} dias.\n\nQuando puder entre em contato! 💕\n📞 31 99733-7304\n📍 @bela_modaspetro';
+  var tmpl=getCfg('msgCob')||defMsg;
+  var msg=tmpl.replace(/\{nome\}/g,c.nome).replace(/\{saldo\}/g,R(s.sd)).replace(/\{dias\}/g,String(dias));
+  bmAbrirWhatsApp(c.tel,msg);
+};
+
+/* Sobrescreve WhatsApp do modal de comprovante */
+wppComp=function(){
+  var d=_comp||{}, c=d.cli;
+  if(!c||!c.tel){toast('⚠️ Cliente sem telefone!');return;}
+  var msg='';
+  if(d.venda) msg=bmMsgVenda(d.venda,c);
+  else if(d.pag) msg=bmMsgPagamento(d.pag,c);
+  if(!msg){toast('⚠️ Comprovante não encontrado!');return;}
+  bmAbrirWhatsApp(c.tel,msg);
+};
+
+function reimprimirMovCaixa(id,tipo){
+  if(tipo==='venda'){
+    var v=bmVendaById(id); if(!v){toast('⚠️ Venda não encontrada!');return;}
+    var cli=bmClienteById(v.cid)||{nome:v.cliNome||'Balcão',tel:v.tel||''};
+    mostrarComp(v,cli,null);
+    return;
+  }
+  var p=bmPagById(id); if(!p){toast('⚠️ Recebimento não encontrado!');return;}
+  var cli=bmClienteById(p.cid)||{nome:p.cliNome||'Cliente',tel:p.tel||''};
+  mostrarComp(null,cli,p);
+}
+function reenviarMovWhatsappCaixa(id,tipo){
+  if(tipo==='venda'){
+    var v=bmVendaById(id); if(!v){toast('⚠️ Venda não encontrada!');return;}
+    var cli=bmClienteById(v.cid)||{nome:v.cliNome||'Cliente',tel:v.tel||''};
+    if(!cli.tel){toast('⚠️ Cliente sem telefone!');return;}
+    bmAbrirWhatsApp(cli.tel,bmMsgVenda(v,cli));
+    return;
+  }
+  var p=bmPagById(id); if(!p){toast('⚠️ Recebimento não encontrado!');return;}
+  var cli=bmClienteById(p.cid)||{nome:p.cliNome||'Cliente',tel:p.tel||''};
+  if(!cli.tel){toast('⚠️ Cliente sem telefone!');return;}
+  bmAbrirWhatsApp(cli.tel,bmMsgPagamento(p,cli));
+}
+function reenviarComprovanteMovCli(id,tipoMov){
+  if(!rCli){toast('⚠️ Selecione um cliente!');return;}
+  if(!rCli.tel){toast('⚠️ Cliente sem telefone!');return;}
+  if(tipoMov==='recebimento'){
+    var p=bmPagById(id); if(!p){toast('⚠️ Recebimento não encontrado!');return;}
+    bmAbrirWhatsApp(rCli.tel,bmMsgPagamento(p,rCli));
+    return;
+  }
+  var f=bmCreditoById(id);
+  if(f){ bmAbrirWhatsApp(rCli.tel,bmMsgCompraCrediario(f,rCli)); return; }
+  var v=bmVendaById(id);
+  if(v){ bmAbrirWhatsApp(rCli.tel,bmMsgVenda(v,rCli)); return; }
+  toast('⚠️ Movimentação não encontrada!');
+}
 </script>
 
 </body>
