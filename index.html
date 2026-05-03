@@ -2139,6 +2139,13 @@ function registrarDeletedLote(nome, itens){
   (itens||[]).forEach(function(item){ registrarDeletedStore(nome, item); });
 }
 
+function limparDeletedProdutosLegadoBM(){
+  // Este sistema agora exclui produto direto da lista local e do syncAll.
+  // Remove o lixo antigo de bm_deleted_produtos que podia deixar o navegador lento.
+  try{ localStorage.removeItem('bm_deleted_produtos'); }catch(e){}
+}
+limparDeletedProdutosLegadoBM();
+
 function toast(msg,tipo){
   var t=document.getElementById('toast');
   t.textContent=msg;
@@ -2867,14 +2874,43 @@ function salvarProd(){
   toast(msg,'ok');
 }
 function delProd(id){
+  id=String(id||'');
+  if(!id){toast('⚠️ Produto inválido!');return;}
+
+  var noCarrinho=(cart||[]).some(function(i){return String(i && i.pid || '')===id;});
+  if(noCarrinho){
+    toast('⚠️ Este produto está no carrinho. Remova do carrinho antes de excluir.','warn');
+    return;
+  }
+
   if(!confirm('Excluir produto?'))return;
+
   var prods=DB.get('produtos')||[];
-  var prod=prods.find(function(p){return p.id===id;});
-  if(prod) registrarDeletedStore('produtos', prod);
-  DB.set('produtos',prods.filter(function(p){return p.id!==id;}));
-  renderProds();
-  renderPGrid();
-  toast('🗑️ Excluído!','ok');
+  var novo=[];
+  var removido=null;
+
+  for(var i=0;i<prods.length;i++){
+    var p=prods[i];
+    if(String(p && p.id || '')===id){removido=p;continue;}
+    novo.push(p);
+  }
+
+  if(!removido){toast('⚠️ Produto não encontrado ou já excluído.','warn');return;}
+
+  try{
+    localStorage.setItem('bm_backup_produtos_antes_exclusao', JSON.stringify({
+      data: nowLocalISO(),
+      produto: removido
+    }));
+  }catch(e){}
+
+  // Exclusão direta: a planilha será substituída pela lista atual no próximo syncAll.
+  // Não gravamos mais em bm_deleted_produtos para evitar travamento ao excluir muitos itens.
+  DB.set('produtos',novo);
+
+  setTimeout(function(){try{renderProds();}catch(e){}},20);
+  setTimeout(function(){try{renderPGrid();}catch(e){}},80);
+  toast('🗑️ Produto excluído. Sincronize para remover da planilha.','ok');
 }
 
 
@@ -3152,10 +3188,22 @@ function selVTab(btn,tab){
   if(tab==='catalogo')renderPGrid();
 }
 function renderPGrid(){
-  normalizarEstoquesProdutosBM();
+  if(!_estoquesNormalizadosUmaVez){
+    normalizarEstoquesProdutosBM();
+    _estoquesNormalizadosUmaVez=true;
+  }
   var el=document.getElementById('pgrid');if(!el)return;
   var q=(document.getElementById('v-psrch')?document.getElementById('v-psrch').value||'':'').trim().toLowerCase();
-  var prods=(DB.get('produtos')||[]).filter(function(p){return !q||textoBuscaProdBM(p).includes(q);});
+  var todos=DB.get('produtos')||[];
+  var limite=q ? 160 : 240;
+  var prods=[];
+  for(var i=0;i<todos.length;i++){
+    var p=todos[i]||{};
+    if(!q || textoBuscaProdBM(p).includes(q)){
+      prods.push(p);
+      if(prods.length>=limite) break;
+    }
+  }
   var catIco={Vestidos:'👗',Blusas:'👚',Calças:'👖',Saias:'👘',Acessórios:'💍',Calçados:'👠',Lingerie:'🩱',Outros:'🛍️'};
   el.innerHTML=prods.map(function(p){
     var est=estoqueProdBM(p);
