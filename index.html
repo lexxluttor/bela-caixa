@@ -487,6 +487,12 @@ td{padding:8px 9px !important;font-size:12px !important;}
   .bal-grid{grid-template-columns:1fr .45fr;}
   .bal-grid .btn{width:100%;justify-content:center;}
 }
+
+
+/* OTIMIZAÇÃO DE DESEMPENHO */
+#c-tb tr,#p-tb tr,#cart .ci,.pcard{content-visibility:auto;contain-intrinsic-size:42px;}
+#pg-clientes .tw,#pg-produtos .tw{contain:content;}
+
 </style>
   <link rel="stylesheet" href="./app-enhancements.css">
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -1831,15 +1837,45 @@ function syncDown(){
   }catch(e){}
 }
 var DB={
-  get:function(k){try{var v=localStorage.getItem('bm_'+k);return v?JSON.parse(v):[];}catch(e){return[];}},
-  set:function(k,v){
-    localStorage.setItem('bm_'+k,JSON.stringify(v));
-    if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
-      window.BelaSheetsSync.scheduleSync();
+  _cache:{},
+  _raw:{},
+  get:function(k){
+    var key='bm_'+k;
+    try{
+      var raw=localStorage.getItem(key)||'[]';
+      if(this._raw[k]===raw && this._cache[k]) return this._cache[k];
+      var parsed=raw?JSON.parse(raw):[];
+      if(!Array.isArray(parsed)) parsed=[];
+      this._raw[k]=raw;
+      this._cache[k]=parsed;
+      return parsed;
+    }catch(e){
+      this._raw[k]='[]';
+      this._cache[k]=[];
+      return [];
     }
+  },
+  set:function(k,v){
+    var arr=Array.isArray(v)?v:[];
+    var raw=JSON.stringify(arr);
+    this._cache[k]=arr;
+    this._raw[k]=raw;
+    localStorage.setItem('bm_'+k,raw);
+    if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
+      window.BelaSheetsSync.scheduleSync(k);
+    }
+  },
+  clearCache:function(k){
+    if(k){delete this._cache[k];delete this._raw[k];return;}
+    this._cache={};this._raw={};
   },
   uid:function(){return Date.now().toString(36)+Math.random().toString(36).substr(2,4);}
 };
+window.addEventListener('storage', function(e){
+  if(e && e.key && e.key.indexOf('bm_')===0 && DB && typeof DB.clearCache==='function'){
+    DB.clearCache(e.key.replace('bm_',''));
+  }
+});
 
 function initDB(){
   if(localStorage.getItem('bm_ok2'))return;
@@ -2203,8 +2239,9 @@ function renderDash(){
   var vh=vendas.filter(function(v){return v.data.startsWith(hoje);});
   var tvh=vh.filter(function(v){return v.forma!=='fiado';}).reduce(function(s,v){return s+v.total;},0);
   var tmes=vendas.filter(function(v){var d=new Date(v.data);return d.getMonth()===mes&&d.getFullYear()===ano&&v.forma!=='fiado';}).reduce(function(s,v){return s+v.total;},0);
-  var totalFiad=clis.reduce(function(s,c){return s+saldo(c.id).sd;},0);
-  var inad=clis.filter(function(c){return saldo(c.id).sd>0.01&&diasSemPag(c.id)>=30;});
+  var mapaSaldoDash=montarMapaSaldoClientes();
+  var totalFiad=Object.keys(mapaSaldoDash).reduce(function(s,id){return s+(mapaSaldoDash[id].sd||0);},0);
+  var inad=clis.filter(function(c){var sd=(mapaSaldoDash[String(c.id||'')]||{sd:0}).sd;return sd>0.01&&diasSemPag(c.id)>=30;});
   document.getElementById('d-stats').innerHTML=
     '<div class="st stg"><div class="sl">Vendas Hoje</div><div class="sv">'+R(tvh)+'</div><span class="tm">'+vh.length+' venda(s)</span></div>'+
     '<div class="st str"><div class="sl">Crediário em Aberto</div><div class="sv">'+R(totalFiad)+'</div></div>'+
@@ -2217,7 +2254,7 @@ function renderDash(){
   }).join('');
   document.getElementById('d-uv').innerHTML=uv||'<div class="empty">Nenhuma venda ainda</div>';
   var inadHtml=inad.slice(0,5).map(function(c){
-    var sd=saldo(c.id).sd,dias=diasSemPag(c.id);
+    var sd=(mapaSaldoDash[String(c.id||'')]||{sd:0}).sd,dias=diasSemPag(c.id);
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:12px;">'+
       '<span><b>'+c.nome+'</b><br><span style="color:var(--orange);font-size:11px;">'+dias+' dias sem pagar</span></span>'+
       '<span style="display:flex;gap:6px;align-items:center;"><b class="txt-r">'+R(sd)+'</b>'+
@@ -2519,7 +2556,7 @@ function renderClis(){
       '<td>'+(c.cpf||'—')+'</td>'+
       '<td>'+(c.tel||'—')+'</td>'+
       '<td style="font-size:13px;">'+(c.end||'—')+'</td>'+
-      '<td><b style="color:'+(lim>0.01?'var(--gold)':'var(--txt2)')+'">'+(lim>0.01?R(lim):'—')+'</b>'+limiteHintClienteHTML(c)+'</td>'+
+      '<td><b style="color:'+(lim>0.01?'var(--gold)':'var(--txt2)')+'">'+(lim>0.01?R(lim):'—')+'</b>'+(filtrados.length<=25?limiteHintClienteHTML(c):'')+'</td>'+
       '<td><b style="color:'+(sd>0.01?'var(--red2)':'var(--green)')+'">'+R(sd)+'</b></td>'+
       '<td><span style="display:flex;gap:5px;flex-wrap:wrap;">'+
         '<button class="btn br xs" onclick="irCliVenda(\''+cid+'\')" title="Nova Venda" style="padding:5px 9px;font-size:12px;">🛒 Venda</button>'+
@@ -2532,8 +2569,11 @@ function renderClis(){
   if(tb) tb.innerHTML=rows || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum cliente encontrado</td></tr>';
   var st=document.getElementById('c-status');
   if(st){
-    var totalMatch = q ? todos.filter(function(c){return textoBuscaClienteBM(c||{}).includes(q);}).length : todos.length;
-    st.textContent = totalMatch>limite ? 'Mostrando '+limite+' de '+totalMatch+' resultados. Continue digitando para filtrar.' : totalMatch+' resultado(s)';
+    if(q && filtrados.length>=limite){
+      st.textContent = 'Mostrando os primeiros '+limite+' resultados. Continue digitando para filtrar melhor.';
+    }else{
+      st.textContent = filtrados.length+' resultado(s)';
+    }
   }
 }
 
@@ -2683,8 +2723,11 @@ function renderProds(){
   if(tb) tb.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto encontrado</td></tr>';
   var st=document.getElementById('p-status');
   if(st){
-    var totalMatch = q ? todos.filter(function(p){return textoBuscaProdBM(p||{}).includes(q);}).length : todos.length;
-    st.textContent = totalMatch>limite ? 'Mostrando '+limite+' de '+totalMatch+' resultados. Continue digitando para filtrar.' : totalMatch+' resultado(s)';
+    if(q && prods.length>=limite){
+      st.textContent = 'Mostrando os primeiros '+limite+' resultados. Continue digitando para filtrar melhor.';
+    }else{
+      st.textContent = prods.length+' resultado(s)';
+    }
   }
 }
 function abrirMdProd(id){
