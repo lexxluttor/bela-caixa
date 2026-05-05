@@ -564,10 +564,6 @@ window.BelaSheetsSync = {
     return syncNow("manual");
   },
 
-  scheduleSync: function (motivo) {
-    return agendarSync(motivo || "manual");
-  },
-
   restoreNow: restoreNow,
 
   backupServerNow: backupServerNow,
