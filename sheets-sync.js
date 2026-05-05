@@ -26,8 +26,6 @@ let ultimoErroSync = "";
 let ultimoMotivoSync = "";
 let intervaloAtivo = false;
 let ignorarHook = false;
-let houveMudancaLocal = false;
-let ultimoSnapshotSync = '';
 
 /* ================= UTIL ================= */
 
@@ -105,37 +103,27 @@ function salvarLocal(nome, dados) {
 
 function gerarHashSync() {
   try {
-    return [
-      localStorage.getItem("bm_clientes") || "[]",
-      localStorage.getItem("bm_produtos") || "[]",
-      localStorage.getItem("bm_vendas") || "[]",
-      localStorage.getItem("bm_pagamentos") || "[]",
-      localStorage.getItem("bm_creditos") || "[]"
-    ].join("\n---BM---\n");
+    return JSON.stringify({
+      clientes: lerLocal("clientes"),
+      produtos: lerLocal("produtos"),
+      vendas: lerLocal("vendas"),
+      pagamentos: lerLocal("pagamentos"),
+      creditos: lerLocal("creditos")
+    });
   } catch (e) {
     return String(Date.now());
   }
 }
 
 function salvarBackupLocal() {
-  try {
-    const agora = Date.now();
-    const ultimo = Number(localStorage.getItem("bm_backup_last_ts") || 0);
-    if (agora - ultimo < 30 * 60 * 1000) return;
-
-    originalSetItem("bm_backup", JSON.stringify({
-      data: agoraISO(),
-      clientes: lerLocal("clientes"),
-      produtos: lerLocal("produtos"),
-      vendas: lerLocal("vendas"),
-      pagamentos: lerLocal("pagamentos"),
-      creditos: lerLocal("creditos")
-    }));
-
-    originalSetItem("bm_backup_last_ts", String(agora));
-  } catch (e) {
-    console.warn("Backup local ignorado:", e);
-  }
+  originalSetItem("bm_backup", JSON.stringify({
+    data: agoraISO(),
+    clientes: lerLocal("clientes"),
+    produtos: lerLocal("produtos"),
+    vendas: lerLocal("vendas"),
+    pagamentos: lerLocal("pagamentos"),
+    creditos: lerLocal("creditos")
+  }));
 }
 
 /* ================= HTTP ================= */
@@ -192,7 +180,9 @@ function mapaClientesPorId() {
   const mapa = new Map();
 
   lerLocal("clientes").forEach(c => {
-    if (c && c.id) mapa.set(String(c.id), c);
+    if (c && c.id) {
+      mapa.set(String(c.id), c);
+    }
   });
 
   return mapa;
@@ -438,8 +428,6 @@ async function syncNow(origem) {
     originalSetItem("bm_last_sync_origin", origem || "manual");
 
     ultimoHashEnviado = gerarHashSync();
-    ultimoSnapshotSync = ultimoHashEnviado;
-    houveMudancaLocal = false;
     ultimoErroSync = "";
     ultimoMotivoSync = origem || "manual";
 
@@ -459,15 +447,15 @@ async function syncNow(origem) {
 function agendarSync(motivo) {
   if (ignorarHook || restoreEmAndamento) return;
 
-  houveMudancaLocal = true;
-
   if (autoSyncTimer) clearTimeout(autoSyncTimer);
 
   autoSyncTimer = setTimeout(async function () {
     autoSyncTimer = null;
 
     if (restoreEmAndamento || syncEmAndamento) return;
-    if (!houveMudancaLocal) return;
+
+    const hashAtual = gerarHashSync();
+    if (hashAtual === ultimoHashEnviado) return;
 
     try {
       await syncNow("auto:" + (motivo || "mudanca"));
@@ -483,7 +471,9 @@ function iniciarSyncIntervalo() {
 
   setInterval(async function () {
     if (restoreEmAndamento || syncEmAndamento) return;
-    if (!houveMudancaLocal) return;
+
+    const hashAtual = gerarHashSync();
+    if (hashAtual === ultimoHashEnviado) return;
 
     try {
       await syncNow("intervalo_2min");
@@ -515,8 +505,6 @@ async function restoreNow() {
 
     originalSetItem("bm_last_restore", agoraISO());
     ultimoHashEnviado = gerarHashSync();
-    ultimoSnapshotSync = ultimoHashEnviado;
-    houveMudancaLocal = false;
     ultimoErroSync = "";
 
     location.reload();
@@ -544,7 +532,6 @@ localStorage.setItem = function (k, v) {
   const nome = String(k).replace("bm_", "");
 
   if (["clientes", "produtos", "vendas", "pagamentos", "creditos"].includes(nome)) {
-    houveMudancaLocal = true;
     agendarSync(nome);
   }
 };
@@ -561,8 +548,6 @@ async function backupServerNow() {
 function init() {
   if (localStorage.getItem("bm_last_sync")) {
     ultimoHashEnviado = gerarHashSync();
-    ultimoSnapshotSync = ultimoHashEnviado;
-    houveMudancaLocal = false;
   }
 
   iniciarSyncIntervalo();
@@ -592,7 +577,6 @@ window.BelaSheetsSync = {
       syncEmAndamento,
       restoreEmAndamento,
       autoSyncPendente: !!autoSyncTimer,
-      houveMudancaLocal,
       ultimoSync: localStorage.getItem("bm_last_sync"),
       origemUltimoSync: localStorage.getItem("bm_last_sync_origin"),
       ultimoRestore: localStorage.getItem("bm_last_restore"),
