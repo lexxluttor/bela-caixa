@@ -2459,9 +2459,120 @@ function aplicarSugestaoLimite(cid){
   });
 }
 
-function limiteHintClienteHTML(c){
+function montarCacheLimiteClientesBM(mapaSaldo){
+  // Cache leve para manter a sugestão de limite visível sem recalcular filtros pesados a cada linha.
+  var cache={mapa:{}, hoje:+new Date()};
+  (creditosValidos()||[]).forEach(function(c){
+    var id=String(c.cid||'');
+    if(!id) return;
+    var r=cache.mapa[id]||(cache.mapa[id]={totalComprado:0,totalPago:0,qtdCompras:0,qtdPagamentos:0,primeiroCredito:null,ultimoPagamento:null,saldoAtual:0});
+    r.totalComprado += dinheiroNum(c.val!=null?c.val:c.valor);
+    r.qtdCompras++;
+    var d=+new Date(c.data||c.createdAt||0);
+    if(isFinite(d) && d>0 && (r.primeiroCredito===null || d<r.primeiroCredito)) r.primeiroCredito=d;
+  });
+  (pagamentosValidos()||[]).forEach(function(p){
+    var id=String(p.cid||'');
+    if(!id) return;
+    var r=cache.mapa[id]||(cache.mapa[id]={totalComprado:0,totalPago:0,qtdCompras:0,qtdPagamentos:0,primeiroCredito:null,ultimoPagamento:null,saldoAtual:0});
+    r.totalPago += dinheiroNum(p.val!=null?p.val:p.valor);
+    r.qtdPagamentos++;
+    var d=+new Date(p.data||p.createdAt||0);
+    if(isFinite(d) && d>0 && (r.ultimoPagamento===null || d>r.ultimoPagamento)) r.ultimoPagamento=d;
+  });
+  Object.keys(cache.mapa).forEach(function(id){
+    var m=cache.mapa[id];
+    if(mapaSaldo && mapaSaldo[id]) m.saldoAtual=Number(mapaSaldo[id].sd||0);
+    else m.saldoAtual=Math.max(0,(m.totalComprado||0)-(m.totalPago||0));
+  });
+  return cache;
+}
+
+function calcularSugestaoLimiteClienteCacheBM(cli, cache){
+  // Mesma lógica de calcularSugestaoLimiteCliente(), mas usando dados pré-carregados.
+  if(!cache) return calcularSugestaoLimiteCliente(cli);
+  var atual=limiteClienteValor(cli);
+  var id=String(cli&&cli.id||'');
+  var m=(cache.mapa&&cache.mapa[id])||{};
+  var totalComprado=Number(m.totalComprado||0);
+  var totalPago=Number(m.totalPago||0);
+  var saldoAtual=Number(m.saldoAtual||0);
+  var qtdCompras=Number(m.qtdCompras||0);
+  var qtdPagamentos=Number(m.qtdPagamentos||0);
+  var ticketMedio=qtdCompras?totalComprado/qtdCompras:0;
+  var taxa=totalComprado>0?Math.min(totalPago/totalComprado,1.2):0;
+  var dias=0;
+  if(qtdCompras>0){
+    var base=qtdPagamentos>0 ? m.ultimoPagamento : m.primeiroCredito;
+    dias=base ? Math.floor((cache.hoje-base)/(1000*60*60*24)) : 0;
+  }
+
+  var ptsPontualidade=0;
+  if(totalComprado<=0) ptsPontualidade=18;
+  else if(saldoAtual<=0.01) ptsPontualidade=40;
+  else if(dias<=5) ptsPontualidade=34;
+  else if(dias<=15) ptsPontualidade=25;
+  else if(dias<=30) ptsPontualidade=14;
+  else ptsPontualidade=3;
+
+  var ptsCapacidade=0;
+  if(totalComprado<=0) ptsCapacidade=8;
+  else if(taxa>=0.90) ptsCapacidade=25;
+  else if(taxa>=0.70) ptsCapacidade=18;
+  else if(taxa>=0.50) ptsCapacidade=10;
+  else if(taxa>=0.30) ptsCapacidade=5;
+  else ptsCapacidade=0;
+
+  var ptsVolume=0;
+  if(totalComprado>=1500) ptsVolume=15;
+  else if(totalComprado>=800) ptsVolume=12;
+  else if(totalComprado>=400) ptsVolume=8;
+  else if(totalComprado>=150) ptsVolume=5;
+  else if(totalComprado>0) ptsVolume=2;
+
+  var ptsTicket=0;
+  if(ticketMedio>=300) ptsTicket=10;
+  else if(ticketMedio>=200) ptsTicket=8;
+  else if(ticketMedio>=120) ptsTicket=6;
+  else if(ticketMedio>=60) ptsTicket=3;
+  else if(ticketMedio>0) ptsTicket=1;
+
+  var ptsHistorico=Math.min(5, Math.floor((qtdCompras+qtdPagamentos)/2));
+  var ptsSituacao=0;
+  if(saldoAtual<=0.01) ptsSituacao=5;
+  else if(atual>0 && saldoAtual<=atual) ptsSituacao=3;
+  else if(atual<=0 && saldoAtual>0) ptsSituacao=1;
+  else ptsSituacao=0;
+
+  var score=ptsPontualidade+ptsCapacidade+ptsVolume+ptsTicket+ptsHistorico+ptsSituacao;
+  if(totalComprado>0 && taxa<0.30 && saldoAtual>0.01) score=Math.min(score,35);
+  if(saldoAtual>0.01 && dias>45) score=Math.min(score,25);
+  score=Math.max(0, Math.min(100, Math.round(score)));
+
+  var multiplicador=0;
+  if(totalComprado<=0) multiplicador=0;
+  else if(score>=90) multiplicador=4;
+  else if(score>=70) multiplicador=3;
+  else if(score>=50) multiplicador=2;
+  else if(score>=30) multiplicador=1;
+  else multiplicador=0;
+
+  var sugerido=arredLimite50_((ticketMedio||0)*multiplicador);
+  if(score>=50 && saldoAtual>0) sugerido=Math.max(sugerido, arredLimite50_(saldoAtual));
+  sugerido=Math.min(sugerido, 1200);
+  if(totalComprado<=0) sugerido=atual;
+
+  var acao='manter';
+  if(score<30 && atual>0) acao='bloquear';
+  else if(sugerido>atual+25) acao='aumentar';
+  else if(sugerido<atual-25) acao='reduzir';
+
+  return {cliente:cli,atual:atual,sugerido:sugerido,score:score,taxa:taxa,totalComprado:totalComprado,totalPago:totalPago,saldoAtual:saldoAtual,ticketMedio:ticketMedio,dias:dias,qtdCompras:qtdCompras,acao:acao};
+}
+
+function limiteHintClienteHTML(c, cache){
   try{
-    var r=calcularSugestaoLimiteCliente(c);
+    var r=cache ? calcularSugestaoLimiteClienteCacheBM(c, cache) : calcularSugestaoLimiteCliente(c);
     if(!r || r.acao==='manter') return '';
     var simbolo=r.acao==='aumentar'?'↑':(r.acao==='reduzir'?'↓':'⛔');
     var cor=r.acao==='aumentar'?'var(--green)':(r.acao==='reduzir'?'var(--orange)':'var(--red2)');
@@ -2510,6 +2621,7 @@ function renderClis(){
     }
   }
   var mapaSaldo=montarMapaSaldoClientes();
+  var cacheLimite=montarCacheLimiteClientesBM(mapaSaldo);
   var rows=filtrados.map(function(c){
     var sd=(mapaSaldo[String(c.id||'')]||{sd:0}).sd;
     var cid=c.id;
@@ -2519,7 +2631,7 @@ function renderClis(){
       '<td>'+(c.cpf||'—')+'</td>'+
       '<td>'+(c.tel||'—')+'</td>'+
       '<td style="font-size:13px;">'+(c.end||'—')+'</td>'+
-      '<td><b style="color:'+(lim>0.01?'var(--gold)':'var(--txt2)')+'">'+(lim>0.01?R(lim):'—')+'</b>'+limiteHintClienteHTML(c)+'</td>'+
+      '<td><b style="color:'+(lim>0.01?'var(--gold)':'var(--txt2)')+'">'+(lim>0.01?R(lim):'—')+'</b>'+limiteHintClienteHTML(c, cacheLimite)+'</td>'+
       '<td><b style="color:'+(sd>0.01?'var(--red2)':'var(--green)')+'">'+R(sd)+'</b></td>'+
       '<td><span style="display:flex;gap:5px;flex-wrap:wrap;">'+
         '<button class="btn br xs" onclick="irCliVenda(\''+cid+'\')" title="Nova Venda" style="padding:5px 9px;font-size:12px;">🛒 Venda</button>'+
