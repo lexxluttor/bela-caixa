@@ -570,7 +570,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
           <div class="fr">
             <div class="fg v-sug" style="flex:2;margin:0;min-width:120px;">
               <label class="fl">Descrição</label>
-              <input class="fi" id="v-desc" placeholder="Ex: Vestido Floral" autocomplete="off" oninput="buscarProdutoManual()" onfocus="buscarProdutoManual()" onkeydown="if(event.key==='Enter')addItem()">
+              <input class="fi" id="v-desc" placeholder="Ex: Vestido Floral" autocomplete="off" oninput="buscarProdutoManualDebounced()" onfocus="buscarProdutoManual()" onkeydown="if(event.key==='Enter')addItem()">
               <div id="v-desc-sg" class="v-sug-list" style="display:none;"></div>
             </div>
             <div class="fg" style="width:110px;margin:0;">
@@ -2470,7 +2470,7 @@ function limiteHintClienteHTML(c){
 }
 
 
-// CLIENTES — versão otimizada para não travar ao digitar
+// CLIENTES — otimização segura 05/05: busca leve, sem score de limite no loop
 var _timerRenderClis=null;
 function renderClisDebounced(){
   clearTimeout(_timerRenderClis);
@@ -2519,7 +2519,7 @@ function renderClis(){
       '<td>'+(c.cpf||'—')+'</td>'+
       '<td>'+(c.tel||'—')+'</td>'+
       '<td style="font-size:13px;">'+(c.end||'—')+'</td>'+
-      '<td><b style="color:'+(lim>0.01?'var(--gold)':'var(--txt2)')+'">'+(lim>0.01?R(lim):'—')+'</b>'+limiteHintClienteHTML(c)+'</td>'+
+      '<td><b style="color:'+(lim>0.01?'var(--gold)':'var(--txt2)')+'">'+(lim>0.01?R(lim):'—')+'</b></td>'+
       '<td><b style="color:'+(sd>0.01?'var(--red2)':'var(--green)')+'">'+R(sd)+'</b></td>'+
       '<td><span style="display:flex;gap:5px;flex-wrap:wrap;">'+
         '<button class="btn br xs" onclick="irCliVenda(\''+cid+'\')" title="Nova Venda" style="padding:5px 9px;font-size:12px;">🛒 Venda</button>'+
@@ -2532,8 +2532,11 @@ function renderClis(){
   if(tb) tb.innerHTML=rows || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum cliente encontrado</td></tr>';
   var st=document.getElementById('c-status');
   if(st){
-    var totalMatch = q ? todos.filter(function(c){return textoBuscaClienteBM(c||{}).includes(q);}).length : todos.length;
-    st.textContent = totalMatch>limite ? 'Mostrando '+limite+' de '+totalMatch+' resultados. Continue digitando para filtrar.' : totalMatch+' resultado(s)';
+    if(q){
+      st.textContent = filtrados.length>=limite ? 'Mostrando os primeiros '+limite+' resultados. Continue digitando para filtrar.' : filtrados.length+' resultado(s)';
+    }else{
+      st.textContent = todos.length>limite ? 'Mostrando '+limite+' de '+todos.length+' clientes. Digite para filtrar.' : todos.length+' cliente(s)';
+    }
   }
 }
 
@@ -2642,7 +2645,7 @@ function textoBuscaProdBM(p){
   ].map(function(v){return String(v||'').toLowerCase();}).join(' ');
 }
 
-// PRODUTOS — versão otimizada para busca rápida
+// PRODUTOS — otimização segura 05/05: busca leve e sem normalizar estoque ao digitar
 var _timerRenderProds=null;
 var _estoquesNormalizadosUmaVez=false;
 function renderProdsDebounced(){
@@ -2683,8 +2686,11 @@ function renderProds(){
   if(tb) tb.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum produto encontrado</td></tr>';
   var st=document.getElementById('p-status');
   if(st){
-    var totalMatch = q ? todos.filter(function(p){return textoBuscaProdBM(p||{}).includes(q);}).length : todos.length;
-    st.textContent = totalMatch>limite ? 'Mostrando '+limite+' de '+totalMatch+' resultados. Continue digitando para filtrar.' : totalMatch+' resultado(s)';
+    if(q){
+      st.textContent = prods.length>=limite ? 'Mostrando os primeiros '+limite+' resultados. Continue digitando para filtrar.' : prods.length+' resultado(s)';
+    }else{
+      st.textContent = todos.length>limite ? 'Mostrando '+limite+' de '+todos.length+' produtos. Digite para filtrar.' : todos.length+' produto(s)';
+    }
   }
 }
 function abrirMdProd(id){
@@ -3270,8 +3276,12 @@ function selecionarProdutoManual(pid){
   limparBuscaProdutoManual();
   document.getElementById('v-qty').focus();
 }
+var _timerBuscaProdutoManualBM=null;
+function buscarProdutoManualDebounced(){
+  clearTimeout(_timerBuscaProdutoManualBM);
+  _timerBuscaProdutoManualBM=setTimeout(buscarProdutoManual, 160);
+}
 function buscarProdutoManual(){
-  normalizarEstoquesProdutosBM();
   var inp=document.getElementById('v-desc');
   var sg=document.getElementById('v-desc-sg');
   if(!inp||!sg)return;
