@@ -403,15 +403,18 @@ function buildCaixa(dateStr){
   const ensureForma=(name)=>{ if(!formas[name]) formas[name]={nome:name,vendas:0,recebimentos:0}; return formas[name]; };
 
   vendasDia.forEach(v=>{
+    // Crediário novo NÃO entra na tabela "Por forma de pagamento",
+    // porque não é entrada de caixa do dia. Ele já aparece no card "Novo crediário"
+    // e nas movimentações, evitando duplicidade visual no total por forma.
+    if(isCrediarioVenda(v)) return;
+
     let forma=String(v.forma_pagamento||v.forma||'').trim()||'Não informado';
-    if(isCrediarioVenda(v)){ forma='Crediário (novo)'; }
-    else{
-      const f=normalizeFormaVenda(v);
-      if(f==='credito') forma='Crédito';
-      else if(f==='debito') forma='Débito';
-      else if(f==='pix') forma='Pix';
-      else if(f==='dinheiro') forma='Dinheiro';
-    }
+    const f=normalizeFormaVenda(v);
+    if(f==='credito') forma='Crédito';
+    else if(f==='debito') forma='Débito';
+    else if(f==='pix') forma='Pix';
+    else if(f==='dinheiro') forma='Dinheiro';
+
     ensureForma(forma).vendas += getValorLancamento(v);
   });
 
