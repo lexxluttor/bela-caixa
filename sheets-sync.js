@@ -410,7 +410,11 @@ async function syncNow(origem) {
   syncEmAndamento = true;
 
   try {
-    salvarBackupLocal();
+    try {
+      salvarBackupLocal();
+    } catch (e) {
+      console.warn("Backup local ignorado por falta de espaço:", e);
+    }
 
     const payload = {
       action: "syncAll",
