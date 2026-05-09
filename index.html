@@ -5983,12 +5983,19 @@ function gerarObjetoBackupAuto(){
   }
 }
 function salvarBackupAutomatico(){
+  /*
+    Backup automático local desativado.
+    Motivo: backup_1, backup_2 e backup_3 ficavam muito grandes no localStorage
+    e bloqueavam vendas/sincronização por limite de espaço do navegador.
+    O backup seguro continua sendo o Backup servidor (Google Drive).
+  */
   try{
-    var backup = gerarObjetoBackupAuto();
-    if(!backup) return;
-    localStorage.setItem('backup_3', localStorage.getItem('backup_2') || '');
-    localStorage.setItem('backup_2', localStorage.getItem('backup_1') || '');
-    localStorage.setItem('backup_1', JSON.stringify(backup));
+    localStorage.removeItem('backup_1');
+    localStorage.removeItem('backup_2');
+    localStorage.removeItem('backup_3');
+    localStorage.removeItem('bm_backup');
+    localStorage.removeItem('bm_last_sync_error');
+    localStorage.removeItem('bm_last_restore_error');
   }catch(e){}
 }
 function exportarBackup(){
