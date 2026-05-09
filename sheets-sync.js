@@ -89,6 +89,27 @@ function normalizarDescricaoCobranca_(v) {
 
 const originalSetItem = localStorage.setItem.bind(localStorage);
 
+function safeSetItem_(k, v) {
+  try {
+    originalSetItem(k, v);
+  } catch (e) {
+    console.warn("localStorage ignorado por falta de espaço:", k, e);
+  }
+}
+
+function limparBackupsLocaisPesados_() {
+  [
+    "bm_backup",
+    "backup_1",
+    "backup_2",
+    "backup_3",
+    "bm_last_sync_error",
+    "bm_last_restore_error"
+  ].forEach(function (k) {
+    try { localStorage.removeItem(k); } catch (e) {}
+  });
+}
+
 function lerLocal(nome) {
   try {
     return JSON.parse(localStorage.getItem("bm_" + nome) || "[]");
@@ -113,17 +134,6 @@ function gerarHashSync() {
   } catch (e) {
     return String(Date.now());
   }
-}
-
-function salvarBackupLocal() {
-  originalSetItem("bm_backup", JSON.stringify({
-    data: agoraISO(),
-    clientes: lerLocal("clientes"),
-    produtos: lerLocal("produtos"),
-    vendas: lerLocal("vendas"),
-    pagamentos: lerLocal("pagamentos"),
-    creditos: lerLocal("creditos")
-  }));
 }
 
 /* ================= HTTP ================= */
@@ -410,12 +420,6 @@ async function syncNow(origem) {
   syncEmAndamento = true;
 
   try {
-    try {
-      salvarBackupLocal();
-    } catch (e) {
-      console.warn("Backup local ignorado por falta de espaço:", e);
-    }
-
     const payload = {
       action: "syncAll",
       origem: origem || "manual",
@@ -428,8 +432,8 @@ async function syncNow(origem) {
 
     const res = await post(payload);
 
-    originalSetItem("bm_last_sync", agoraISO());
-    originalSetItem("bm_last_sync_origin", origem || "manual");
+    safeSetItem_("bm_last_sync", agoraISO());
+    safeSetItem_("bm_last_sync_origin", origem || "manual");
 
     ultimoHashEnviado = gerarHashSync();
     ultimoErroSync = "";
@@ -440,7 +444,7 @@ async function syncNow(origem) {
   } catch (e) {
     console.error("Erro no sync:", e);
     ultimoErroSync = String(e && e.message || e);
-    originalSetItem("bm_last_sync_error", ultimoErroSync);
+    safeSetItem_("bm_last_sync_error", ultimoErroSync);
     throw e;
 
   } finally {
@@ -507,7 +511,7 @@ async function restoreNow() {
 
     ignorarHook = false;
 
-    originalSetItem("bm_last_restore", agoraISO());
+    safeSetItem_("bm_last_restore", agoraISO());
     ultimoHashEnviado = gerarHashSync();
     ultimoErroSync = "";
 
@@ -518,7 +522,7 @@ async function restoreNow() {
     ignorarHook = false;
     console.error("Erro no restore:", e);
     ultimoErroSync = String(e && e.message || e);
-    originalSetItem("bm_last_restore_error", ultimoErroSync);
+    safeSetItem_("bm_last_restore_error", ultimoErroSync);
     return false;
 
   } finally {
@@ -550,6 +554,8 @@ async function backupServerNow() {
 /* ================= START ================= */
 
 function init() {
+  limparBackupsLocaisPesados_();
+
   if (localStorage.getItem("bm_last_sync")) {
     ultimoHashEnviado = gerarHashSync();
   }
