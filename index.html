@@ -891,6 +891,7 @@ td{padding:8px 9px !important;font-size:12px !important;}
       <select class="fi" id="rl-a" style="width:100px;" onchange="renderRel()"></select>
       <button class="btn bb sm" type="button" onclick="baixarXmlMesRelatorio()">📦 XML do mês</button>
       <button class="btn bh sm" type="button" onclick="abrirXmlPeriodoRelatorio()">🗓️ XML por período</button>
+      <button class="btn bb sm" type="button" onclick="abrirNfceLoteModal()">🧾 Emitir NFC-e pendentes</button>
     </div>
 
     <div class="vtabs" style="margin-bottom:14px;">
@@ -6335,6 +6336,59 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 </div>
 
+<!-- MODAL NFC-E LOTE -->
+<div class="ov" id="mo-nfce-lote">
+  <div class="modal" style="max-width:920px;">
+    <div class="mh">
+      <div class="mht">🧾 Emitir NFC-e pendentes em massa</div>
+      <button class="mx" onclick="fMd('mo-nfce-lote')">✕</button>
+    </div>
+    <div class="mb">
+      <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;align-items:end;">
+        <div class="fg">
+          <label class="fl">Data das vendas</label>
+          <input class="fi" id="nfce-lote-data" type="date">
+        </div>
+        <div class="fg">
+          <label class="fl">Forma de pagamento</label>
+          <select class="fi" id="nfce-lote-forma">
+            <option value="todas">Todas</option>
+            <option value="dinheiro">Dinheiro</option>
+            <option value="pix">Pix</option>
+            <option value="debito">Débito</option>
+            <option value="credito">Crédito</option>
+            <option value="fiado">Crediário / fiado</option>
+          </select>
+        </div>
+        <div class="fg">
+          <button class="btn bh" type="button" onclick="buscarNfceLotePendentes()">🔎 Buscar pendentes</button>
+        </div>
+        <div class="fg">
+          <button class="btn bb" type="button" onclick="emitirNfceLotePendentes()">🚀 Emitir todas</button>
+        </div>
+      </div>
+
+      <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
+        <div class="card"><div class="tm">Pendentes</div><div class="tv" id="nfce-lote-qtd">0</div></div>
+        <div class="card"><div class="tm">Valor total</div><div class="tv" id="nfce-lote-total">R$ 0,00</div></div>
+        <div class="card"><div class="tm">Filtro</div><div class="tv" id="nfce-lote-filtro" style="font-size:16px;">—</div></div>
+      </div>
+
+      <div class="xml-help" style="margin-top:10px;">
+        O sistema lista somente vendas finalizadas da data escolhida que ainda não têm NFC-e marcada no caixa. A emissão é feita uma por uma, usando a mesma rota segura da emissão individual.
+      </div>
+
+      <div id="nfce-lote-lista" style="margin-top:12px;max-height:360px;overflow:auto;">
+        <div style="color:var(--txt2);text-align:center;padding:14px;">Clique em buscar pendentes.</div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" type="button" onclick="fMd('mo-nfce-lote')">Fechar</button>
+      <button class="btn bb" type="button" onclick="emitirNfceLotePendentes()">🚀 Emitir todas pendentes</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 (function(){
@@ -6564,6 +6618,151 @@ document.addEventListener('DOMContentLoaded',function(){
     }
     window.open(venda.nfce_xml_url, '_blank');
   };
+
+  function nfceLoteHoje(){
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+
+  function nfceLoteMoeda(v){
+    return Number(v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+  }
+
+  function nfceNormalizarForma(v){
+    var t = String(v || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+      .trim().toLowerCase();
+
+    if(!t) return '';
+    if(t.indexOf('pix') >= 0) return 'pix';
+    if(t.indexOf('dinheiro') >= 0) return 'dinheiro';
+    if(t.indexOf('debito') >= 0 || t.indexOf('débito') >= 0) return 'debito';
+    if(t.indexOf('credito') >= 0 || t.indexOf('crédito') >= 0) return 'credito';
+    if(t.indexOf('fiado') >= 0 || t.indexOf('crediario') >= 0 || t.indexOf('crediário') >= 0) return 'fiado';
+    if(t.indexOf('cartao') >= 0 || t.indexOf('cartão') >= 0) return 'credito';
+    return t;
+  }
+
+  function nfceVendaTemNota(v){
+    if(!v) return false;
+    var st = String(v.nfce_status || '').toLowerCase();
+    if(st && st.indexOf('cancelada') < 0) return true;
+    if(v.nfce_numero || v.nfce_chave || v.nfce_xml_url || v.nfce_pdf_url) return true;
+    return false;
+  }
+
+  function nfceVendaDia(v){
+    return String(v.data || v.createdAt || v.dataVenda || '').substring(0,10);
+  }
+
+  function nfceLotePendentes(){
+    var dataEl = document.getElementById('nfce-lote-data');
+    var formaEl = document.getElementById('nfce-lote-forma');
+    var data = dataEl ? dataEl.value : '';
+    var forma = formaEl ? formaEl.value : 'todas';
+    var vendas = DB.get('vendas') || [];
+
+    return vendas.filter(function(v){
+      var formaVenda = nfceNormalizarForma(v.forma || v.forma_pagamento || v.pagamento || '');
+      var dataOk = !data || nfceVendaDia(v) === data;
+      var formaOk = forma === 'todas' || formaVenda === forma;
+      var valorOk = Number(v.total || 0) > 0;
+      return dataOk && formaOk && valorOk && !nfceVendaTemNota(v);
+    });
+  }
+
+  function nfceRenderLoteLista(lista){
+    var host = document.getElementById('nfce-lote-lista');
+    var qtd = document.getElementById('nfce-lote-qtd');
+    var total = document.getElementById('nfce-lote-total');
+    var filtro = document.getElementById('nfce-lote-filtro');
+    var formaEl = document.getElementById('nfce-lote-forma');
+    var dataEl = document.getElementById('nfce-lote-data');
+    var soma = (lista||[]).reduce(function(s,v){ return s + Number(v.total||0); },0);
+
+    if(qtd) qtd.textContent = String((lista||[]).length);
+    if(total) total.textContent = nfceLoteMoeda(soma);
+    if(filtro) filtro.textContent = (dataEl && dataEl.value ? dataEl.value : 'Data não informada') + ' • ' + (formaEl ? formaEl.options[formaEl.selectedIndex].text : 'Todas');
+
+    if(!host) return;
+    if(!lista || !lista.length){
+      host.innerHTML = '<div style="color:var(--txt2);text-align:center;padding:14px;">Nenhuma venda pendente encontrada para este filtro.</div>';
+      return;
+    }
+
+    host.innerHTML = lista.map(function(v){
+      var forma = nfceNormalizarForma(v.forma || v.forma_pagamento || '');
+      return '<div class="imp-row" style="grid-template-columns:1fr .7fr .45fr .55fr;gap:8px;">' +
+        '<div><b>' + escHtml(v.cliNome || v.cliente || 'Balcão') + '</b><br><small>' + escHtml(String(v.id || '')) + '</small></div>' +
+        '<div>' + escHtml(forma || '-') + '<br><small>' + escHtml(String(v.data || '').replace('T',' ').substring(0,16)) + '</small></div>' +
+        '<div style="text-align:right;font-weight:800;">' + nfceLoteMoeda(v.total || 0) + '</div>' +
+        '<div style="text-align:right;"><button class="btn bb sm" type="button" onclick="emitirNfceCaixa(\'' + String(v.id).replace(/'/g,'\\'') + '\')">Emitir</button></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function escHtml(s){
+    return String(s == null ? '' : s).replace(/[&<>"]/g,function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];
+    });
+  }
+
+  window.abrirNfceLoteModal = function(){
+    var dataEl = document.getElementById('nfce-lote-data');
+    if(dataEl && !dataEl.value) dataEl.value = nfceLoteHoje();
+    if(typeof abrirMd === 'function') abrirMd('mo-nfce-lote'); else if(typeof oMd === 'function') oMd('mo-nfce-lote');
+    buscarNfceLotePendentes();
+  };
+
+  window.buscarNfceLotePendentes = function(){
+    var lista = nfceLotePendentes();
+    nfceRenderLoteLista(lista);
+    if(typeof toast === 'function') toast('🔎 ' + lista.length + ' venda(s) pendente(s) encontrada(s).');
+    return lista;
+  };
+
+  window.emitirNfceLotePendentes = async function(){
+    var lista = nfceLotePendentes();
+    var soma = lista.reduce(function(s,v){ return s + Number(v.total||0); },0);
+
+    if(!lista.length){
+      if(typeof toast === 'function') toast('⚠️ Nenhuma venda pendente para emitir.');
+      nfceRenderLoteLista(lista);
+      return;
+    }
+
+    if(!confirm('Emitir ' + lista.length + ' NFC-e pendente(s), totalizando ' + nfceLoteMoeda(soma) + '?')) return;
+
+    var ok = 0, erro = 0;
+    for(var i=0;i<lista.length;i++){
+      var venda = lista[i];
+      try{
+        var cliente = acharCliente(venda.cid);
+        var payload = payloadNota(venda, cliente);
+        var resp = await fetch(apiBase() + '/nfce/emitir', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(payload)
+        });
+        var data = await resp.json().catch(function(){ return {}; });
+        if(!resp.ok || !data || data.ok !== true) throw new Error((data && (data.error || data.mensagem)) || 'Falha ao emitir.');
+        salvarRetornoNota(venda.id, data);
+        ok++;
+        if(typeof toast === 'function') toast('✅ Emitida ' + ok + ' de ' + lista.length);
+      }catch(e){
+        erro++;
+        console.error('Erro NFC-e lote venda', venda && venda.id, e);
+      }
+    }
+
+    try{ renderCaixa(); }catch(e){}
+    try{ renderVendas(); }catch(e){}
+    try{ renderDash(); }catch(e){}
+    nfceRenderLoteLista(nfceLotePendentes());
+
+    if(typeof toast === 'function') toast('Finalizado: ' + ok + ' emitida(s), ' + erro + ' falha(s).', erro ? 'warn' : 'ok');
+  };
+
 })();
 </script>
 
