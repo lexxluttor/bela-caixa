@@ -276,6 +276,23 @@ function preencherNcmPorCategoria(){
   if(ncm) ncmEl.value = ncm;
 }
 
+
+function atualizarNCMAutomatico(){
+  var catEl = document.getElementById('prod-cat');
+  var ncmEl = document.getElementById('prod-ncm');
+  if(!catEl || !ncmEl) return;
+
+  var subcategoria = String(catEl.value || '').trim();
+  if(!subcategoria) return;
+
+  var ncmNovo = NCM_POR_CATEGORIA[subcategoria] || '';
+
+  if(ncmNovo){
+    ncmEl.value = ncmNovo;
+  }
+}
+
+
 function aplicarPadraoFiscal(){
   var cat = (document.getElementById('prod-cat') || {}).value || '';
   if(document.getElementById('prod-origem')) document.getElementById('prod-origem').value = '0';
@@ -4106,3 +4123,11 @@ document.addEventListener('DOMContentLoaded',function(){
   }
 });
 
+
+
+
+document.addEventListener('change', function(e){
+  if(e.target && e.target.id === 'prod-cat'){
+    atualizarNCMAutomatico();
+  }
+});
