@@ -2731,5 +2731,94 @@ function reenviarComprovanteMovCli(id,tipoMov){
 }
 </script>
 
+
+<script>
+/* =========================================================
+   AUTO PREENCHIMENTO FISCAL — BELA MODAS
+   ========================================================= */
+
+const MAPA_FISCAL_SUBCATEGORIA = {
+  "Sandália feminina": { ncm:"64029990", cfop:"5102", csosn:"102", unidade:"PAR" },
+  "Sandalias": { ncm:"64029990", cfop:"5102", csosn:"102", unidade:"PAR" },
+  "Tênis feminino": { ncm:"64041100", cfop:"5102", csosn:"102", unidade:"PAR" },
+  "Tenis feminino": { ncm:"64041100", cfop:"5102", csosn:"102", unidade:"PAR" },
+  "Tênis masculino": { ncm:"64041100", cfop:"5102", csosn:"102", unidade:"PAR" },
+  "Sapato feminino": { ncm:"64035990", cfop:"5102", csosn:"102", unidade:"PAR" },
+  "Bolsa feminina": { ncm:"42022210", cfop:"5102", csosn:"102", unidade:"UN" },
+  "Blusa feminina": { ncm:"61091000", cfop:"5102", csosn:"102", unidade:"UN" },
+  "Calça feminina": { ncm:"62046200", cfop:"5102", csosn:"102", unidade:"UN" },
+  "Vestido": { ncm:"62044300", cfop:"5102", csosn:"102", unidade:"UN" }
+};
+
+function localizarCampo(chaves){
+  const campos = [...document.querySelectorAll("input, select")];
+
+  for(const campo of campos){
+    const alvo = (
+      (campo.id || "") + " " +
+      (campo.name || "") + " " +
+      (campo.placeholder || "")
+    ).toLowerCase();
+
+    if(chaves.some(k => alvo.includes(k))){
+      return campo;
+    }
+  }
+
+  return null;
+}
+
+function aplicarFiscalAutomatico(subcategoria){
+
+  if(!subcategoria) return;
+
+  const fiscal = MAPA_FISCAL_SUBCATEGORIA[subcategoria];
+
+  if(!fiscal) return;
+
+  const campoNCM = localizarCampo(["ncm"]);
+  const campoCFOP = localizarCampo(["cfop"]);
+  const campoCSOSN = localizarCampo(["csosn"]);
+  const campoUN = localizarCampo(["unidade","ucom","utrib"]);
+
+  if(campoNCM) campoNCM.value = fiscal.ncm;
+  if(campoCFOP) campoCFOP.value = fiscal.cfop;
+  if(campoCSOSN) campoCSOSN.value = fiscal.csosn;
+  if(campoUN) campoUN.value = fiscal.unidade;
+
+  console.log("Fiscal automático aplicado:", fiscal);
+}
+
+function ativarFiscalAutomatico(){
+
+  const selects = [...document.querySelectorAll("select")];
+
+  selects.forEach(select => {
+
+    const nome = (
+      (select.id || "") + " " +
+      (select.name || "")
+    ).toLowerCase();
+
+    if(
+      nome.includes("subcat") ||
+      nome.includes("subcategoria")
+    ){
+
+      select.addEventListener("change", e => {
+        aplicarFiscalAutomatico(e.target.value);
+      });
+
+    }
+
+  });
+
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  ativarFiscalAutomatico();
+});
+</script>
+
 </body>
 </html>
