@@ -858,6 +858,7 @@ document.addEventListener('DOMContentLoaded',function(){
         <div class="fg"><label class="fl">Custo Compra (R$)</label><input class="fi" id="prod-custo" type="number" step="0.01" min="0" placeholder="0,00"></div>
         <div class="fg"><label class="fl">Código de Barras</label><input class="fi" id="prod-ean" placeholder="EAN principal ou vários separados por vírgula"></div>
         <div class="fg"><label class="fl">NCM</label><input class="fi" id="prod-ncm" placeholder="NCM"></div>
+        <div class="fg"><label class="fl">CEST</label><input class="fi" id="prod-cest" placeholder="CEST, se houver"></div>
         <div class="fg gc" style="display:flex;gap:8px;flex-wrap:wrap;">
           <button type="button" class="btn bh sm" onclick="aplicarPadraoFiscal()">Aplicar padrão fiscal</button>
           <button type="button" class="btn bb sm" onclick="entradaManualSemXML()">Entrada manual s/ XML</button>
@@ -878,6 +879,10 @@ document.addEventListener('DOMContentLoaded',function(){
         </div>
         <div class="fg"><label class="fl">CSOSN</label><input class="fi" id="prod-csosn" value="102" placeholder="102"></div>
         <div class="fg"><label class="fl">CFOP</label><input class="fi" id="prod-cfop" value="5102" placeholder="5102"></div>
+        <div class="fg"><label class="fl">CST PIS</label><input class="fi" id="prod-cst-pis" value="49" placeholder="49"></div>
+        <div class="fg"><label class="fl">Alíquota PIS (%)</label><input class="fi" id="prod-aliq-pis" type="number" step="0.01" min="0" value="0"></div>
+        <div class="fg"><label class="fl">CST COFINS</label><input class="fi" id="prod-cst-cofins" value="49" placeholder="49"></div>
+        <div class="fg"><label class="fl">Alíquota COFINS (%)</label><input class="fi" id="prod-aliq-cofins" type="number" step="0.01" min="0" value="0"></div>
         <div class="fg"><label class="fl">Escala</label>
           <select class="fi" id="prod-escala">
             <option value="S">S</option>
