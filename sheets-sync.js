@@ -551,6 +551,19 @@ async function backupServerNow() {
   return r.json();
 }
 
+async function restaurarBackupServidorNow() {
+  const r = await fetch(API_URL + "?action=restaurarUltimoBackup");
+  const json = await r.json();
+
+  if (!json.ok) {
+    throw new Error(json.error || "Falha ao restaurar backup no servidor");
+  }
+
+  await restoreNow();
+
+  return json;
+}
+
 /* ================= START ================= */
 
 function init() {
@@ -577,6 +590,8 @@ window.BelaSheetsSync = {
   restoreNow: restoreNow,
 
   backupServerNow: backupServerNow,
+
+  restaurarBackupServidorNow: restaurarBackupServidorNow,
 
   status: function () {
     return {
