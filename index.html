@@ -79,7 +79,7 @@ document.addEventListener('DOMContentLoaded',function(){
 <div class="pg on" id="pg-dash">
   <div class="ph"><div class="ph-t">📊 Dashboard</div><span class="tm" id="dash-dt"></span></div>
   <div class="pb">
-<div class="fr" style="margin-bottom:12px;"><button class="btn bb sm" type="button" onclick="exportarBackup()">💾 Fazer Backup</button><button class="btn bh sm" type="button" onclick="document.getElementById('restore-file').click()">📂 Restaurar Backup</button><input id="restore-file" type="file" accept=".json,application/json" style="display:none" onchange="restaurarBackupArquivo(event)"></div>
+<div class="fr" style="margin-bottom:12px;"><button class="btn bb sm" type="button" onclick="exportarBackup()">💾 Fazer Backup</button><button class="btn bh sm" type="button" onclick="document.getElementById('restore-file').click()">📂 Restaurar Backup</button><button class="btn bo sm" type="button" onclick="restaurarBackupPlanilhaEscolhida()">☁️ Restaurar planilha do Drive</button><input id="restore-file" type="file" accept=".json,application/json" style="display:none" onchange="restaurarBackupArquivo(event)"></div>
     <div class="stats" id="d-stats"></div>
     <div class="g2">
       <div class="card"><div class="ct">💸 Últimas Vendas</div><div id="d-uv"></div></div>
@@ -544,6 +544,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="fr" style="flex-wrap:wrap;gap:8px;">
         <button class="btn bb sm" type="button" onclick="exportarBackup()">💾 Fazer Backup</button>
         <button class="btn bh sm" type="button" onclick="document.getElementById('restore-file').click()">📂 Restaurar Backup</button>
+        <button class="btn bo sm" type="button" onclick="restaurarBackupPlanilhaEscolhida()">☁️ Restaurar planilha do Drive</button>
         <input id="restore-file" type="file" accept=".json,application/json" style="display:none" onchange="restaurarBackupArquivo(event)">
       </div>
       <div class="tm" style="margin-top:8px;">Use o backup para salvar e restaurar os dados do sistema.</div>
@@ -1334,9 +1335,10 @@ document.addEventListener('DOMContentLoaded',function(){
         <div class="fr" style="flex-wrap:wrap;gap:8px;">
           <button class="btn bb sm" onclick="syncNow()">🔄 Sincronizar agora</button>
           <button class="btn bg2 sm" onclick="backupNowServidor()">☁️ Backup servidor (Google Drive)</button>
-          <button class="btn bo sm" onclick="restaurarUltimoBackupServidor()">♻️ Restaurar último backup do servidor</button>
+          <button class="btn bo sm" onclick="restaurarBackupPlanilhaEscolhida()">☁️ Restaurar planilha escolhida</button>
+          <button class="btn bh sm" onclick="restaurarUltimoBackupServidor()">♻️ Restaurar último backup do servidor</button>
         </div>
-        <div class="tm" style="margin-top:8px;">Sincronização automática a cada 2 minutos. Use a restauração do backup somente em emergência.</div>
+        <div class="tm" style="margin-top:8px;">Sincronização automática a cada 2 minutos. Para restaurar, prefira “Restaurar planilha escolhida”.</div>
       </div>
     </div>
   </div>
@@ -2286,6 +2288,20 @@ document.addEventListener('DOMContentLoaded',function(){
     var ov = el('ov-sync');
     if(ov) ov.classList.remove('on');
   };
+
+  window.restaurarBackupPlanilhaEscolhida = async function(){
+    try{
+      if(!window.BelaSheetsSync || typeof window.BelaSheetsSync.escolherPlanilhaRestauracao !== 'function'){
+        throw new Error('Função escolherPlanilhaRestauracao não encontrada. Verifique o sheets-sync.js atualizado.');
+      }
+      return await window.BelaSheetsSync.escolherPlanilhaRestauracao();
+    }catch(e){
+      console.error('Erro ao abrir seletor de planilhas:', e);
+      toastWarn('❌ Erro ao abrir seletor de planilhas: ' + (e && e.message ? e.message : e));
+      return false;
+    }
+  };
+
 
   var syncOriginal = window.syncNow;
   window.syncNow = async function(){
