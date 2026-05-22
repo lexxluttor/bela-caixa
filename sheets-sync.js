@@ -544,6 +544,126 @@ localStorage.setItem = function (k, v) {
   }
 };
 
+
+/* ================= RESTORE POR PLANILHA ================= */
+
+async function listarPlanilhasBackup() {
+  const r = await fetch(API_URL + "?action=listarPlanilhasBackup");
+  const json = await r.json();
+
+  if (!json.ok) {
+    throw new Error(json.error || "Erro ao listar planilhas");
+  }
+
+  return json.arquivos || [];
+}
+
+async function restaurarPlanilhaPorId(id) {
+  if (!id) {
+    alert("ID da planilha não informado.");
+    return false;
+  }
+
+  if (restoreEmAndamento || syncEmAndamento) {
+    alert("Sistema ocupado. Tente novamente em alguns segundos.");
+    return false;
+  }
+
+  restoreEmAndamento = true;
+
+  try {
+    const r = await fetch(
+      API_URL + "?action=getAllFromSpreadsheet&id=" + encodeURIComponent(id)
+    );
+
+    const dados = await r.json();
+
+    if (!dados.ok) {
+      throw new Error(dados.error || "Falha ao restaurar planilha");
+    }
+
+    ignorarHook = true;
+
+    salvarLocal("clientes", (dados.clientes || []).map(normalizarClienteRestauracao));
+    salvarLocal("produtos", (dados.produtos || []).map(normalizarProdutoRestauracao));
+    salvarLocal("vendas", (dados.vendas || []).map(normalizarVendaRestauracao));
+    salvarLocal("pagamentos", (dados.recebimentos || []).map(normalizarRecebimentoRestauracao));
+    salvarLocal("creditos", (dados.cobrancas || []).map(normalizarCobrancaRestauracao));
+
+    ignorarHook = false;
+
+    safeSetItem_("bm_last_restore", agoraISO());
+    safeSetItem_("bm_last_restore_source", dados.spreadsheetName || id);
+
+    ultimoHashEnviado = gerarHashSync();
+    ultimoErroSync = "";
+
+    alert("Backup restaurado com sucesso: " + (dados.spreadsheetName || "Planilha"));
+
+    location.reload();
+    return true;
+
+  } catch (e) {
+    ignorarHook = false;
+
+    console.error("Erro ao restaurar planilha escolhida:", e);
+
+    ultimoErroSync = String(e && e.message || e);
+    safeSetItem_("bm_last_restore_error", ultimoErroSync);
+
+    alert("Erro ao restaurar: " + ultimoErroSync);
+    return false;
+
+  } finally {
+    restoreEmAndamento = false;
+  }
+}
+
+async function escolherPlanilhaRestauracao() {
+  try {
+    const lista = await listarPlanilhasBackup();
+
+    if (!lista.length) {
+      alert("Nenhuma planilha de backup encontrada.");
+      return;
+    }
+
+    let texto = "Escolha uma planilha para restaurar:\\n\\n";
+
+    lista.forEach(function (p, i) {
+      texto += (i + 1) + " - " + p.nome + "\\n";
+    });
+
+    const escolha = prompt(texto + "\\nDigite o número da planilha:");
+
+    if (!escolha) return;
+
+    const idx = Number(escolha) - 1;
+
+    if (idx < 0 || idx >= lista.length) {
+      alert("Número inválido.");
+      return;
+    }
+
+    const planilha = lista[idx];
+
+    const confirmar = confirm(
+      "Restaurar dados da planilha:\\n\\n" +
+      planilha.nome +
+      "\\n\\nIsso substituirá os dados locais atuais do sistema."
+    );
+
+    if (!confirmar) return;
+
+    await restaurarPlanilhaPorId(planilha.id);
+
+  } catch (e) {
+    console.error("Erro ao listar planilhas:", e);
+    alert("Erro ao listar planilhas: " + (e && e.message || e));
+  }
+}
+
+
 /* ================= BACKUP SERVIDOR ================= */
 
 async function backupServerNow() {
@@ -576,6 +696,12 @@ window.BelaSheetsSync = {
 
   restoreNow: restoreNow,
 
+  escolherPlanilhaRestauracao: escolherPlanilhaRestauracao,
+
+  restaurarPlanilhaPorId: restaurarPlanilhaPorId,
+
+  listarPlanilhasBackup: listarPlanilhasBackup,
+
   backupServerNow: backupServerNow,
 
   status: function () {
@@ -586,6 +712,7 @@ window.BelaSheetsSync = {
       ultimoSync: localStorage.getItem("bm_last_sync"),
       origemUltimoSync: localStorage.getItem("bm_last_sync_origin"),
       ultimoRestore: localStorage.getItem("bm_last_restore"),
+      origemUltimoRestore: localStorage.getItem("bm_last_restore_source"),
       ultimoErroSync,
       ultimoMotivoSync
     };
