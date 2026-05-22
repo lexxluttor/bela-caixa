@@ -299,6 +299,10 @@ function aplicarPadraoFiscal(){
   if(document.getElementById('prod-unidade')) document.getElementById('prod-unidade').value = categoriaEhCalcado(cat) ? 'PAR' : 'UN';
   if(document.getElementById('prod-csosn')) document.getElementById('prod-csosn').value = '102';
   if(document.getElementById('prod-cfop')) document.getElementById('prod-cfop').value = '5102';
+  if(document.getElementById('prod-cst-pis')) document.getElementById('prod-cst-pis').value = '49';
+  if(document.getElementById('prod-aliq-pis')) document.getElementById('prod-aliq-pis').value = '0';
+  if(document.getElementById('prod-cst-cofins')) document.getElementById('prod-cst-cofins').value = '49';
+  if(document.getElementById('prod-aliq-cofins')) document.getElementById('prod-aliq-cofins').value = '0';
   if(document.getElementById('prod-escala')) document.getElementById('prod-escala').value = 'S';
   preencherNcmPorCategoria();
 }
@@ -1388,20 +1392,29 @@ function abrirMdProd(id){
     document.getElementById('prod-custo').value=p.custo!=null?p.custo:'';
     document.getElementById('prod-ean').value=(p.ean||'');
     document.getElementById('prod-ncm').value=p.ncm||'';
+    if(document.getElementById('prod-cest')) document.getElementById('prod-cest').value=p.cest||'';
     document.getElementById('prod-origem').value=p.origem||'0';
     document.getElementById('prod-unidade').value=p.unidade||(categoriaEhCalcado(p.subcategoria||p.subcat||p.cat||'')?'PAR':'UN');
     document.getElementById('prod-csosn').value=p.csosn||'102';
     document.getElementById('prod-cfop').value=p.cfop||'5102';
+    if(document.getElementById('prod-cst-pis')) document.getElementById('prod-cst-pis').value=p.cst_pis||p.cstPis||'49';
+    if(document.getElementById('prod-aliq-pis')) document.getElementById('prod-aliq-pis').value=p.aliq_pis!=null?p.aliq_pis:(p.aliqPis!=null?p.aliqPis:'0');
+    if(document.getElementById('prod-cst-cofins')) document.getElementById('prod-cst-cofins').value=p.cst_cofins||p.cstCofins||'49';
+    if(document.getElementById('prod-aliq-cofins')) document.getElementById('prod-aliq-cofins').value=p.aliq_cofins!=null?p.aliq_cofins:(p.aliqCofins!=null?p.aliqCofins:'0');
     document.getElementById('prod-escala').value=p.escala||'S';
     document.getElementById('prod-origem-estoque').value=p.origem_estoque||'manual_sem_xml';
   }else{
-    ['prod-cod','prod-nome','prod-preco','prod-desc2','prod-custo','prod-ean','prod-ncm'].forEach(function(i){document.getElementById(i).value='';});
+    ['prod-cod','prod-nome','prod-preco','prod-desc2','prod-custo','prod-ean','prod-ncm','prod-cest'].forEach(function(i){var el=document.getElementById(i); if(el) el.value='';});
     document.getElementById('prod-estq').value=0;
     preencherCategoriasProduto('ROUPAS', 'Vestido');
     document.getElementById('prod-origem').value='0';
     document.getElementById('prod-unidade').value='UN';
     document.getElementById('prod-csosn').value='102';
     document.getElementById('prod-cfop').value='5102';
+    if(document.getElementById('prod-cst-pis')) document.getElementById('prod-cst-pis').value='49';
+    if(document.getElementById('prod-aliq-pis')) document.getElementById('prod-aliq-pis').value='0';
+    if(document.getElementById('prod-cst-cofins')) document.getElementById('prod-cst-cofins').value='49';
+    if(document.getElementById('prod-aliq-cofins')) document.getElementById('prod-aliq-cofins').value='0';
     document.getElementById('prod-escala').value='S';
     document.getElementById('prod-origem-estoque').value='manual_sem_xml';
     aplicarPadraoFiscal();
@@ -1532,10 +1545,15 @@ function salvarProd(){
     custo:parseFloat(document.getElementById('prod-custo').value)||0,
     ean:eanFinal,
     ncm:document.getElementById('prod-ncm').value.trim(),
+    cest:(document.getElementById('prod-cest')?document.getElementById('prod-cest').value.trim():''),
     origem:document.getElementById('prod-origem').value,
     unidade:document.getElementById('prod-unidade').value,
     csosn:document.getElementById('prod-csosn').value.trim()||'102',
     cfop:document.getElementById('prod-cfop').value.trim()||'5102',
+    cst_pis:(document.getElementById('prod-cst-pis')?document.getElementById('prod-cst-pis').value.trim():'49')||'49',
+    aliq_pis:parseFloat((document.getElementById('prod-aliq-pis')||{}).value)||0,
+    cst_cofins:(document.getElementById('prod-cst-cofins')?document.getElementById('prod-cst-cofins').value.trim():'49')||'49',
+    aliq_cofins:parseFloat((document.getElementById('prod-aliq-cofins')||{}).value)||0,
     escala:document.getElementById('prod-escala').value,
     origem_estoque:origemEstoque,
     createdAt:atual.createdAt||nowLocalISO(),
