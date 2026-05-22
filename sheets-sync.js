@@ -570,8 +570,13 @@ init();
 /* ================= API GLOBAL ================= */
 
 window.BelaSheetsSync = {
+
   syncNow: function () {
     return syncNow("manual");
+  },
+
+  scheduleSync: function (motivo) {
+    return agendarSync(motivo || "manual");
   },
 
   restoreNow: restoreNow,
