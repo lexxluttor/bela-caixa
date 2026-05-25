@@ -1,36 +1,8 @@
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 const CATEGORIAS_PRINCIPAIS = ["CALÇADOS","ROUPAS","ACESSÓRIOS","OUTROS"];
 
 const SUBCATEGORIAS_POR_PRINCIPAL = {
-  "CALÇADOS": ["Tênis masculino","Tênis feminino","Chinelos","Sandálias","Botas","Sapatos","Sapatilhas"],
-  "ROUPAS": ["Camisa masculina","Camiseta masculina","Polo masculina","Calça masculina","Bermuda masculina","Jeans masculino","Jaqueta masculina","Blusa feminina","Camiseta feminina","Vestido","Saia","Calça feminina","Jeans feminino","Short feminino","Conjunto feminino","Jaqueta feminina","Calça moletom","Blusa moletom","Conjunto moletom"],
+  "CALÇADOS": ["Tênis masculino","Tênis feminino","Tênis infantil","Chinelos","Chinelo infantil","Sandálias","Sandália infantil","Botas","Sapatos","Sapatilhas","Calçados"],
+  "ROUPAS": ["Blusa masculina","Blusa feminina","Camisa masculina","Camiseta masculina","Camiseta feminina","Polo masculina","Vestido","Saia","Calça masculina","Calça feminina","Calça jeans masculina","Calça jeans feminina","Jeans masculino","Jeans feminino","Bermuda masculina","Short feminino","Jaqueta","Jaqueta masculina","Jaqueta feminina","Conjunto feminino","Conjunto masculino","Conjunto infantil","Calça moletom","Blusa moletom","Conjunto moletom masculino","Conjunto moletom feminino","Conjunto moletom infantil","Cueca","Calcinha","Sutiã/Top","Meias","Pijama"],
   "ACESSÓRIOS": ["Bolsas","Mochilas","Cintos","Carteiras","Bonés","Acessórios"],
   "OUTROS": ["Outros"]
 };
@@ -42,35 +14,52 @@ const CATEGORIAS_FISCAIS = CATEGORIAS_PRINCIPAIS.flatMap(function(grupo){
 const NCM_POR_CATEGORIA = {
   "Tênis masculino": "64041100",
   "Tênis feminino": "64041100",
-  "Chinelos": "64029990",
-  "Sandálias": "64029990",
-  "Botas": "64039190",
-  "Sapatos": "64035990",
+  "Tênis infantil": "64041100",
+  "Chinelos": "64022000",
+  "Chinelo infantil": "64022000",
+  "Sandálias": "64022000",
+  "Sandália infantil": "64022000",
+  "Botas": "64039990",
+  "Sapatos": "64039990",
   "Sapatilhas": "64029990",
-  "Camisa masculina": "61051000",
+  "Calçados": "64029990",
+  "Blusa masculina": "61091000",
+  "Blusa feminina": "61091000",
+  "Camisa masculina": "61091000",
   "Camiseta masculina": "61091000",
-  "Polo masculina": "61051000",
-  "Calça masculina": "62034200",
-  "Bermuda masculina": "62034300",
-  "Jeans masculino": "62034200",
-  "Jaqueta masculina": "62019300",
-  "Blusa feminina": "61062000",
   "Camiseta feminina": "61091000",
+  "Polo masculina": "61051000",
   "Vestido": "62044300",
   "Saia": "62045300",
+  "Calça masculina": "62034200",
   "Calça feminina": "62046200",
+  "Calça jeans masculina": "62034200",
+  "Calça jeans feminina": "62046200",
+  "Jeans masculino": "62034200",
   "Jeans feminino": "62046200",
-  "Short feminino": "62046300",
-  "Conjunto feminino": "61042300",
+  "Bermuda masculina": "62034200",
+  "Short feminino": "62046200",
+  "Jaqueta": "62029300",
+  "Jaqueta masculina": "62019300",
   "Jaqueta feminina": "62029300",
+  "Conjunto feminino": "61042300",
+  "Conjunto masculino": "61032300",
+  "Conjunto infantil": "61042300",
   "Calça moletom": "61046200",
   "Blusa moletom": "61102000",
-  "Conjunto moletom": "61042300",
-  "Bolsas": "42022210",
+  "Conjunto moletom masculino": "61102000",
+  "Conjunto moletom feminino": "61102000",
+  "Conjunto moletom infantil": "61102000",
+  "Cueca": "61071100",
+  "Calcinha": "61082200",
+  "Sutiã/Top": "62121000",
+  "Meias": "61159600",
+  "Pijama": "61083100",
+  "Bolsas": "42029200",
   "Mochilas": "42029200",
   "Cintos": "42033000",
-  "Carteiras": "42023100",
-  "Bonés": "65050000",
+  "Carteiras": "42023200",
+  "Bonés": "65050090",
   "Acessórios": "",
   "Outros": ""
 };
@@ -78,30 +67,47 @@ const NCM_POR_CATEGORIA = {
 const REF_POR_CATEGORIA = {
   "Tênis masculino": "TENM",
   "Tênis feminino": "TENF",
+  "Tênis infantil": "TENI",
   "Chinelos": "CHI",
+  "Chinelo infantil": "CHII",
   "Sandálias": "SAN",
+  "Sandália infantil": "SANI",
   "Botas": "BOT",
   "Sapatos": "SAP",
   "Sapatilhas": "SAT",
+  "Calçados": "CALC",
+  "Blusa masculina": "BLM",
+  "Blusa feminina": "BLU",
   "Camisa masculina": "CAM",
   "Camiseta masculina": "CMM",
-  "Polo masculina": "POL",
-  "Calça masculina": "CALM",
-  "Bermuda masculina": "BERM",
-  "Jeans masculino": "JEM",
-  "Jaqueta masculina": "JAM",
-  "Blusa feminina": "BLU",
   "Camiseta feminina": "CMF",
+  "Polo masculina": "POL",
   "Vestido": "VES",
   "Saia": "SAI",
+  "Calça masculina": "CALM",
   "Calça feminina": "CALF",
+  "Calça jeans masculina": "JEM",
+  "Calça jeans feminina": "JEF",
+  "Jeans masculino": "JEM",
   "Jeans feminino": "JEF",
+  "Bermuda masculina": "BERM",
   "Short feminino": "SHO",
-  "Conjunto feminino": "CON",
+  "Jaqueta": "JAQ",
+  "Jaqueta masculina": "JAM",
   "Jaqueta feminina": "JAF",
+  "Conjunto feminino": "CON",
+  "Conjunto masculino": "CONM",
+  "Conjunto infantil": "CONI",
   "Calça moletom": "MOLC",
   "Blusa moletom": "MOLB",
-  "Conjunto moletom": "MOLJ",
+  "Conjunto moletom masculino": "MOLM",
+  "Conjunto moletom feminino": "MOLF",
+  "Conjunto moletom infantil": "MOLI",
+  "Cueca": "CUE",
+  "Calcinha": "CALCIN",
+  "Sutiã/Top": "SUT",
+  "Meias": "MEI",
+  "Pijama": "PIJ",
   "Bolsas": "BOL",
   "Mochilas": "MOC",
   "Cintos": "CIN",
@@ -207,7 +213,43 @@ function atualizarCategoriaPrincipalProduto(){
 }
 
 function categoriaEhCalcado(cat){
-  return ["Tênis masculino","Tênis feminino","Chinelos","Sandálias","Botas","Sapatos","Sapatilhas"].indexOf(cat) >= 0;
+  return ["Tênis masculino","Tênis feminino","Tênis infantil","Chinelos","Chinelo infantil","Sandálias","Sandália infantil","Botas","Sapatos","Sapatilhas","Calçados"].indexOf(cat) >= 0;
+}
+
+function ncmValidoApp(ncm){
+  var s = String(ncm || '').replace(/\D/g, '');
+  return s.length === 8 && s !== '00000000';
+}
+
+function origemFiscalPorEstoqueApp(origemEstoque){
+  origemEstoque = String(origemEstoque || '').toLowerCase();
+  if(origemEstoque === 'xml_nfe' || origemEstoque === 'xml_entrada') return 'xml_entrada';
+  if(origemEstoque === 'automatico') return 'automatico';
+  return 'manual';
+}
+
+function resolverOrigemNcmProdutoApp(atual, ncmValor, ncmCategoria, origemEstoque){
+  var origemAtual = String((atual && (atual.ncm_origem || atual.origem_ncm || atual.origem_fiscal)) || '').toLowerCase();
+  var ncmAtual = String((atual && atual.ncm) || '').replace(/\D/g, '');
+  var ncmNovo = String(ncmValor || '').replace(/\D/g, '');
+
+  if(origemEstoque === 'xml_nfe' || origemEstoque === 'xml_entrada'){
+    return 'xml_entrada';
+  }
+
+  if(origemAtual === 'xml_entrada' && ncmValidoApp(ncmNovo) && ncmNovo === ncmAtual){
+    return 'xml_entrada';
+  }
+
+  if(ncmValidoApp(ncmNovo) && ncmCategoria && ncmNovo === String(ncmCategoria).replace(/\D/g, '')){
+    return 'automatico';
+  }
+
+  if(ncmValidoApp(ncmNovo)){
+    return 'manual';
+  }
+
+  return 'automatico';
 }
 
 function sugerirCategoriaPorNome(nome){
@@ -216,9 +258,12 @@ function sugerirCategoriaPorNome(nome){
     .replace(/\s+/g,' ').trim();
   if(!n) return '';
 
+  if(n.includes('tenis infantil')) return 'Tênis infantil';
   if(n.includes('tenis feminino')) return 'Tênis feminino';
   if(n.includes('tenis masculino')) return 'Tênis masculino';
+  if(n.includes('chinelo infantil')) return 'Chinelo infantil';
   if(n.includes('chinelo')) return 'Chinelos';
+  if(n.includes('sandalia infantil')) return 'Sandália infantil';
   if(n.includes('sandalia')) return 'Sandálias';
   if(n.includes('bota')) return 'Botas';
   if(n.includes('sapato')) return 'Sapatos';
@@ -230,9 +275,14 @@ function sugerirCategoriaPorNome(nome){
   if(n.includes('bone')) return 'Bonés';
   if(n.includes('vestido')) return 'Vestido';
   if(n.includes('saia')) return 'Saia';
-  if(n.includes('conjunto moletom') || (n.includes('conjunto') && n.includes('moletom'))) return 'Conjunto moletom';
+  if(n.includes('conjunto moletom infantil')) return 'Conjunto moletom infantil';
+  if(n.includes('conjunto moletom masculino')) return 'Conjunto moletom masculino';
+  if(n.includes('conjunto moletom feminino')) return 'Conjunto moletom feminino';
+  if(n.includes('conjunto moletom') || (n.includes('conjunto') && n.includes('moletom'))) return 'Conjunto moletom feminino';
   if(n.includes('blusa moletom') || n.includes('moletom canguru') || n.includes('moletom')) return 'Blusa moletom';
   if(n.includes('calca moletom')) return 'Calça moletom';
+  if(n.includes('blusa masculina')) return 'Blusa masculina';
+  if(n.includes('blusa feminina')) return 'Blusa feminina';
   if(n.includes('blusa')) return 'Blusa feminina';
   if(n.includes('camisa')) return 'Camisa masculina';
   if(n.includes('polo')) return 'Polo masculina';
@@ -273,7 +323,10 @@ function preencherNcmPorCategoria(){
   var atual = String(ncmEl.value || '').trim();
   if(atual) return;
   var ncm = NCM_POR_CATEGORIA[catEl.value] || '';
-  if(ncm) ncmEl.value = ncm;
+  if(ncm){
+    ncmEl.value = ncm;
+    ncmEl.dataset.ncmOrigem = 'automatico';
+  }
 }
 
 
@@ -287,8 +340,9 @@ function atualizarNCMAutomatico(){
 
   var ncmNovo = NCM_POR_CATEGORIA[subcategoria] || '';
 
-  if(ncmNovo){
+  if(ncmNovo && (!ncmValidoApp(ncmEl.value) || ncmEl.dataset.ncmOrigem === 'automatico')){
     ncmEl.value = ncmNovo;
+    ncmEl.dataset.ncmOrigem = 'automatico';
   }
 }
 
@@ -309,6 +363,7 @@ function aplicarPadraoFiscal(){
 
 function entradaManualSemXML(){
   aplicarPadraoFiscal();
+  if(document.getElementById('prod-ncm')) document.getElementById('prod-ncm').dataset.ncmOrigem='automatico';
   if(document.getElementById('prod-origem-estoque')) document.getElementById('prod-origem-estoque').value = 'manual_sem_xml';
 }
 
@@ -340,6 +395,15 @@ document.addEventListener('DOMContentLoaded', function(){
       atualizarCategoriaPrincipalProduto();
       preencherNcmPorCategoria();
       aplicarPadraoFiscal();
+    });
+  }
+  var ncmEl = document.getElementById('prod-ncm');
+  if(ncmEl){
+    ncmEl.addEventListener('input', function(){
+      ncmEl.dataset.ncmOrigem = 'manual';
+    });
+    ncmEl.addEventListener('change', function(){
+      ncmEl.dataset.ncmOrigem = 'manual';
     });
   }
   if(nomeEl){
@@ -1392,6 +1456,7 @@ function abrirMdProd(id){
     document.getElementById('prod-custo').value=p.custo!=null?p.custo:'';
     document.getElementById('prod-ean').value=(p.ean||'');
     document.getElementById('prod-ncm').value=p.ncm||'';
+    document.getElementById('prod-ncm').dataset.ncmOrigem=p.ncm_origem||p.origem_ncm||p.origem_fiscal||'';
     if(document.getElementById('prod-cest')) document.getElementById('prod-cest').value=p.cest||'';
     document.getElementById('prod-origem').value=p.origem||'0';
     document.getElementById('prod-unidade').value=p.unidade||(categoriaEhCalcado(p.subcategoria||p.subcat||p.cat||'')?'PAR':'UN');
@@ -1417,6 +1482,7 @@ function abrirMdProd(id){
     if(document.getElementById('prod-aliq-cofins')) document.getElementById('prod-aliq-cofins').value='0';
     document.getElementById('prod-escala').value='S';
     document.getElementById('prod-origem-estoque').value='manual_sem_xml';
+    if(document.getElementById('prod-ncm')) document.getElementById('prod-ncm').dataset.ncmOrigem='automatico';
     aplicarPadraoFiscal();
   }
   abrirMd('mo-prod');
@@ -1530,6 +1596,11 @@ function salvarProd(){
 
   var eanFinal=codigosFinais.join(',');
 
+  var ncmValor=document.getElementById('prod-ncm').value.trim();
+  var ncmCategoria=NCM_POR_CATEGORIA[categoria] || '';
+  var ncmOrigem=resolverOrigemNcmProdutoApp(atual, ncmValor, ncmCategoria, origemEstoque);
+  var origemFiscal=origemFiscalPorEstoqueApp(origemEstoque);
+
   var obj={
     id:id,
     cod:codFinal,
@@ -1544,7 +1615,7 @@ function salvarProd(){
     desc2:document.getElementById('prod-desc2').value,
     custo:parseFloat(document.getElementById('prod-custo').value)||0,
     ean:eanFinal,
-    ncm:document.getElementById('prod-ncm').value.trim(),
+    ncm:ncmValor,
     cest:(document.getElementById('prod-cest')?document.getElementById('prod-cest').value.trim():''),
     origem:document.getElementById('prod-origem').value,
     unidade:document.getElementById('prod-unidade').value,
@@ -1556,6 +1627,9 @@ function salvarProd(){
     aliq_cofins:parseFloat((document.getElementById('prod-aliq-cofins')||{}).value)||0,
     escala:document.getElementById('prod-escala').value,
     origem_estoque:origemEstoque,
+    origem_fiscal:origemFiscal,
+    ncm_origem:ncmOrigem,
+    origem_ncm:ncmOrigem,
     createdAt:atual.createdAt||nowLocalISO(),
     updatedAt:nowLocalISO()
   };
@@ -2046,7 +2120,7 @@ function aplicarCategoriasXMLTodos(){
     it.cat=sub;
     it.subcat=sub;
     it.subcategoria=sub;
-    if(!it.ncm && NCM_POR_CATEGORIA[sub]) it.ncm=NCM_POR_CATEGORIA[sub];
+    if(!ncmValidoApp(it.ncm) && NCM_POR_CATEGORIA[sub]){ it.ncm=NCM_POR_CATEGORIA[sub]; it.ncm_origem='automatico'; }
   });
   renderPreviewImportacaoXML();
   toast('✅ Categoria aplicada para todos os itens!','ok');
@@ -2060,7 +2134,7 @@ function alterarCategoriaXML(idx, grupo){
   it.cat=sub;
   it.subcat=sub;
   it.subcategoria=sub;
-  if(NCM_POR_CATEGORIA[sub]) it.ncm=NCM_POR_CATEGORIA[sub];
+  if(!ncmValidoApp(it.ncm) && NCM_POR_CATEGORIA[sub]){ it.ncm=NCM_POR_CATEGORIA[sub]; it.ncm_origem='automatico'; }
   renderPreviewImportacaoXML();
 }
 function alterarSubcategoriaXML(idx, sub){
@@ -2071,7 +2145,7 @@ function alterarSubcategoriaXML(idx, sub){
   it.cat=sub;
   it.subcat=sub;
   it.subcategoria=sub;
-  if(NCM_POR_CATEGORIA[sub]) it.ncm=NCM_POR_CATEGORIA[sub];
+  if(!ncmValidoApp(it.ncm) && NCM_POR_CATEGORIA[sub]){ it.ncm=NCM_POR_CATEGORIA[sub]; it.ncm_origem='automatico'; }
 }
 function limparImportacaoXML(){
   importacaoXMLAtual=null;
@@ -2151,6 +2225,8 @@ function lerArquivoXML(ev){
           nomeBase:nomeBase,
           ean: ean,
           ncm: ncm || NCM_POR_CATEGORIA[subcat] || '',
+          ncm_origem: ncmValidoApp(ncm) ? 'xml_entrada' : 'automatico',
+          origem_fiscal: 'xml_entrada',
           qtd: q,
           custo: custo,
           precoVenda: precoVenda,
@@ -2240,7 +2316,7 @@ function confirmarImportacaoXML(){
       var p = produtos[idx];
       p.estq = Number(p.estq||0) + Number(it.qtd||0);
       if(it.custo) p.custo = it.custo;
-      if(it.ncm) p.ncm = it.ncm;
+      if(it.ncm){ p.ncm = it.ncm; p.ncm_origem = it.ncm_origem || 'xml_entrada'; p.origem_ncm = p.ncm_origem; }
       if(it.ean){ var listaMerge=extrairCodigosBarras((p.ean||'')+','+it.ean); p.ean = listaMerge.join(','); }
       if(it.desc2) p.desc2 = it.desc2;
       if(Number(it.precoVenda||0) > 0) p.preco = Number(it.precoVenda||0);
@@ -2256,6 +2332,11 @@ function confirmarImportacaoXML(){
       p.cfop = p.cfop || '5102';
       p.escala = p.escala || 'S';
       p.origem_estoque = 'xml_nfe';
+      p.origem_fiscal = 'xml_entrada';
+      p.cst_pis = p.cst_pis || '49';
+      p.aliq_pis = p.aliq_pis || 0;
+      p.cst_cofins = p.cst_cofins || '49';
+      p.aliq_cofins = p.aliq_cofins || 0;
       p.updatedAt = agora;
       produtos[idx] = p;
     }else{
@@ -2273,10 +2354,17 @@ function confirmarImportacaoXML(){
         custo: Number(it.custo||0),
         ean: it.ean || it.codigo_barras || it.codBarras || it.codigoDeBarras || '',
         ncm: it.ncm || (NCM_POR_CATEGORIA[it.subcategoria || it.subcat || it.cat || ''] || ''),
+        ncm_origem: it.ncm_origem || (ncmValidoApp(it.ncm) ? 'xml_entrada' : 'automatico'),
+        origem_ncm: it.ncm_origem || (ncmValidoApp(it.ncm) ? 'xml_entrada' : 'automatico'),
+        origem_fiscal: 'xml_entrada',
         origem: '0',
         unidade: categoriaEhCalcado(it.subcategoria || it.subcat || it.cat || '') ? 'PAR' : 'UN',
         csosn: '102',
         cfop: '5102',
+        cst_pis: '49',
+        aliq_pis: 0,
+        cst_cofins: '49',
+        aliq_cofins: 0,
         escala: 'S',
         origem_estoque: 'xml_nfe',
         createdAt: agora,
