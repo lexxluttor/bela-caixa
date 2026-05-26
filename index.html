@@ -2215,6 +2215,113 @@ document.addEventListener('DOMContentLoaded',function(){
     }
   };
 
+
+  function salvarCancelamentoNota(vid, data, motivo){
+    var vendas = DB.get('vendas') || [];
+    var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
+    if(idx < 0) return;
+
+    vendas[idx].nfce_cancelamento = {
+      solicitado: true,
+      cancelado: !!(data && data.cancelado),
+      transmitido: !!(data && data.transmitido),
+      pendente_habilitacao: !!(data && data.pendente_habilitacao),
+      pendente_configuracao: !!(data && data.pendente_configuracao),
+      cStat: (data && data.cStat) || '',
+      xMotivo: (data && data.xMotivo) || '',
+      nProt: (data && data.nProt) || '',
+      dhRegEvento: (data && data.dhRegEvento) || '',
+      motivo: motivo || '',
+      atualizadoEm: new Date().toISOString()
+    };
+
+    if(data && data.cancelado){
+      vendas[idx].nfce_status = 'cancelada';
+      vendas[idx].status_nfce = 'cancelada';
+    }else if(data && data.transmitido){
+      vendas[idx].nfce_status = 'cancelamento_rejeitado_ou_pendente';
+      vendas[idx].status_nfce = 'cancelamento_rejeitado_ou_pendente';
+    }else{
+      vendas[idx].nfce_status = vendas[idx].nfce_status || 'emitida_homologacao';
+    }
+
+    vendas[idx].updatedAt = new Date().toISOString();
+    DB.set('vendas', vendas);
+  }
+
+  window.cancelarNfceCaixa = async function(vid){
+    try{
+      var venda = acharVenda(vid);
+      if(!venda){
+        if(typeof toast==='function') toast('⚠️ Venda não encontrada!');
+        return;
+      }
+
+      var status = String(venda.nfce_status || venda.status_nfce || '').toLowerCase();
+      if(status.indexOf('cancel') >= 0){
+        if(typeof toast==='function') toast('⚠️ Essa NFC-e já consta como cancelada ou em cancelamento.');
+        return;
+      }
+
+      if(!(venda.nfce_numero || venda.nfce_chave || venda.nfce_xml_url || venda.nfce_pdf_url)){
+        if(typeof toast==='function') toast('⚠️ Essa venda ainda não possui NFC-e para cancelar.');
+        return;
+      }
+
+      var motivo = prompt('Informe o motivo do cancelamento da NFC-e.\nMínimo 15 caracteres.', 'Cancelamento solicitado pelo cliente');
+      if(motivo === null) return;
+      motivo = String(motivo || '').trim();
+
+      if(motivo.length < 15 || motivo.length > 255){
+        if(typeof toast==='function') toast('⚠️ O motivo precisa ter entre 15 e 255 caracteres.');
+        return;
+      }
+
+      if(!confirm('Confirma o cancelamento da NFC-e desta venda?')){
+        return;
+      }
+
+      var base = apiBase();
+      if(typeof toast==='function') toast('⏳ Solicitando cancelamento da NFC-e...');
+
+      var resp = await fetch(base + '/nfce/' + encodeURIComponent(venda.id) + '/cancelar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivo: motivo })
+      });
+
+      var data;
+      try{
+        data = await resp.json();
+      }catch(e){
+        throw new Error('Resposta inválida da API.');
+      }
+
+      if(!resp.ok || !data){
+        throw new Error((data && (data.error || data.xMotivo)) || 'Falha ao cancelar NFC-e.');
+      }
+
+      salvarCancelamentoNota(vid, data, motivo);
+
+      try{ renderCaixa(); }catch(e){}
+      try{ renderVendas(); }catch(e){}
+      try{ renderDash(); }catch(e){}
+
+      if(data.cancelado){
+        if(typeof toast==='function') toast('✅ NFC-e cancelada com sucesso!','ok');
+      }else if(data.pendente_habilitacao){
+        if(typeof toast==='function') toast('⚠️ Cancelamento preparado, mas SEFAZ ainda está bloqueada no servidor.');
+      }else if(data.pendente_configuracao){
+        if(typeof toast==='function') toast('⚠️ Falta configurar a URL de evento da SEFAZ no Render.');
+      }else{
+        if(typeof toast==='function') toast('⚠️ Retorno: ' + (data.xMotivo || data.error || 'cancelamento não autorizado.'));
+      }
+    }catch(err){
+      if(typeof toast==='function') toast('❌ ' + (err.message || 'Erro ao cancelar NFC-e.'));
+    }
+  };
+
+
   window.abrirNotaPdf = function(vid){
     var venda = acharVenda(vid);
     if(!venda || !venda.nfce_pdf_url){
