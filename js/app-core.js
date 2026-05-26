@@ -3090,7 +3090,12 @@ function renderCaixa(){
       if(vx.nfce_xml_url){
         btns+='<button class="btn bo xs" onclick="abrirNotaXml(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Abrir XML da nota">XML</button>';
       }
-      btns+='<button class="btn bd2 xs" onclick="pedirSenhaECancelar(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Cancelar">🚫</button>';
+      var nfceStatus=String(vx.nfce_status||'').toLowerCase();
+      var temNfce=!!(vx.nfce_numero||vx.nfce_chave||vx.nfce_xml_url||vx.nfce_pdf_url);
+      if(temNfce && nfceStatus.indexOf('cancel')<0){
+        btns+='<button class="btn bd2 xs nfce-cancel-btn" onclick="cancelarNfceCaixa(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Cancelar NFC-e na SEFAZ">NFC-e 🚫</button>';
+      }
+      btns+='<button class="btn bd2 xs" onclick="pedirSenhaECancelar(\''+m.sid+'\')" style="padding:4px 8px;font-size:12px;" title="Cancelar venda no caixa">🚫</button>';
       btns+='<button class="btn bh xs" onclick="reimprimirMovCaixa(\''+m.sid+'\',\''+m.tipo+'\')" style="padding:4px 8px;font-size:12px;" title="Reimprimir comprovante">🖨️</button>';
       btns+='<button class="btn bo xs" onclick="reenviarMovWhatsappCaixa(\''+m.sid+'\',\''+m.tipo+'\')" style="padding:4px 8px;font-size:12px;" title="Reenviar no WhatsApp">📱</button>';
     }
