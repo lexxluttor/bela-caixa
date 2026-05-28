@@ -3023,6 +3023,52 @@ function renderCrediario(){
   tb.innerHTML=rows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2);">Nenhum cliente com crediário em aberto 🎉</td></tr>';
 }
 
+
+// ================= STATUS VISUAL NFC-E =================
+function nfceStatusInfo(v){
+  v = v || {};
+  var raw = String(v.nfce_status || v.status_nfce || v.statusNfce || '').toLowerCase();
+  var cancel = v.nfce_cancelamento || v.cancelamento || {};
+  var cStat = String(v.nfce_cstat || v.cStat || (cancel && cancel.cStat) || '').trim();
+  var motivo = String(v.nfce_xmotivo || v.xMotivo || (cancel && cancel.xMotivo) || '').trim();
+  var prot = String(v.nfce_protocolo || v.protocolo || v.nProt || (cancel && (cancel.nProt || cancel.nProtCancelamento)) || '').trim();
+  var temNota = !!(v.nfce_numero || v.nfce_chave || v.nfce_xml_url || v.nfce_pdf_url || raw || cStat || prot);
+
+  if(!temNota){
+    return {classe:'sem', label:'SEM NFC-e', icone:'⚪', cor:'var(--txt2)', detalhe:''};
+  }
+
+  if(raw.indexOf('cancel') >= 0 || (cancel && cancel.cancelado) || cStat === '135' || cStat === '155'){
+    return {classe:'cancelada', label:'CANCELADA', icone:'⚫', cor:'var(--txt2)', detalhe: prot ? 'Prot. cancelamento: '+prot : motivo};
+  }
+
+  if(raw.indexOf('rejeit') >= 0 || raw.indexOf('erro') >= 0 || raw.indexOf('falha') >= 0){
+    return {classe:'rejeitada', label:'REJEITADA', icone:'🔴', cor:'var(--red2)', detalhe: motivo || (cStat ? 'SEFAZ '+cStat : '')};
+  }
+
+  if(raw.indexOf('autoriz') >= 0 || cStat === '100' || prot){
+    return {classe:'autorizada', label:'AUTORIZADA', icone:'🟢', cor:'var(--green)', detalhe: prot ? 'Protocolo: '+prot : ''};
+  }
+
+  if(raw.indexOf('pend') >= 0 || raw.indexOf('homolog') >= 0 || raw.indexOf('emitida') >= 0 || temNota){
+    return {classe:'pendente', label:'PENDENTE', icone:'🟡', cor:'var(--gold)', detalhe: motivo || 'Aguardando autorização SEFAZ'};
+  }
+
+  return {classe:'pendente', label:'PENDENTE', icone:'🟡', cor:'var(--gold)', detalhe: motivo || ''};
+}
+
+function nfceBadgeHTML(v, compacto){
+  var s = nfceStatusInfo(v);
+  if(s.classe === 'sem' && compacto) return '';
+  var detalhe = s.detalhe ? '<span style="font-size:10px;color:var(--txt2);margin-left:4px;">'+s.detalhe+'</span>' : '';
+  return '<div class="nfce-status-line" title="'+(s.detalhe||s.label).replace(/"/g,'&quot;')+'" style="margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">'+
+    '<span class="nfce-badge nfce-'+s.classe+'" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:900;padding:2px 6px;border-radius:999px;border:1px solid var(--bdr);color:'+s.cor+';background:rgba(255,255,255,.55);">'+
+      s.icone+' '+s.label+
+    '</span>'+
+    detalhe+
+  '</div>';
+}
+
 function renderCaixa(){
   var data=document.getElementById('cx-d').value; if(!data)return;
   var vendas=DB.get('vendas').filter(function(v){return v.data.startsWith(data);});
@@ -3112,6 +3158,7 @@ function renderCaixa(){
         '<span style="color:var(--txt2);font-size:12px;">'+
           new Date(m.d).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · '+FF(m.f)+
         '</span>'+
+        (m.tipo==='venda'?nfceBadgeHTML((DB.get('vendas')||[]).find(function(v){return String(v.id)===String(m.sid);})||{}, true):'')+
       '</div>'+
       '<span style="font-weight:800;color:'+cor+';font-size:15px;flex-shrink:0;">'+R(m.val)+'</span>'+
       btns+
@@ -3746,7 +3793,7 @@ function renderVendas(){
     if(itensResumo.length>40) itensResumo=itensResumo.substr(0,40)+'...';
     return '<tr>'+
       '<td>'+FDT(v.data)+'</td>'+
-      '<td><b>'+v.cliNome+'</b></td>'+
+      '<td><b>'+v.cliNome+'</b>'+nfceBadgeHTML(v, false)+'</td>'+
       '<td style="font-size:12px;color:var(--txt2);">'+itensResumo+'</td>'+
       '<td>'+FF(v.forma)+'</td>'+
       '<td style="font-weight:800;color:var(--red2);">'+R(v.total)+'</td>'+
