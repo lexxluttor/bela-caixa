@@ -3060,9 +3060,28 @@ function nfceStatusInfo(v){
 function nfceBadgeHTML(v, compacto){
   var s = nfceStatusInfo(v);
   if(s.classe === 'sem' && compacto) return '';
-  var detalhe = s.detalhe ? '<span style="font-size:10px;color:var(--txt2);margin-left:4px;">'+s.detalhe+'</span>' : '';
-  return '<div class="nfce-status-line" title="'+(s.detalhe||s.label).replace(/"/g,'&quot;')+'" style="margin-top:3px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">'+
-    '<span class="nfce-badge nfce-'+s.classe+'" style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:900;padding:2px 6px;border-radius:999px;border:1px solid var(--bdr);color:'+s.cor+';background:rgba(255,255,255,.55);">'+
+
+  var title = (s.detalhe || s.label || '').replace(/"/g,'&quot;');
+
+  // No Caixa usamos versão pequena para não quebrar o layout.
+  if(compacto){
+    return '<span class="nfce-badge-mini nfce-'+s.classe+'" title="'+title+'" '+
+      'style="display:inline-flex;align-items:center;gap:3px;margin-left:6px;vertical-align:middle;'+
+      'font-size:9px;font-weight:900;line-height:1;padding:3px 6px;border-radius:999px;'+
+      'border:1px solid var(--bdr);color:'+s.cor+';background:rgba(255,255,255,.75);white-space:nowrap;">'+
+      s.icone+' '+s.label+
+    '</span>';
+  }
+
+  // Em telas largas pode mostrar o detalhe.
+  var detalhe = s.detalhe
+    ? '<div style="font-size:10px;color:var(--txt2);margin-top:2px;max-width:220px;white-space:normal;">'+s.detalhe+'</div>'
+    : '';
+
+  return '<div class="nfce-status-line" title="'+title+'" style="margin-top:4px;display:block;">'+
+    '<span class="nfce-badge nfce-'+s.classe+'" style="display:inline-flex;align-items:center;gap:4px;'+
+      'font-size:10px;font-weight:900;line-height:1;padding:3px 7px;border-radius:999px;'+
+      'border:1px solid var(--bdr);color:'+s.cor+';background:rgba(255,255,255,.7);white-space:nowrap;">'+
       s.icone+' '+s.label+
     '</span>'+
     detalhe+
@@ -3157,8 +3176,8 @@ function renderCaixa(){
         '<b style="font-size:14px;">'+m.desc+'</b><br>'+
         '<span style="color:var(--txt2);font-size:12px;">'+
           new Date(m.d).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})+' · '+FF(m.f)+
+          (m.tipo==='venda'?nfceBadgeHTML((DB.get('vendas')||[]).find(function(v){return String(v.id)===String(m.sid);})||{}, true):'')+
         '</span>'+
-        (m.tipo==='venda'?nfceBadgeHTML((DB.get('vendas')||[]).find(function(v){return String(v.id)===String(m.sid);})||{}, true):'')+
       '</div>'+
       '<span style="font-weight:800;color:'+cor+';font-size:15px;flex-shrink:0;">'+R(m.val)+'</span>'+
       btns+
