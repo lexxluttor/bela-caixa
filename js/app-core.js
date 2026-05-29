@@ -826,7 +826,7 @@ function ir(pg){
   if(pg==='clientes')renderClis();
   if(pg==='produtos')renderProds();
   if(pg==='balanco')initBalancoReal();
-  if(pg==='caixa'){renderCaixa(); setTimeout(realocarBotaoNfcePendentesCaixa, 50); setTimeout(realocarBotoesBackupFiscalCaixa, 80);}
+  if(pg==='caixa'){renderCaixa(); setTimeout(realocarBotaoNfcePendentesCaixa, 50);}
   if(pg==='crediario')renderCrediario();
   if(pg==='vendas'){setTimeout(renderVendas,50);}
   if(pg==='config')initConfig();
@@ -3158,21 +3158,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
 // ================= BACKUP FISCAL NO CORE =================
 function obterAppsScriptUrlFiscal_(){
-  try{
-    var s = window.BelaSheetsSync || {};
-    var candidatos = [
-      s.url, s.URL, s.webAppUrl, s.WEB_APP_URL, s.scriptUrl, s.SCRIPT_URL,
-      window.BELA_SHEETS_URL, window.SHEETS_URL, window.APPS_SCRIPT_URL,
-      localStorage.getItem('bm_sheets_url'),
-      localStorage.getItem('sheets_url'),
-      localStorage.getItem('apps_script_url')
-    ];
-    for(var i=0;i<candidatos.length;i++){
-      var u=String(candidatos[i]||'').trim();
-      if(u && /^https?:\/\//i.test(u)) return u;
-    }
-  }catch(e){}
-  return '';
+  return String(window.APPS_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbxvE2DpOpZDW1bZOvatqdN0HjSOXI3gvFdGPSj7qeUb6NF2V-K18-5tpil1KGW4O1lB/exec").trim();
 }
 
 function chamarAppsScriptFiscal_(action, params){
@@ -3313,8 +3299,55 @@ function realocarBotoesBackupFiscalCaixa(){
   }
 }
 
+
+
+// ================= BOTÕES BACKUP FISCAL NA ÁREA DE BACKUPS =================
+function inserirBotoesBackupFiscalNaAreaBackup(){
+  var ids = ['btn-backup-fiscal-config','btn-restaurar-fiscal-config'];
+  if(document.getElementById(ids[0]) && document.getElementById(ids[1])) return;
+
+  var candidatos = Array.prototype.slice.call(document.querySelectorAll('button, a, .btn'));
+  var ref = candidatos.find(function(el){
+    var txt = String(el.textContent || el.innerText || '').toLowerCase();
+    return (txt.indexOf('backup') >= 0 || txt.indexOf('restaur') >= 0) &&
+           txt.indexOf('fiscal') < 0;
+  });
+
+  if(!ref) return;
+
+  var container = ref.parentElement || document.body;
+
+  var wrap = document.getElementById('box-backup-fiscal-config');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'box-backup-fiscal-config';
+    wrap.style.marginTop = '10px';
+    wrap.style.display = 'flex';
+    wrap.style.gap = '8px';
+    wrap.style.flexWrap = 'wrap';
+  }
+
+  function mk(id, txt, cls, fn){
+    var b = document.getElementById(id);
+    if(!b){
+      b = document.createElement('button');
+      b.type = 'button';
+      b.id = id;
+      b.innerHTML = txt;
+      b.onclick = fn;
+    }
+    b.className = cls || 'btn';
+    return b;
+  }
+
+  wrap.appendChild(mk('btn-backup-fiscal-config','🧾 Backup Fiscal','btn bg', backupFiscalAgoraCore));
+  wrap.appendChild(mk('btn-restaurar-fiscal-config','♻️ Restaurar Fiscal','btn bo', restaurarBackupFiscalCore));
+
+  container.appendChild(wrap);
+}
+
 document.addEventListener('DOMContentLoaded', function(){
-  setTimeout(realocarBotoesBackupFiscalCaixa, 700);
+  setTimeout(inserirBotoesBackupFiscalNaAreaBackup, 800);
 });
 
 function renderCaixa(){
@@ -3413,7 +3446,7 @@ function renderCaixa(){
     '</div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt2)">Sem movimentações</div>';
   setTimeout(realocarBotaoNfcePendentesCaixa, 50);
-  setTimeout(realocarBotoesBackupFiscalCaixa, 80);
+ 
 }
 
 
