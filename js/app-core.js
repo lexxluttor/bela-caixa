@@ -826,7 +826,7 @@ function ir(pg){
   if(pg==='clientes')renderClis();
   if(pg==='produtos')renderProds();
   if(pg==='balanco')initBalancoReal();
-  if(pg==='caixa'){renderCaixa(); setTimeout(realocarBotaoNfcePendentesCaixa, 50);}
+  if(pg==='caixa'){renderCaixa(); setTimeout(realocarBotaoNfcePendentesCaixa, 50); setTimeout(realocarBotoesBackupFiscalCaixa, 80);}
   if(pg==='crediario')renderCrediario();
   if(pg==='vendas'){setTimeout(renderVendas,50);}
   if(pg==='config')initConfig();
@@ -3155,6 +3155,168 @@ document.addEventListener('DOMContentLoaded', function(){
   setTimeout(realocarBotaoNfcePendentesCaixa, 500);
 });
 
+
+// ================= BACKUP FISCAL NO CORE =================
+function obterAppsScriptUrlFiscal_(){
+  try{
+    var s = window.BelaSheetsSync || {};
+    var candidatos = [
+      s.url, s.URL, s.webAppUrl, s.WEB_APP_URL, s.scriptUrl, s.SCRIPT_URL,
+      window.BELA_SHEETS_URL, window.SHEETS_URL, window.APPS_SCRIPT_URL,
+      localStorage.getItem('bm_sheets_url'),
+      localStorage.getItem('sheets_url'),
+      localStorage.getItem('apps_script_url')
+    ];
+    for(var i=0;i<candidatos.length;i++){
+      var u=String(candidatos[i]||'').trim();
+      if(u && /^https?:\/\//i.test(u)) return u;
+    }
+  }catch(e){}
+  return '';
+}
+
+function chamarAppsScriptFiscal_(action, params){
+  var url = obterAppsScriptUrlFiscal_();
+  if(!url){
+    if(typeof toast==='function') toast('⚠️ URL do Apps Script não encontrada.');
+    else alert('URL do Apps Script não encontrada.');
+    return Promise.reject(new Error('URL do Apps Script não encontrada'));
+  }
+
+  params = params || {};
+  params.action = action;
+
+  var qs = Object.keys(params).map(function(k){
+    return encodeURIComponent(k)+'='+encodeURIComponent(params[k]);
+  }).join('&');
+
+  return fetch(url + (url.indexOf('?')>=0 ? '&' : '?') + qs, {
+    method:'GET',
+    cache:'no-store'
+  }).then(function(r){
+    return r.json();
+  });
+}
+
+function backupFiscalAgoraCore(){
+  if(!confirm('Gerar backup da planilha fiscal agora?\n\nSerá criada uma cópia da planilha fiscal no Google Drive.')) return;
+
+  if(typeof toast==='function') toast('⏳ Gerando backup fiscal...','info');
+
+  return chamarAppsScriptFiscal_('backupFiscalAgora').then(function(r){
+    if(!r || !r.ok){
+      throw new Error((r && r.error) || 'Falha ao criar backup fiscal.');
+    }
+
+    var msg = '✅ Backup fiscal criado!';
+    if(r.nome) msg += '\n\n' + r.nome;
+    if(r.url) msg += '\n\n' + r.url;
+
+    if(typeof toast==='function') toast('✅ Backup fiscal criado!','ok');
+    alert(msg);
+    return r;
+  }).catch(function(e){
+    if(typeof toast==='function') toast('❌ Erro no backup fiscal.');
+    alert('Erro no backup fiscal:\n' + e.message);
+  });
+}
+
+function restaurarBackupFiscalCore(){
+  if(!confirm('Restaurar o ÚLTIMO backup fiscal?\n\nAtenção: isso vai substituir as abas fiscais atuais: NFC-e, XML, configurações e cancelamentos.')) return;
+  if(!confirm('Confirma mesmo a restauração fiscal?\n\nUse somente se precisar voltar um backup fiscal.')) return;
+
+  if(typeof pedirSenha === 'function'){
+    pedirSenha(function(){ executarRestauracaoBackupFiscalCore_(); });
+  }else{
+    executarRestauracaoBackupFiscalCore_();
+  }
+}
+
+function executarRestauracaoBackupFiscalCore_(){
+  if(typeof toast==='function') toast('⏳ Restaurando backup fiscal...','info');
+
+  return chamarAppsScriptFiscal_('restaurarUltimoBackupFiscal').then(function(r){
+    if(!r || !r.ok){
+      throw new Error((r && r.error) || 'Falha ao restaurar backup fiscal.');
+    }
+
+    if(typeof toast==='function') toast('✅ Backup fiscal restaurado!','ok');
+    alert('✅ Backup fiscal restaurado com sucesso!\n\nOrigem: ' + (r.origemNome || r.backupName || 'último backup fiscal'));
+    return r;
+  }).catch(function(e){
+    if(typeof toast==='function') toast('❌ Erro ao restaurar fiscal.');
+    alert('Erro ao restaurar backup fiscal:\n' + e.message);
+  });
+}
+
+function realocarBotoesBackupFiscalCaixa(){
+  var cxData = document.getElementById('cx-d');
+  if(!cxData) return;
+
+  var container = cxData.closest('div') || cxData.parentElement;
+  while(container && container !== document.body){
+    var txt = String(container.textContent || '').toLowerCase();
+    if((txt.indexOf('fechar') >= 0 && txt.indexOf('imprimir') >= 0) || container.querySelector('button')){
+      break;
+    }
+    container = container.parentElement;
+  }
+  if(!container) container = cxData.parentElement || document.body;
+
+  function mkBtn(id, html, cls, fn, title){
+    var b = document.getElementById(id);
+    if(!b){
+      b = document.createElement('button');
+      b.type = 'button';
+      b.id = id;
+      b.innerHTML = html;
+      b.onclick = fn;
+      b.title = title || '';
+    }
+    b.className = cls || 'btn';
+    b.style.display = 'inline-flex';
+    b.style.alignItems = 'center';
+    b.style.justifyContent = 'center';
+    b.style.gap = '6px';
+    b.style.marginLeft = '8px';
+    b.style.whiteSpace = 'nowrap';
+    return b;
+  }
+
+  var btnBackup = mkBtn(
+    'btn-backup-fiscal-caixa',
+    '🧾 Backup Fiscal',
+    'btn bg btn-backup-fiscal-caixa',
+    backupFiscalAgoraCore,
+    'Criar backup da planilha fiscal'
+  );
+
+  var btnRestore = mkBtn(
+    'btn-restaurar-fiscal-caixa',
+    '♻️ Restaurar Fiscal',
+    'btn bo btn-restaurar-fiscal-caixa',
+    restaurarBackupFiscalCore,
+    'Restaurar último backup fiscal'
+  );
+
+  var botoes = Array.prototype.slice.call(container.querySelectorAll('button'));
+  var fechar = botoes.find(function(b){
+    return String(b.textContent || '').toLowerCase().indexOf('fechar') >= 0;
+  });
+
+  if(fechar && fechar.parentElement === container){
+    container.insertBefore(btnBackup, fechar);
+    container.insertBefore(btnRestore, fechar);
+  }else{
+    container.appendChild(btnBackup);
+    container.appendChild(btnRestore);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(realocarBotoesBackupFiscalCaixa, 700);
+});
+
 function renderCaixa(){
   var data=document.getElementById('cx-d').value; if(!data)return;
   var vendas=DB.get('vendas').filter(function(v){return v.data.startsWith(data);});
@@ -3251,6 +3413,7 @@ function renderCaixa(){
     '</div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt2)">Sem movimentações</div>';
   setTimeout(realocarBotaoNfcePendentesCaixa, 50);
+  setTimeout(realocarBotoesBackupFiscalCaixa, 80);
 }
 
 
