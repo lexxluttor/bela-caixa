@@ -826,7 +826,7 @@ function ir(pg){
   if(pg==='clientes')renderClis();
   if(pg==='produtos')renderProds();
   if(pg==='balanco')initBalancoReal();
-  if(pg==='caixa')renderCaixa();
+  if(pg==='caixa'){renderCaixa(); setTimeout(realocarBotaoNfcePendentesCaixa, 50);}
   if(pg==='crediario')renderCrediario();
   if(pg==='vendas'){setTimeout(renderVendas,50);}
   if(pg==='config')initConfig();
@@ -3088,6 +3088,73 @@ function nfceBadgeHTML(v, compacto){
   '</div>';
 }
 
+
+// ================= BOTÃO NFC-e PENDENTES NO CAIXA =================
+function encontrarBotaoNfcePendentes_(){
+  var candidatos = Array.prototype.slice.call(document.querySelectorAll('button, a, .btn'));
+  return candidatos.find(function(el){
+    var txt = String(el.textContent || el.innerText || '').toLowerCase();
+    return txt.indexOf('nfc') >= 0 && txt.indexOf('pend') >= 0;
+  }) || null;
+}
+
+function realocarBotaoNfcePendentesCaixa(){
+  var cxData = document.getElementById('cx-d');
+  if(!cxData) return;
+
+  var btn = encontrarBotaoNfcePendentes_();
+
+  // Se não encontrar no HTML, cria um botão chamando a função existente, quando existir.
+  if(!btn){
+    btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '📄 NFC-e pendentes';
+    btn.onclick = function(){
+      if(typeof abrirNfcePendentes === 'function') return abrirNfcePendentes();
+      if(typeof abrirNotasPendentes === 'function') return abrirNotasPendentes();
+      if(typeof listarNfcePendentes === 'function') return listarNfcePendentes();
+      if(typeof abrirRelatorioNfcePendentes === 'function') return abrirRelatorioNfcePendentes();
+      if(typeof toast === 'function') toast('⚠️ Função de NFC-e pendentes não encontrada.');
+      else alert('Função de NFC-e pendentes não encontrada.');
+    };
+  }
+
+  btn.id = btn.id || 'btn-nfce-pendentes-caixa';
+  btn.className = (btn.className || 'btn').replace(/\s*btn-nfce-pendentes-caixa/g,'') + ' btn-nfce-pendentes-caixa';
+  btn.style.display = 'inline-flex';
+  btn.style.alignItems = 'center';
+  btn.style.justifyContent = 'center';
+  btn.style.gap = '6px';
+  btn.style.marginLeft = '8px';
+  btn.style.whiteSpace = 'nowrap';
+
+  // Usa o mesmo container do campo de data, onde ficam Fechar Caixa e Imprimir.
+  var container = cxData.closest('div') || cxData.parentElement;
+  while(container && container !== document.body){
+    var txt = String(container.textContent || '').toLowerCase();
+    if((txt.indexOf('fechar') >= 0 && txt.indexOf('imprimir') >= 0) || container.querySelector('button')){
+      break;
+    }
+    container = container.parentElement;
+  }
+  if(!container) container = cxData.parentElement || document.body;
+
+  var botoes = Array.prototype.slice.call(container.querySelectorAll('button'));
+  var fechar = botoes.find(function(b){
+    return String(b.textContent || '').toLowerCase().indexOf('fechar') >= 0;
+  });
+
+  if(fechar && fechar.parentElement === container){
+    container.insertBefore(btn, fechar);
+  }else{
+    container.appendChild(btn);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(realocarBotaoNfcePendentesCaixa, 500);
+});
+
 function renderCaixa(){
   var data=document.getElementById('cx-d').value; if(!data)return;
   var vendas=DB.get('vendas').filter(function(v){return v.data.startsWith(data);});
@@ -3183,6 +3250,7 @@ function renderCaixa(){
       btns+
     '</div>';
   }).join(''):'<div style="text-align:center;padding:20px;color:var(--txt2)">Sem movimentações</div>';
+  setTimeout(realocarBotaoNfcePendentesCaixa, 50);
 }
 
 
