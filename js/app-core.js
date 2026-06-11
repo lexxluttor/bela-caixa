@@ -2593,19 +2593,21 @@ function garantirPagamentoDivididoUI(){
     box.style.display='none';
     box.style.marginTop='12px';
     box.style.padding='12px';
-    box.style.border='1px solid var(--bdr)';
+    box.style.border='1px solid #ddd';
     box.style.borderRadius='12px';
+    box.style.background='#fff';
+    box.style.color='#111';
     box.innerHTML=''+
-      '<div style="font-weight:800;margin-bottom:8px;">Pagamento dividido</div>'+ 
+      '<div style="font-weight:800;margin-bottom:8px;color:#111;">Pagamento dividido</div>'+ 
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'+
-      '<label class="tm">PIX<input class="fi pag-div-inp" id="pag-div-pix" data-forma="pix" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00"></label>'+ 
-      '<label class="tm">Dinheiro<input class="fi pag-div-inp" id="pag-div-dinheiro" data-forma="dinheiro" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00"></label>'+ 
-      '<label class="tm">Débito<input class="fi pag-div-inp" id="pag-div-debito" data-forma="debito" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00"></label>'+ 
-      '<label class="tm">Crédito<input class="fi pag-div-inp" id="pag-div-credito" data-forma="credito" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00"></label>'+ 
+      '<label style="font-size:12px;color:#333;">PIX<input class="fi pag-div-inp" id="pag-div-pix" data-forma="pix" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00" style="background:#fff;color:#111;border:1px solid #ddd;"></label>'+ 
+      '<label style="font-size:12px;color:#333;">Dinheiro<input class="fi pag-div-inp" id="pag-div-dinheiro" data-forma="dinheiro" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00" style="background:#fff;color:#111;border:1px solid #ddd;"></label>'+ 
+      '<label style="font-size:12px;color:#333;">Débito<input class="fi pag-div-inp" id="pag-div-debito" data-forma="debito" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00" style="background:#fff;color:#111;border:1px solid #ddd;"></label>'+ 
+      '<label style="font-size:12px;color:#333;">Crédito<input class="fi pag-div-inp" id="pag-div-credito" data-forma="credito" inputmode="decimal" oninput="atualizarPagamentoDividido()" placeholder="0,00" style="background:#fff;color:#111;border:1px solid #ddd;"></label>'+ 
       '</div>'+ 
-      '<div class="tm" style="margin-top:8px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;">'+
-      '<span>Somado: <b id="pag-div-somado">R$ 0,00</b></span>'+ 
-      '<span>Falta: <b id="pag-div-falta">R$ 0,00</b></span>'+ 
+      '<div style="margin-top:8px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px;color:#333;">'+
+      '<span>Somado: <b id="pag-div-somado" style="color:#111;">R$ 0,00</b></span>'+ 
+      '<span>Falta: <b id="pag-div-falta" style="color:#111;">R$ 0,00</b></span>'+ 
       '</div>';
     modal.appendChild(box);
   }
