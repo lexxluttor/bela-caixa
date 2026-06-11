@@ -776,9 +776,16 @@ function diasSemPag(cid){
 
   if(!crds.length)return 0;
 
+  var totalCompras = crds.reduce(function(s,c){
+    return s + dinheiroNum(c.val!=null?c.val:c.valor);
+  },0);
+
   var totalPagamentos = pgs.reduce(function(s,p){
     return s + dinheiroNum(p.val!=null?p.val:p.valor);
   },0);
+
+  // Se a diferença for até R$ 1,00, considera quitado e não há atraso.
+  if(totalCompras - totalPagamentos <= TOLERANCIA_QUITACAO)return 0;
 
   var acumuladoCompras = 0;
   var primeiraCompraAberta = null;
@@ -786,8 +793,7 @@ function diasSemPag(cid){
   for(var i=0;i<crds.length;i++){
     acumuladoCompras += dinheiroNum(crds[i].val!=null?crds[i].val:crds[i].valor);
 
-    // Se as compras anteriores foram quitadas, a contagem reinicia na próxima compra em aberto.
-    // Margem de R$ 1,00 evita atraso por pequenas diferenças de arredondamento/centavos.
+    // Encontra a primeira compra que ainda ficou em aberto depois dos pagamentos.
     if(acumuladoCompras - totalPagamentos > TOLERANCIA_QUITACAO){
       primeiraCompraAberta = crds[i];
       break;
@@ -796,7 +802,20 @@ function diasSemPag(cid){
 
   if(!primeiraCompraAberta)return 0;
 
-  return Math.floor((new Date()-new Date(primeiraCompraAberta.data))/(1000*60*60*24));
+  var dataRef = new Date(primeiraCompraAberta.data);
+
+  // Se houve pagamento depois dessa compra em aberto, a contagem recomeça no último pagamento.
+  // Isso evita marcar atraso antigo quando o cliente fez pagamento parcial recentemente.
+  if(pgs.length){
+    var ultimoPagamento = new Date(pgs[pgs.length-1].data);
+    if(!isNaN(ultimoPagamento.getTime()) && ultimoPagamento > dataRef){
+      dataRef = ultimoPagamento;
+    }
+  }
+
+  if(isNaN(dataRef.getTime()))return 0;
+
+  return Math.floor((new Date()-dataRef)/(1000*60*60*24));
 }
 
 function lerDeletedStore(nome){
