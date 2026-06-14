@@ -301,9 +301,22 @@ document.addEventListener('DOMContentLoaded',function(){
     <span class="tm">Atualiza estoque ao finalizar</span>
   </div>
   <div class="pb">
-    <div class="bal-alert">⚠️ MODO REAL: ao finalizar com senha, o estoque será atualizado. Produto não lido ficará com estoque 0.</div>
+    <div class="bal-alert">⚠️ MODO REAL POR CATEGORIA: ao finalizar com senha, somente a categoria escolhida será atualizada. Produto não lido dessa categoria ficará com estoque 0. As outras categorias não serão alteradas.</div>
 
     <div class="stats" id="bal-stats"></div>
+
+    <div class="card">
+      <div class="ct">📂 Categoria do balanço</div>
+      <div class="tm" style="margin-bottom:10px;">Escolha a categoria que será contada. Ao finalizar, somente produtos dessa categoria serão ajustados; as outras categorias não serão alteradas.</div>
+      <div class="fg" style="max-width:320px;margin-bottom:0;">
+        <label class="fl">Contar categoria</label>
+        <select class="fi" id="bal-categoria" onchange="balTrocarCategoria()">
+          <option value="ROUPAS">Roupas</option>
+          <option value="CALÇADOS">Calçados</option>
+          <option value="ACESSÓRIOS">Acessórios</option>
+        </select>
+      </div>
+    </div>
 
     <div class="card">
       <div class="ct">📲 Leitura de código de barras</div>
@@ -2545,8 +2558,8 @@ var balAutoAddTimer = null;
 function balNovoEstado(){
   return {id:'BAL-'+Date.now(),data:new Date().toISOString(),contagens:{},codigos:{},leituras:[]};
 }
-function balGet(){try{return JSON.parse(localStorage.getItem(BAL_KEY)||'null')||balNovoEstado();}catch(e){return balNovoEstado();}}
-function balSet(st){localStorage.setItem(BAL_KEY,JSON.stringify(st||balNovoEstado()));}
+function balGet(){try{return JSON.parse(localStorage.getItem(balKeyAtual())||'null')||balNovoEstado();}catch(e){return balNovoEstado();}}
+function balSet(st){localStorage.setItem(balKeyAtual(),JSON.stringify(st||balNovoEstado()));}
 function balNormalizarCodigo(v){return String(v==null?'':v).replace(/\s+/g,'').trim();}
 function balCodigosProduto(p){
   var bruto=[p&&p.ean,p&&p.codigo_barras,p&&p.codBarras,p&&p.codigoDeBarras,p&&p.codigos_barras,p&&p.codigosBarras].filter(Boolean).join(',');
@@ -2556,11 +2569,42 @@ function balCodigosProduto(p){
 }
 function balBuscarProduto(codigo){
   var alvo=balNormalizarCodigo(codigo); if(!alvo) return null;
-  return (DB.get('produtos')||[]).find(function(p){return balCodigosProduto(p).indexOf(alvo)>=0;})||null;
+  return balProdutosCategoria().find(function(p){return balCodigosProduto(p).indexOf(alvo)>=0;})||null;
 }
 function balEstoqueProduto(p){var n=Number(String((p&&(p.estoque!=null?p.estoque:p.estq))||0).replace(',','.'));return Number.isFinite(n)?n:0;}
 function balNomeProduto(p){return (p&&(p.nome||p.descricao||p.desc))||'Produto sem nome';}
 function balFmt(n){n=Number(n||0);return n.toLocaleString('pt-BR',{maximumFractionDigits:2});}
+
+function balCategoriaSelecionada(){
+  var el=document.getElementById('bal-categoria');
+  var v=el ? String(el.value||'ROUPAS') : 'ROUPAS';
+  return ['ROUPAS','CALÇADOS','ACESSÓRIOS'].indexOf(v)>=0 ? v : 'ROUPAS';
+}
+function balKeyAtual(){return BAL_KEY+'_'+balCategoriaSelecionada();}
+function balCategoriaProduto(p){
+  var grupo=String((p&&(p.grupo||p.categoria_principal||p.categoriaPrincipal))||'').toUpperCase();
+  if(['ROUPAS','CALÇADOS','ACESSÓRIOS'].indexOf(grupo)>=0) return grupo;
+  var sub=(p&&(p.cat||p.subcat||p.subcategoria||p.categoria||''))||'';
+  if(typeof categoriaPrincipalPorSubcategoria==='function'){
+    var g=String(categoriaPrincipalPorSubcategoria(sub)||'').toUpperCase();
+    if(['ROUPAS','CALÇADOS','ACESSÓRIOS'].indexOf(g)>=0) return g;
+  }
+  var txt=String((p&&(p.nome||p.descricao||p.desc||sub))||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+  if(/tenis|chinelo|sandalia|sapato|bota|sapatilha|papete|tamanco|rasteira/.test(txt)) return 'CALÇADOS';
+  if(/bolsa|mochila|cinto|carteira|bone|acessorio|meia|oculos|pulseira|colar|brinco|tiara|relogio/.test(txt)) return 'ACESSÓRIOS';
+  return 'ROUPAS';
+}
+function balProdutosCategoria(){
+  var cat=balCategoriaSelecionada();
+  return (DB.get('produtos')||[]).filter(function(p){return balCategoriaProduto(p)===cat;});
+}
+function balTrocarCategoria(){
+  balUltimaConferencia=[];
+  var card=document.getElementById('bal-simulacao-card');
+  if(card) card.style.display='none';
+  balRender();
+  setTimeout(function(){var c=document.getElementById('bal-cod');if(c)c.focus();},50);
+}
 
 function initBalancoReal(){
   balRender();
@@ -2617,19 +2661,20 @@ function balAdicionarLeitura(){
   setTimeout(function(){if(codEl)codEl.focus();},50);
 }
 function balLimparCampos(){var cod=document.getElementById('bal-cod'),qtd=document.getElementById('bal-qtd');if(cod)cod.value='';if(qtd)qtd.value='';var f=document.getElementById('bal-found');if(f)f.textContent='Bipe um produto para iniciar a contagem.';if(cod)cod.focus();}
-function balProdutoPorId(id){id=String(id);return (DB.get('produtos')||[]).find(function(p){return String(p.id||p.cod||'')===id;})||null;}
+function balProdutoPorId(id){id=String(id);return balProdutosCategoria().find(function(p){return String(p.id||p.cod||'')===id;})||null;}
 function balRemoverItem(id){var st=balGet();delete st.contagens[String(id)];delete st.codigos[String(id)];st.leituras=(st.leituras||[]).filter(function(l){return String(l.produto_id)!==String(id);});balSet(st);balRender();}
 function balAlterarQtd(id,val){var qtd=Number(String(val||'').replace(',','.')), st=balGet(); if(!Number.isFinite(qtd)||qtd<0)return; if(qtd===0){delete st.contagens[String(id)];delete st.codigos[String(id)];}else st.contagens[String(id)]=qtd; balSet(st);balRenderStats();}
-function balResetarBalanco(){if(!confirm('Limpar todo o balanço aberto? Nenhum estoque será alterado agora.'))return;localStorage.removeItem(BAL_KEY);balUltimaConferencia=[];var card=document.getElementById('bal-simulacao-card');if(card)card.style.display='none';balRender();}
+function balResetarBalanco(){if(!confirm('Limpar o balanço aberto desta categoria? Nenhum estoque será alterado agora.'))return;localStorage.removeItem(balKeyAtual());balUltimaConferencia=[];var card=document.getElementById('bal-simulacao-card');if(card)card.style.display='none';balRender();}
 function balRenderStats(){
-  var st=balGet(), produtos=DB.get('produtos')||[], ids=Object.keys(st.contagens||{});
+  var st=balGet(), produtos=balProdutosCategoria(), ids=Object.keys(st.contagens||{});
+  ids=ids.filter(function(id){return !!balProdutoPorId(id);});
   var totalContado=ids.reduce(function(s,id){return s+Number(st.contagens[id]||0);},0);
-  var stats=[['Produtos cadastrados',produtos.length,'stb'],['Produtos lidos',ids.length,'stg'],['Peças contadas',balFmt(totalContado),'stgo'],['Leituras feitas',(st.leituras||[]).length,'sto']];
+  var stats=[['Categoria',balCategoriaSelecionada(),'stb'],['Produtos da categoria',produtos.length,'stb'],['Produtos lidos',ids.length,'stg'],['Peças contadas',balFmt(totalContado),'stgo'],['Leituras feitas',(st.leituras||[]).length,'sto']];
   var el=document.getElementById('bal-stats'); if(el)el.innerHTML=stats.map(function(x){return '<div class="st '+x[2]+'"><div class="sl">'+x[0]+'</div><div class="sv">'+x[1]+'</div></div>';}).join('');
 }
 function balRender(){
   balRenderStats();
-  var st=balGet(), ids=Object.keys(st.contagens||{}), tb=document.getElementById('bal-lidos');
+  var st=balGet(), ids=Object.keys(st.contagens||{}).filter(function(id){return !!balProdutoPorId(id);}), tb=document.getElementById('bal-lidos');
   if(tb){
     if(!ids.length) tb.innerHTML='<tr><td colspan="5" class="empty">Nenhum produto lido ainda.</td></tr>';
     else tb.innerHTML=ids.map(function(id){
@@ -2640,7 +2685,7 @@ function balRender(){
   }
 }
 function balGerarConferencia(){
-  var st=balGet(), produtos=DB.get('produtos')||[];
+  var st=balGet(), produtos=balProdutosCategoria();
   var linhas=produtos.map(function(p){
     var id=String(p.id||p.cod||''), sistema=balEstoqueProduto(p), contado=Number((st.contagens||{})[id]||0), diff=contado-sistema;
     return {id:id,nome:balNomeProduto(p),codigo:(balCodigosProduto(p)[0]||''),sistema:sistema,contado:contado,diff:diff};
@@ -2658,17 +2703,18 @@ function balGerarConferencia(){
 }
 function balFinalizarReal(){
   var st=balGet();
-  var produtos=DB.get('produtos')||[];
-  var ids=Object.keys(st.contagens||{});
-  if(!produtos.length){if(typeof toast==='function')toast('Nenhum produto cadastrado.');return;}
+  var produtos=balProdutosCategoria();
+  var ids=Object.keys(st.contagens||{}).filter(function(id){return !!balProdutoPorId(id);});
+  if(!produtos.length){if(typeof toast==='function')toast('Nenhum produto cadastrado nesta categoria.');return;}
   if(!ids.length){if(typeof toast==='function')toast('Nenhum produto lido no balanço.');return;}
 
   balGerarConferencia();
 
   pedirSenha(function(){
-    var msg='ATENÇÃO: isso vai atualizar o estoque REAL de todos os produtos.\n\n'+
-            'Produtos não lidos ficarão com estoque 0.\n'+
-            'Produtos lidos receberão a quantidade contada.\n\n'+
+    var msg='ATENÇÃO: isso vai atualizar o estoque REAL somente da categoria '+balCategoriaSelecionada()+'.\n\n'+
+            'Produtos não lidos desta categoria ficarão com estoque 0.\n'+
+            'Produtos lidos receberão a quantidade contada.\n'+
+            'As outras categorias não serão alteradas.\n\n'+
             'Deseja finalizar e aplicar o balanço agora?';
     if(!confirm(msg))return;
 
@@ -2676,7 +2722,9 @@ function balFinalizarReal(){
     var contagens=st.contagens||{};
     var totalProdutos=0, totalZerados=0, totalAlterados=0;
 
-    produtos=produtos.map(function(p){
+    var categoriaAtual=balCategoriaSelecionada();
+    produtos=(DB.get('produtos')||[]).map(function(p){
+      if(balCategoriaProduto(p)!==categoriaAtual) return p;
       var id=String(p.id||p.cod||'');
       var antigo=balEstoqueProduto(p);
       var contado=Number(contagens[id]||0);
@@ -2696,7 +2744,7 @@ function balFinalizarReal(){
     }catch(e){}
 
     DB.set('produtos', produtos);
-    localStorage.removeItem(BAL_KEY);
+    localStorage.removeItem(balKeyAtual());
     balUltimaConferencia=[];
 
     try{renderProds();}catch(e){}
@@ -2704,17 +2752,17 @@ function balFinalizarReal(){
     balRender();
 
     if(typeof toast==='function')toast('✅ Balanço aplicado: '+totalAlterados+' produtos alterados. Sincronize para salvar na planilha.','ok');
-    alert('Balanço aplicado com sucesso!\n\nProdutos analisados: '+totalProdutos+'\nProdutos alterados: '+totalAlterados+'\nProdutos zerados por não leitura: '+totalZerados+'\n\nAgora clique em Sincronizar agora para enviar o estoque real para a planilha.');
+    alert('Balanço aplicado com sucesso!\n\nCategoria: '+categoriaAtual+'\nProdutos analisados: '+totalProdutos+'\nProdutos alterados: '+totalAlterados+'\nProdutos zerados por não leitura: '+totalZerados+'\n\nAs outras categorias não foram alteradas.\n\nAgora clique em Sincronizar agora para enviar o estoque real para a planilha.');
   });
 }
 
 function balExportarCsv(){
   if(!balUltimaConferencia||!balUltimaConferencia.length)balGerarConferencia();
-  var linhas=[['Produto','Codigo','Estoque sistema','Contado','Diferenca']];
-  (balUltimaConferencia||[]).forEach(function(x){linhas.push([x.nome,x.codigo,x.sistema,x.contado,x.diff]);});
+  var linhas=[['Categoria','Produto','Codigo','Estoque sistema','Contado','Diferenca']];
+  (balUltimaConferencia||[]).forEach(function(x){linhas.push([balCategoriaSelecionada(),x.nome,x.codigo,x.sistema,x.contado,x.diff]);});
   var csv=linhas.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(';');}).join('\n');
   var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'}), a=document.createElement('a');
-  a.href=URL.createObjectURL(blob); a.download='balanco_conferencia_'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click();
+  a.href=URL.createObjectURL(blob); a.download='balanco_conferencia_'+balCategoriaSelecionada().toLowerCase()+'_'+new Date().toISOString().slice(0,10)+'.csv'; document.body.appendChild(a); a.click();
   setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},500);
 }
 
