@@ -228,6 +228,42 @@ function origemFiscalPorEstoqueApp(origemEstoque){
   return 'manual';
 }
 
+const CNPJ_BELA_MODAS_FISCAL = '19225338000170';
+
+function somenteDigitosFiscalBM(v){
+  return String(v == null ? '' : v).replace(/\D/g, '');
+}
+
+function classificarOrigemFiscalProdutoApp(prod, origemEstoque, cnpjDestinatario){
+  prod = prod || {};
+  var origem = String(origemEstoque || prod.origem_estoque || prod.origem_fiscal || '').toLowerCase();
+  var dest = somenteDigitosFiscalBM(cnpjDestinatario || prod.xml_destinatario_cnpj || prod.destinatario_cnpj || prod.cnpj_destinatario || '');
+
+  if(origem === 'xml_nfe' || origem === 'xml_entrada'){
+    if(dest && dest === CNPJ_BELA_MODAS_FISCAL) return 'bela_modas';
+    if(dest && dest !== CNPJ_BELA_MODAS_FISCAL) return 'outro_cnpj';
+    return 'xml_sem_cnpj';
+  }
+
+  return 'sem_nota';
+}
+
+function rotuloOrigemFiscalProdutoApp(status){
+  status = String(status || '').toLowerCase();
+  if(status === 'bela_modas') return '🟢 Bela Modas';
+  if(status === 'outro_cnpj') return '🟡 Outro CNPJ';
+  if(status === 'xml_sem_cnpj') return '🔵 XML sem CNPJ';
+  return '🔴 Sem nota';
+}
+
+function corOrigemFiscalProdutoApp(status){
+  status = String(status || '').toLowerCase();
+  if(status === 'bela_modas') return 'var(--green)';
+  if(status === 'outro_cnpj') return 'var(--gold)';
+  if(status === 'xml_sem_cnpj') return 'var(--blue)';
+  return 'var(--red2)';
+}
+
 function resolverOrigemNcmProdutoApp(atual, ncmValor, ncmCategoria, origemEstoque){
   var origemAtual = String((atual && (atual.ncm_origem || atual.origem_ncm || atual.origem_fiscal)) || '').toLowerCase();
   var ncmAtual = String((atual && atual.ncm) || '').replace(/\D/g, '');
@@ -1697,6 +1733,7 @@ function salvarProd(){
     escala:document.getElementById('prod-escala').value,
     origem_estoque:origemEstoque,
     origem_fiscal:origemFiscal,
+    origem_fiscal_status:classificarOrigemFiscalProdutoApp(Object.assign({}, atual, {origem_estoque:origemEstoque, origem_fiscal:origemFiscal})),
     ncm_origem:ncmOrigem,
     origem_ncm:ncmOrigem,
     createdAt:atual.createdAt||nowLocalISO(),
@@ -2254,9 +2291,11 @@ function lerArquivoXML(ev){
       }
 
       var emit = doc.getElementsByTagName('emit')[0] || doc;
+      var dest = doc.getElementsByTagName('dest')[0] || doc;
       var ide = doc.getElementsByTagName('ide')[0] || doc;
       var fornecedor = txt(emit,'xNome') || txt(emit,'xFant') || 'Fornecedor';
       var cnpj = txt(emit,'CNPJ');
+      var destinatarioCnpj = somenteDigitosFiscalBM(txt(dest,'CNPJ') || txt(dest,'CPF'));
       var numero = txt(ide,'nNF');
       var serie = txt(ide,'serie');
       var emissao = txt(ide,'dhEmi') || txt(ide,'dEmi');
@@ -2311,6 +2350,7 @@ function lerArquivoXML(ev){
       importacaoXMLAtual = {
         fornecedor: fornecedor,
         cnpj: cnpj,
+        destinatarioCnpj: destinatarioCnpj,
         numero: numero,
         serie: serie,
         emissao: emissao,
@@ -2334,7 +2374,7 @@ function renderPreviewImportacaoXML(){
     limparImportacaoXML();
     return;
   }
-  document.getElementById('ix-forn').textContent = importacaoXMLAtual.fornecedor + (importacaoXMLAtual.cnpj ? ' · ' + importacaoXMLAtual.cnpj : '');
+  document.getElementById('ix-forn').textContent = importacaoXMLAtual.fornecedor + (importacaoXMLAtual.cnpj ? ' · ' + importacaoXMLAtual.cnpj : '') + (importacaoXMLAtual.destinatarioCnpj ? ' · Dest: ' + importacaoXMLAtual.destinatarioCnpj : '');
   document.getElementById('ix-nota').textContent = 'NF ' + (importacaoXMLAtual.numero||'—') + ' · Série ' + (importacaoXMLAtual.serie||'—') + (importacaoXMLAtual.emissao ? ' · ' + FD(importacaoXMLAtual.emissao) : '');
 
   var primeiro = importacaoXMLAtual.itens[0] || {};
@@ -2375,6 +2415,8 @@ function confirmarImportacaoXML(){
   }
   var produtos = DB.get('produtos') || [];
   var agora = nowLocalISO();
+  var destinatarioCnpj = somenteDigitosFiscalBM(importacaoXMLAtual.destinatarioCnpj || '');
+  var origemFiscalStatusXML = classificarOrigemFiscalProdutoApp({origem_estoque:'xml_nfe', xml_destinatario_cnpj:destinatarioCnpj});
 
   importacaoXMLAtual.itens.forEach(function(it){
     var idx = produtos.findIndex(function(p){
@@ -2402,6 +2444,9 @@ function confirmarImportacaoXML(){
       p.escala = p.escala || 'S';
       p.origem_estoque = 'xml_nfe';
       p.origem_fiscal = 'xml_entrada';
+      p.xml_emitente_cnpj = somenteDigitosFiscalBM(importacaoXMLAtual.cnpj || '');
+      p.xml_destinatario_cnpj = destinatarioCnpj;
+      p.origem_fiscal_status = origemFiscalStatusXML;
       p.cst_pis = p.cst_pis || '49';
       p.aliq_pis = p.aliq_pis || 0;
       p.cst_cofins = p.cst_cofins || '49';
@@ -2426,6 +2471,9 @@ function confirmarImportacaoXML(){
         ncm_origem: it.ncm_origem || (ncmValidoApp(it.ncm) ? 'xml_entrada' : 'automatico'),
         origem_ncm: it.ncm_origem || (ncmValidoApp(it.ncm) ? 'xml_entrada' : 'automatico'),
         origem_fiscal: 'xml_entrada',
+        origem_fiscal_status: origemFiscalStatusXML,
+        xml_emitente_cnpj: somenteDigitosFiscalBM(importacaoXMLAtual.cnpj || ''),
+        xml_destinatario_cnpj: destinatarioCnpj,
         origem: '0',
         unidade: categoriaEhCalcado(it.subcategoria || it.subcat || it.cat || '') ? 'PAR' : 'UN',
         csosn: '102',
@@ -2449,6 +2497,7 @@ function confirmarImportacaoXML(){
     id: DB.uid(),
     fornecedor: importacaoXMLAtual.fornecedor,
     cnpj: importacaoXMLAtual.cnpj,
+    destinatarioCnpj: importacaoXMLAtual.destinatarioCnpj || '',
     numero: importacaoXMLAtual.numero,
     serie: importacaoXMLAtual.serie,
     emissao: importacaoXMLAtual.emissao,
@@ -3908,6 +3957,64 @@ function produtoSemCustoCadastrado_(p){
   return parseNumRelEstoque(c) <= 0;
 }
 
+function statusFiscalRelEstoque_(p){
+  var status = String((p && p.origem_fiscal_status) || '').toLowerCase();
+  if(status) return status;
+  return classificarOrigemFiscalProdutoApp(p || {});
+}
+
+function renderRelCoberturaFiscalEstoque(itens){
+  var resumo = {bela_modas:{pecas:0,valor:0}, outro_cnpj:{pecas:0,valor:0}, xml_sem_cnpj:{pecas:0,valor:0}, sem_nota:{pecas:0,valor:0}};
+  var porCategoria = {};
+  var totalPecas = 0, totalValor = 0;
+
+  (itens||[]).forEach(function(x){
+    if(!x || x.est <= 0) return;
+    var status = statusFiscalRelEstoque_(x.p);
+    if(!resumo[status]) status = 'sem_nota';
+    var valor = Number(x.entrada || x.venda || 0);
+    resumo[status].pecas += x.est;
+    resumo[status].valor += valor;
+    totalPecas += x.est;
+    totalValor += valor;
+
+    var grupo = x.grupo || 'OUTROS';
+    if(!porCategoria[grupo]) porCategoria[grupo] = {pecas:0, valor:0, bela_modas:0, outro_cnpj:0, xml_sem_cnpj:0, sem_nota:0};
+    porCategoria[grupo].pecas += x.est;
+    porCategoria[grupo].valor += valor;
+    porCategoria[grupo][status] += x.est;
+  });
+
+  var coberturaPecas = totalPecas ? (resumo.bela_modas.pecas / totalPecas * 100) : 0;
+  var coberturaAmpla = totalPecas ? ((resumo.bela_modas.pecas + resumo.outro_cnpj.pecas + resumo.xml_sem_cnpj.pecas) / totalPecas * 100) : 0;
+  var st = document.getElementById('rl-fiscal-st');
+  if(st) st.innerHTML =
+    '<div class="st stg"><div class="sl">Cobertura Bela Modas</div><div class="sv">'+coberturaPecas.toFixed(1).replace('.',',')+'%</div><span class="tm">'+resumo.bela_modas.pecas+' peça(s) no CNPJ correto</span></div>'+
+    '<div class="st stgo"><div class="sl">Outro CNPJ</div><div class="sv">'+resumo.outro_cnpj.pecas+'</div><span class="tm">'+R(resumo.outro_cnpj.valor)+'</span></div>'+
+    '<div class="st stb"><div class="sl">XML sem CNPJ</div><div class="sv">'+resumo.xml_sem_cnpj.pecas+'</div><span class="tm">'+R(resumo.xml_sem_cnpj.valor)+'</span></div>'+
+    '<div class="st str"><div class="sl">Sem nota</div><div class="sv">'+resumo.sem_nota.pecas+'</div><span class="tm">'+R(resumo.sem_nota.valor)+'</span></div>'+
+    '<div class="st sto"><div class="sl">Cobertura ampla</div><div class="sv">'+coberturaAmpla.toFixed(1).replace('.',',')+'%</div><span class="tm">Inclui qualquer XML</span></div>';
+
+  var rows = Object.entries(porCategoria).sort(function(a,b){return b[1].valor-a[1].valor;}).map(function(e){
+    var d=e[1];
+    var pct=d.pecas ? (d.bela_modas/d.pecas*100) : 0;
+    return '<tr>'+
+      '<td><b>'+esc(e[0])+'</b></td>'+
+      '<td style="text-align:center">'+d.pecas+'</td>'+
+      '<td style="text-align:center;color:var(--green);font-weight:800">'+d.bela_modas+'</td>'+
+      '<td style="text-align:center;color:var(--gold);font-weight:800">'+d.outro_cnpj+'</td>'+
+      '<td style="text-align:center;color:var(--blue);font-weight:800">'+d.xml_sem_cnpj+'</td>'+
+      '<td style="text-align:center;color:var(--red2);font-weight:800">'+d.sem_nota+'</td>'+
+      '<td style="text-align:right;font-weight:800">'+pct.toFixed(1).replace('.',',')+'%</td>'+
+    '</tr>';
+  }).join('');
+
+  var cat = document.getElementById('rl-fiscal-cat');
+  if(cat) cat.innerHTML = rows ?
+    '<div class="tw"><table><thead><tr><th>Categoria</th><th>Peças</th><th>Bela Modas</th><th>Outro CNPJ</th><th>XML sem CNPJ</th><th>Sem nota</th><th>% Bela Modas</th></tr></thead><tbody>'+rows+'</tbody></table></div>' :
+    '<div class="empty">Sem estoque positivo para classificar</div>';
+}
+
 function renderRelEstoque(){
   var prods=DB.get('produtos')||[];
   var itens=prods.map(function(p){
@@ -3935,6 +4042,8 @@ function renderRelEstoque(){
     '<div class="st stg"><div class="sl">Valor venda estoque</div><div class="sv">'+R(valorVenda)+'</div></div>'+
     '<div class="st sto"><div class="sl">Valor entrada/custo</div><div class="sv">'+R(valorEntrada)+'</div></div>'+
     '<div class="st str"><div class="sl">Lucro estimado</div><div class="sv">'+R(lucro)+'</div><span class="tm">Margem média: '+margemMedia.toFixed(1).replace('.',',')+'%</span></div>';
+
+  renderRelCoberturaFiscalEstoque(itens);
 
   var grupos={};
   itens.forEach(function(x){
@@ -3964,10 +4073,11 @@ function renderRelEstoque(){
     '<div class="tm" style="margin-top:10px;line-height:1.4;">Agora o relatório separa produtos sem custo cadastrados de produtos sem custo que ainda têm estoque positivo.</div>';
 
   var prodRows=itens.filter(function(x){return x.est>0;}).sort(function(a,b){return b.venda-a.venda;}).slice(0,200).map(function(x){
-    return '<tr><td><b>'+esc(x.p.nome||'')+'</b><br><span class="tm">'+esc(x.p.cod||x.p.ean||'')+'</span></td><td>'+esc(x.grupo)+'<br><span class="tm">'+esc(x.subcat)+'</span></td><td style="text-align:center">'+x.est+'</td><td style="text-align:right">'+R(x.entrada)+'</td><td style="text-align:right;color:var(--gold);font-weight:800">'+R(x.venda)+'</td><td style="text-align:right">'+x.margem.toFixed(1).replace('.',',')+'%</td></tr>';
+    var statusFiscal = statusFiscalRelEstoque_(x.p);
+    return '<tr><td><b>'+esc(x.p.nome||'')+'</b><br><span class="tm">'+esc(x.p.cod||x.p.ean||'')+'</span></td><td>'+esc(x.grupo)+'<br><span class="tm">'+esc(x.subcat)+'</span></td><td><b style="color:'+corOrigemFiscalProdutoApp(statusFiscal)+'">'+rotuloOrigemFiscalProdutoApp(statusFiscal)+'</b></td><td style="text-align:center">'+x.est+'</td><td style="text-align:right">'+R(x.entrada)+'</td><td style="text-align:right;color:var(--gold);font-weight:800">'+R(x.venda)+'</td><td style="text-align:right">'+x.margem.toFixed(1).replace('.',',')+'%</td></tr>';
   }).join('');
   var tb=document.getElementById('rl-est-prod');
-  if(tb) tb.innerHTML=prodRows||'<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--txt2)">Sem estoque positivo</td></tr>';
+  if(tb) tb.innerHTML=prodRows||'<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--txt2)">Sem estoque positivo</td></tr>';
 }
 
 // INIT
