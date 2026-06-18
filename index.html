@@ -498,6 +498,16 @@ document.addEventListener('DOMContentLoaded',function(){
         <div class="tm">Valores calculados com base no estoque atual dos produtos cadastrados. Não altera dados.</div>
       </div>
       <div class="stats" id="rl-est-st"></div>
+
+      <div class="card" style="border-color:var(--green);">
+        <div class="ct">🧾 Cobertura Fiscal do Estoque</div>
+        <div class="tm" style="margin-bottom:10px;line-height:1.4;">
+          Classificação por origem fiscal: 🟢 Bela Modas, 🟡 outro CNPJ, 🔵 XML sem CNPJ identificado e 🔴 sem nota de entrada.
+        </div>
+        <div class="stats" id="rl-fiscal-st"></div>
+        <div id="rl-fiscal-cat"></div>
+      </div>
+
       <div class="g2" style="margin-bottom:14px;">
         <div class="card">
           <div class="ct">📊 Estoque por categoria</div>
@@ -511,7 +521,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="card">
         <div class="ct">🧾 Produtos em estoque</div>
         <div class="tw" style="max-height:360px;overflow:auto;"><table>
-          <thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Custo</th><th>Venda</th><th>Margem</th></tr></thead>
+          <thead><tr><th>Produto</th><th>Categoria</th><th>Origem fiscal</th><th>Estoque</th><th>Custo</th><th>Venda</th><th>Margem</th></tr></thead>
           <tbody id="rl-est-prod"></tbody>
         </table></div>
       </div>
