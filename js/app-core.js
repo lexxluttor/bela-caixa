@@ -238,6 +238,9 @@ function classificarOrigemFiscalProdutoApp(prod, origemEstoque, cnpjDestinatario
   prod = prod || {};
   var origem = String(origemEstoque || prod.origem_estoque || prod.origem_fiscal || '').toLowerCase();
   var dest = somenteDigitosFiscalBM(cnpjDestinatario || prod.xml_destinatario_cnpj || prod.destinatario_cnpj || prod.cnpj_destinatario || '');
+  if(!dest && (origem === 'xml_nfe' || origem === 'xml_entrada')){
+    dest = localizarCnpjDestinatarioPorEntradasFiscalBM(prod);
+  }
 
   if(origem === 'xml_nfe' || origem === 'xml_entrada'){
     if(dest && dest === CNPJ_BELA_MODAS_FISCAL) return 'bela_modas';
@@ -2264,6 +2267,56 @@ function txt(node, tag){
   var el = node.getElementsByTagName(tag)[0];
   return el ? (el.textContent || '').trim() : '';
 }
+
+function xmlPrimeiroPorLocalNameFiscalBM(node, localName){
+  if(!node) return null;
+  localName = String(localName || '');
+  var todos = node.getElementsByTagName('*');
+  for(var i=0;i<todos.length;i++){
+    if(String(todos[i].localName || todos[i].nodeName || '').replace(/^.*:/,'') === localName){
+      return todos[i];
+    }
+  }
+  return null;
+}
+
+function txtXmlFiscalBM(node, tag){
+  if(!node) return '';
+  var direto = txt(node, tag);
+  if(direto) return direto;
+  var el = xmlPrimeiroPorLocalNameFiscalBM(node, tag);
+  return el ? String(el.textContent || '').trim() : '';
+}
+
+function xmlBlocoFiscalBM(doc, tag){
+  return doc.getElementsByTagName(tag)[0] || xmlPrimeiroPorLocalNameFiscalBM(doc, tag) || doc;
+}
+
+function localizarCnpjDestinatarioPorEntradasFiscalBM(prod){
+  try{
+    if(!prod) return '';
+    var cod = String(prod.cod || '').trim();
+    var eans = (typeof extrairCodigosBarras === 'function') ? extrairCodigosBarras(prod.ean || prod.codigos_barras || '') : [];
+    var nome = String(prod.nome || '').trim().toLowerCase();
+    var entradas = (DB && typeof DB.get === 'function') ? (DB.get('entradas') || []) : [];
+    for(var i=entradas.length-1;i>=0;i--){
+      var ent = entradas[i] || {};
+      var dest = somenteDigitosFiscalBM(ent.destinatarioCnpj || ent.xml_destinatario_cnpj || ent.cnpj_destinatario || '');
+      if(!dest) continue;
+      var itens = Array.isArray(ent.itens) ? ent.itens : [];
+      for(var j=0;j<itens.length;j++){
+        var it = itens[j] || {};
+        var itCod = String(it.cod || it.cProd || '').trim();
+        if(cod && itCod && cod === itCod) return dest;
+        var itEans = (typeof extrairCodigosBarras === 'function') ? extrairCodigosBarras(it.ean || it.codigo_barras || it.codBarras || it.codigoDeBarras || '') : [];
+        if(eans.length && itEans.some(function(x){ return eans.indexOf(x) >= 0; })) return dest;
+        var itNome = String(it.nome || it.nomeBase || it.xProd || '').trim().toLowerCase();
+        if(nome && itNome && nome === itNome) return dest;
+      }
+    }
+  }catch(e){}
+  return '';
+}
 function catByNCM(ncm){
   ncm=String(ncm||'');
   if(ncm.startsWith('64')) return 'Calçados';
@@ -2290,27 +2343,27 @@ function lerArquivoXML(ev){
         throw new Error('XML inválido');
       }
 
-      var emit = doc.getElementsByTagName('emit')[0] || doc;
-      var dest = doc.getElementsByTagName('dest')[0] || doc;
-      var ide = doc.getElementsByTagName('ide')[0] || doc;
-      var fornecedor = txt(emit,'xNome') || txt(emit,'xFant') || 'Fornecedor';
-      var cnpj = txt(emit,'CNPJ');
-      var destinatarioCnpj = somenteDigitosFiscalBM(txt(dest,'CNPJ') || txt(dest,'CPF'));
-      var numero = txt(ide,'nNF');
-      var serie = txt(ide,'serie');
-      var emissao = txt(ide,'dhEmi') || txt(ide,'dEmi');
+      var emit = xmlBlocoFiscalBM(doc, 'emit');
+      var dest = xmlBlocoFiscalBM(doc, 'dest');
+      var ide = xmlBlocoFiscalBM(doc, 'ide');
+      var fornecedor = txtXmlFiscalBM(emit,'xNome') || txtXmlFiscalBM(emit,'xFant') || 'Fornecedor';
+      var cnpj = somenteDigitosFiscalBM(txtXmlFiscalBM(emit,'CNPJ') || txtXmlFiscalBM(emit,'CPF'));
+      var destinatarioCnpj = somenteDigitosFiscalBM(txtXmlFiscalBM(dest,'CNPJ') || txtXmlFiscalBM(dest,'CPF'));
+      var numero = txtXmlFiscalBM(ide,'nNF');
+      var serie = txtXmlFiscalBM(ide,'serie');
+      var emissao = txtXmlFiscalBM(ide,'dhEmi') || txtXmlFiscalBM(ide,'dEmi');
 
       var dets = Array.prototype.slice.call(doc.getElementsByTagName('det'));
       var itens = dets.map(function(det){
         var prod = det.getElementsByTagName('prod')[0] || det;
-        var info = parseInfAdProd(txt(det,'infAdProd'));
-        var cod = txt(prod,'cProd');
-        var nomeBase = txt(prod,'xProd');
+        var info = parseInfAdProd(txtXmlFiscalBM(det,'infAdProd'));
+        var cod = txtXmlFiscalBM(prod,'cProd');
+        var nomeBase = txtXmlFiscalBM(prod,'xProd');
         var nome = nomeBase + (info.cor||info.tam ? ' — ' + [info.cor, info.tam].filter(Boolean).join(' / ') : '');
-        var q = Number(txt(prod,'qCom') || 0);
-        var custo = Number(txt(prod,'vUnCom') || 0);
-        var ean = txt(prod,'cEAN');
-        var ncm = txt(prod,'NCM');
+        var q = Number(txtXmlFiscalBM(prod,'qCom') || 0);
+        var custo = Number(txtXmlFiscalBM(prod,'vUnCom') || 0);
+        var ean = txtXmlFiscalBM(prod,'cEAN');
+        var ncm = txtXmlFiscalBM(prod,'NCM');
         var existente = (DB.get('produtos')||[]).find(function(p){
           return (ean && codigoPertenceProduto(p, ean)) || (cod && String(p.cod||'')===String(cod));
         });
