@@ -468,7 +468,6 @@ var TEMAS={
   lilas:{'--bg':'#f3e8ff','--s1':'#f9f0ff','--s2':'#e8d0ff','--txt':'#2a1a3b','--txt2':'#6a3a9b','--bdr':'#c8a0e8','--red':'#9b59b6','--red2':'#8e44ad','--green':'#27ae60','--blue':'#2980b9','--gold':'#f39c12','--glow':'rgba(155,89,182,.15)','--sb-bg':'linear-gradient(180deg,#2a1a3b,#15091e)'},
   laranja:{'--bg':'#fff3e0','--s1':'#fff8f0','--s2':'#ffe0b2','--txt':'#2a1500','--txt2':'#7a4010','--bdr':'#ffcc80','--red':'#e67e22','--red2':'#d35400','--green':'#27ae60','--blue':'#2980b9','--gold':'#e67e22','--glow':'rgba(230,126,34,.15)','--sb-bg':'linear-gradient(180deg,#2a1500,#150a00)'},
   cafe:{'--bg':'#f5ebe0','--s1':'#fdf6ee','--s2':'#e8d5c0','--txt':'#2a1a0a','--txt2':'#6b4226','--bdr':'#d4a882','--red':'#8B5E3C','--red2':'#6F4E37','--green':'#27ae60','--blue':'#2980b9','--gold':'#d4a017','--glow':'rgba(139,94,60,.15)','--sb-bg':'linear-gradient(180deg,#2a1a0a,#150d05)'},
-  copa:{'--bg':'#eaf7ee','--s1':'#ffffff','--s2':'#dff5e6','--txt':'#063b1f','--txt2':'#1f6b3a','--bdr':'#f1c40f','--red':'#009c3b','--red2':'#ffdf00','--green':'#009c3b','--blue':'#002776','--gold':'#ffdf00','--orange':'#ffdf00','--glow':'rgba(0,156,59,.18)','--sb-bg':'linear-gradient(180deg,#009c3b 0%,#009c3b 48%,#ffdf00 49%,#ffdf00 56%,#002776 57%,#002776 100%)'},
   natal:{'--bg':'#f0fff0','--s1':'#f8fff8','--s2':'#d4f0d4','--txt':'#0a2a0a','--txt2':'#1a5a1a','--bdr':'#90c090','--red':'#c0392b','--red2':'#e74c3c','--green':'#1e8449','--blue':'#2980b9','--gold':'#f1c40f','--glow':'rgba(192,57,43,.15)','--sb-bg':'linear-gradient(180deg,#0a2a0a,#051405)'}
 };
 
@@ -4167,7 +4166,7 @@ window.addEventListener('load', function(){
 
 
 // ── CONFIGURAÇÕES ──
-var TEMAS_NOMES={escuro:'Escuro',claro:'Cinza Claro',branco:'Branco',rosa:'Rosa',vinho:'Vinho',preto:'Preto',copa:'🇧🇷 Copa'};
+var TEMAS_NOMES={escuro:'Escuro',claro:'Cinza Claro',branco:'Branco',rosa:'Rosa',vinho:'Vinho',preto:'Preto'};
 
 var MSG_COB_PAD='Olá, {nome}! 😊\n\nAqui é a *Bela Modas*! 👗\n\nPassando para lembrar que você tem um saldo de crediário em aberto de *{valor}* há {dias} dia(s).\n\nQuando puder, entre em contato para regularizarmos! 💕\n\n📞 31 99733-7304\n📍 @bela_modaspetro';
 var MSG_REC_PAD='👗 *Bela Modas*\n\nOlá, {nome}! 😊\n\n*Comprovante de Venda*\nData: {data}\n\n{itens}\n\n💰 *Total: {total}*\nPagamento: {forma}\n\nObrigada! 💕\n📞 31 99733-7304';
@@ -4176,7 +4175,6 @@ var MSG_EXT_PAD='👗 *Bela Modas*\n\nOlá, {nome}! 😊\n\n📋 *Extrato de Cre
 function setCfg(k,v){localStorage.setItem('bm_cfg_'+k,v);}
 
 function initConfig(){
-  inserirTemaCopaBM();
   ['cfg-s-atual','cfg-s-nova','cfg-s-conf'].forEach(function(id){
     var el=document.getElementById(id); if(el) el.value='';
   });
@@ -4190,7 +4188,7 @@ function initConfig(){
   var sel=document.querySelector('[data-tema="'+t+'"]');
   if(sel){sel.style.outline='3px solid #c0392b'; sel.style.transform='scale(1.06)';}
   var tn=document.getElementById('tema-atual-nome');
-  var nomes={vinho:'Vinho',escuro:'Escuro',claro:'Cinza',branco:'Branco',rosa:'Rosa',preto:'Preto',verde:'Verde',azul:'Azul',lilas:'Lilás',laranja:'Laranja',cafe:'Café',natal:'Natal',copa:'🇧🇷 Copa',custom:'Personalizado'};
+  var nomes={vinho:'Vinho',escuro:'Escuro',claro:'Cinza',branco:'Branco',rosa:'Rosa',preto:'Preto',verde:'Verde',azul:'Azul',lilas:'Lilás',laranja:'Laranja',cafe:'Café',natal:'Natal',custom:'Personalizado'};
   if(tn) tn.textContent=nomes[t]||t;
   // Preencher mensagens
   var defCob='Olá, {nome}! 😊\n\nAqui é a *Bela Modas*! 👗\n\nPassando para lembrar que você tem um crediário em aberto de *{saldo}* há {dias} dias.\n\nQuando puder, entre em contato! 💕\n\n📞 31 99733-7304';
@@ -4227,8 +4225,6 @@ function aplicarTema(nome){
   });
   var sb=document.getElementById('sb');
   if(sb&&t['--sb-bg'])sb.style.background=t['--sb-bg'];
-  document.body.classList.toggle('tema-copa-ativo', nome === 'copa');
-  root.setAttribute('data-tema', nome);
   try{
     var obj=JSON.parse(localStorage.getItem('bm_cfg_obj')||'{}');
     obj.tema=nome; localStorage.setItem('bm_cfg_obj',JSON.stringify(obj));
@@ -4784,24 +4780,7 @@ function salvarMsgsCfg(){
   }catch(e){toast('❌ Erro ao salvar!');}
 }
 
-
-function inserirTemaCopaBM(){
-  var jaExiste=document.querySelector('[data-tema="copa"], #tema-copa');
-  if(jaExiste) return;
-  var htmlBotao='<button type="button" onclick="aplicarTemaCfg(\'copa\')" data-tema="copa" class="tema-card" style="background:linear-gradient(135deg,#009c3b 0%,#009c3b 45%,#ffdf00 46%,#ffdf00 62%,#002776 63%,#002776 100%);border:2px solid #ffdf00;border-radius:10px;padding:10px 6px;cursor:pointer;text-align:center;transition:all .2s;color:#fff;font-size:12px;font-weight:900;text-shadow:0 1px 2px rgba(0,0,0,.45);">🇧🇷 Copa</button>';
-  var cards=document.querySelectorAll('.tema-card');
-  if(cards.length){
-    var ultimo=cards[cards.length-1];
-    ultimo.insertAdjacentHTML('afterend', htmlBotao);
-  }
-  var modalGrid=document.querySelector('#mo-cfg-tema .g3, #mo-cfg-tema .g2, #mo-cfg-tema [style*="grid-template-columns"]');
-  if(modalGrid && !modalGrid.querySelector('#tema-copa')){
-    modalGrid.insertAdjacentHTML('beforeend','<div class="tema-card" onclick="aplicarTema(\'copa\')" id="tema-copa" data-tema="copa" style="border:2px solid var(--bdr);border-radius:10px;padding:18px 8px;cursor:pointer;text-align:center;transition:all .2s;background:linear-gradient(135deg,#009c3b 0%,#009c3b 45%,#ffdf00 46%,#ffdf00 62%,#002776 63%,#002776 100%);color:#fff;font-weight:900;text-shadow:0 1px 2px rgba(0,0,0,.45);" onmouseenter="this.style.transform=\'scale(1.05)\'" onmouseleave="this.style.transform=\'\'">🇧🇷<br>Copa</div>');
-  }
-}
-
 function abrirCfgTema(){
-  inserirTemaCopaBM();
   var t=getCfg('tema')||'vinho';
   document.querySelectorAll('.tema-card').forEach(function(c){
     c.style.borderColor='var(--bdr)'; c.style.boxShadow='none';
@@ -4892,7 +4871,7 @@ function pedirSenhaECancelar(vid){
 
 
 
-var _TEMAS_NOMES_CFG={escuro:'Escuro',claro:'Cinza',branco:'Branco',rosa:'Rosa',vinho:'Vinho',preto:'Preto',copa:'🇧🇷 Copa'};
+var _TEMAS_NOMES_CFG={escuro:'Escuro',claro:'Cinza',branco:'Branco',rosa:'Rosa',vinho:'Vinho',preto:'Preto'};
 
 
 
@@ -4928,7 +4907,7 @@ function abrirFormaPag(){
 
 
 
-var _NOMES_TEMA={vinho:'Vinho',escuro:'Escuro',claro:'Cinza',branco:'Branco',rosa:'Rosa',preto:'Preto',copa:'🇧🇷 Copa'};
+var _NOMES_TEMA={vinho:'Vinho',escuro:'Escuro',claro:'Cinza',branco:'Branco',rosa:'Rosa',preto:'Preto'};
 
 function aplicarTemaCfg(nome){
   aplicarTema(nome);
