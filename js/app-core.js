@@ -4512,6 +4512,107 @@ function parseInputDateTime(v,fallback){
   }
 }
 
+function vendaPossuiNfceBM(v){
+  if(!v) return false;
+  try{
+    if(typeof nfceStatusInfo === 'function'){
+      return nfceStatusInfo(v).classe !== 'sem';
+    }
+  }catch(e){}
+  var raw = String(v.nfce_status || v.status_nfce || v.statusNfce || '').trim();
+  return !!(v.nfce_numero || v.nfce_chave || v.nfce_xml_url || v.nfce_pdf_url || raw || v.nfce_protocolo || v.protocolo || v.nProt);
+}
+
+function recalcularTotaisVendaBM(v){
+  v = v || {};
+  var itens = Array.isArray(v.itens) ? v.itens : [];
+  var subtotal = itens.reduce(function(s,it){
+    return s + (dinheiroNum(it && it.preco) * Number((it && (it.qty || it.qtd || it.quantidade)) || 0));
+  }, 0);
+  var desconto = dinheiroNum(v.desconto || 0);
+  if(desconto > subtotal) desconto = subtotal;
+  v.subtotal = subtotal;
+  v.desconto = desconto;
+  v.total = Math.max(0, subtotal - desconto);
+  v.updatedAt = nowLocalISO();
+  return v.total;
+}
+
+function sincronizarCreditoVendaEditadaBM(v){
+  if(!v || !v.id) return;
+  var creditos = DB.get('creditos') || [];
+  var alterou = false;
+  var idx = creditos.findIndex(function(c){ return String(c.vid || '') === String(v.id); });
+
+  if(String(v.forma || '').toLowerCase() === 'fiado'){
+    var desc = 'Venda Crediário: ' + ((v.itens || []).map(function(i){ return i.desc || i.nome || 'Item'; }).join(', ') || 'Itens removidos');
+    if(idx >= 0){
+      creditos[idx].cid = v.cid;
+      creditos[idx].cliNome = v.cliNome;
+      creditos[idx].desc = desc;
+      creditos[idx].val = v.total;
+      creditos[idx].data = v.data;
+      creditos[idx].updatedAt = nowLocalISO();
+    }else{
+      creditos.push({id:DB.uid(), cid:v.cid, cliNome:v.cliNome, data:v.data, desc:desc, val:v.total, vid:v.id, createdAt:nowLocalISO(), updatedAt:nowLocalISO()});
+    }
+    alterou = true;
+  }else if(idx >= 0){
+    creditos.splice(idx, 1);
+    alterou = true;
+  }
+
+  if(alterou) DB.set('creditos', creditos);
+}
+
+function removerItemVendaSemNfce(vid, itemIndex){
+  pedirSenha(function(){
+    var vendas = DB.get('vendas') || [];
+    var idx = vendas.findIndex(function(x){ return String(x.id) === String(vid); });
+    if(idx < 0){ toast('⚠️ Venda não encontrada!'); return; }
+
+    var v = vendas[idx];
+    if(vendaPossuiNfceBM(v)){
+      toast('⚠️ Venda com NFC-e. Cancele a nota para alterar itens.');
+      return;
+    }
+
+    var itens = Array.isArray(v.itens) ? v.itens : [];
+    var pos = Number(itemIndex);
+    if(!isFinite(pos) || pos < 0 || pos >= itens.length){ toast('⚠️ Item não encontrado!'); return; }
+
+    var item = itens[pos];
+    var valorItem = dinheiroNum(item.preco) * Number(item.qty || item.qtd || item.quantidade || 0);
+    var nomeItem = item.desc || item.nome || 'item';
+
+    if(itens.length <= 1){
+      if(!confirm('Esta venda possui apenas este item. Deseja cancelar a venda inteira?')) return;
+      cancelarVenda(vid);
+      return;
+    }
+
+    if(!confirm('Remover \"'+nomeItem+'\" da venda?\n\nValor: '+R(valorItem)+'\nO item voltará para o estoque.')) return;
+
+    itens.splice(pos, 1);
+    v.itens = itens;
+    ajustarEstoqueVenda([item], 'somar');
+    recalcularTotaisVendaBM(v);
+    vendas[idx] = v;
+    DB.set('vendas', vendas);
+    sincronizarCreditoVendaEditadaBM(v);
+
+    try{ limparDebitosOrfaos(); }catch(e){}
+    try{ renderProds(); }catch(e){}
+    try{ renderPGrid(); }catch(e){}
+    try{ renderVendas(); }catch(e){}
+    try{ renderCaixa(); }catch(e){}
+    try{ renderRel(); }catch(e){}
+    try{ renderDash(); }catch(e){}
+    abrirVdet(vid);
+    toast('✅ Item removido da venda!','ok');
+  });
+}
+
 function abrirVdet(vid){
   var vendas=DB.get('vendas');
   var v=vendas.find(function(x){return x.id===vid;});
@@ -4523,12 +4624,17 @@ function abrirVdet(vid){
   document.getElementById('vdet-total').textContent=R(v.total);
   var sel=document.getElementById('vdet-forma');
   if(sel) sel.value=v.forma||'dinheiro';
-  var rows=(v.itens||[]).map(function(it){
+  var permiteRemover = !vendaPossuiNfceBM(v);
+  var rows=(v.itens||[]).map(function(it,idx){
+    var acao = permiteRemover
+      ? '<button class="btn bd2 xs" onclick="removerItemVendaSemNfce(\''+vid+'\','+idx+')" title="Remover item da venda">🗑️</button>'
+      : '<span class="tm" title="Venda com NFC-e: não permite alterar itens">NFC-e</span>';
     return '<tr>'+
       '<td style="padding:8px 6px;border-bottom:1px solid var(--bdr);">'+it.desc+'</td>'+
       '<td style="padding:8px 6px;text-align:center;border-bottom:1px solid var(--bdr);">'+it.qty+'</td>'+
       '<td style="padding:8px 6px;text-align:right;border-bottom:1px solid var(--bdr);">'+R(it.preco)+'</td>'+
       '<td style="padding:8px 6px;text-align:right;border-bottom:1px solid var(--bdr);font-weight:700;">'+R(it.preco*it.qty)+'</td>'+
+      '<td style="padding:8px 6px;text-align:center;border-bottom:1px solid var(--bdr);">'+acao+'</td>'+
     '</tr>';
   }).join('');
   document.getElementById('vdet-itens').innerHTML=rows;
