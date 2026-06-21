@@ -413,3 +413,179 @@ td{padding:8px 9px !important;font-size:12px !important;}
   border:1px solid rgba(255,255,255,.25);
   font-weight:800;
 }
+
+/* ============================================================
+   TEMA COPA — Bela Modas
+   Ative adicionando a classe "tema-copa" no body/shell ou usando
+   data-theme="copa" / data-tema="copa".
+   Não altera o tema padrão se a classe não estiver ativa.
+   ============================================================ */
+body.tema-copa,
+.tema-copa,
+body[data-theme="copa"],
+body[data-tema="copa"]{
+  --bg:#eaf7ee;
+  --s1:#ffffff;
+  --s2:#dff5e6;
+  --s3:#c8ebd4;
+  --txt:#063b1f;
+  --txt2:#1f6b3a;
+  --bdr:#f1c40f;
+  --red:#009c3b;
+  --red2:#ffdf00;
+  --green:#009c3b;
+  --blue:#002776;
+  --gold:#ffdf00;
+  --orange:#f39c12;
+  --glow:rgba(0,156,59,.18);
+}
+
+body.tema-copa #sb,
+body[data-theme="copa"] #sb,
+body[data-tema="copa"] #sb,
+.tema-copa #sb{
+  background:linear-gradient(180deg,#009c3b 0%,#009c3b 45%,#002776 100%) !important;
+}
+
+body.tema-copa .ph,
+body[data-theme="copa"] .ph,
+body[data-tema="copa"] .ph,
+.tema-copa .ph{
+  background:linear-gradient(90deg,#009c3b 0%,#ffdf00 55%,#002776 100%) !important;
+  border-bottom:2px solid #ffdf00 !important;
+}
+
+body.tema-copa .ph-t,
+body[data-theme="copa"] .ph-t,
+body[data-tema="copa"] .ph-t,
+.tema-copa .ph-t{
+  color:#ffffff !important;
+  text-shadow:0 2px 4px rgba(0,0,0,.35);
+}
+
+body.tema-copa .brand img,
+body[data-theme="copa"] .brand img,
+body[data-tema="copa"] .brand img,
+.tema-copa .brand img{
+  border-color:#ffdf00 !important;
+  box-shadow:0 0 18px rgba(255,223,0,.35) !important;
+}
+
+body.tema-copa .brand-name,
+body.tema-copa .sb-clk,
+body[data-theme="copa"] .brand-name,
+body[data-theme="copa"] .sb-clk,
+body[data-tema="copa"] .brand-name,
+body[data-tema="copa"] .sb-clk,
+.tema-copa .brand-name,
+.tema-copa .sb-clk{
+  color:#ffdf00 !important;
+  text-shadow:0 2px 4px rgba(0,0,0,.35);
+}
+
+body.tema-copa .nv,
+body[data-theme="copa"] .nv,
+body[data-tema="copa"] .nv,
+.tema-copa .nv{
+  color:#ffffff !important;
+}
+
+body.tema-copa .nv:hover,
+body[data-theme="copa"] .nv:hover,
+body[data-tema="copa"] .nv:hover,
+.tema-copa .nv:hover{
+  background:rgba(255,223,0,.22) !important;
+}
+
+body.tema-copa .nv.on,
+body[data-theme="copa"] .nv.on,
+body[data-tema="copa"] .nv.on,
+.tema-copa .nv.on{
+  background:#ffdf00 !important;
+  color:#002776 !important;
+  box-shadow:0 3px 14px rgba(255,223,0,.35) !important;
+}
+
+body.tema-copa .card,
+body.tema-copa .st,
+body.tema-copa .md,
+body[data-theme="copa"] .card,
+body[data-theme="copa"] .st,
+body[data-theme="copa"] .md,
+body[data-tema="copa"] .card,
+body[data-tema="copa"] .st,
+body[data-tema="copa"] .md,
+.tema-copa .card,
+.tema-copa .st,
+.tema-copa .md{
+  border-color:rgba(0,156,59,.35) !important;
+  box-shadow:0 4px 16px rgba(0,39,118,.06);
+}
+
+body.tema-copa .br,
+body.tema-copa .bf.on,
+body.tema-copa .vtab.on,
+body[data-theme="copa"] .br,
+body[data-theme="copa"] .bf.on,
+body[data-theme="copa"] .vtab.on,
+body[data-tema="copa"] .br,
+body[data-tema="copa"] .bf.on,
+body[data-tema="copa"] .vtab.on,
+.tema-copa .br,
+.tema-copa .bf.on,
+.tema-copa .vtab.on{
+  background:#009c3b !important;
+  color:#ffffff !important;
+  border-color:#009c3b !important;
+}
+
+body.tema-copa .bb,
+body[data-theme="copa"] .bb,
+body[data-tema="copa"] .bb,
+.tema-copa .bb{
+  background:#002776 !important;
+}
+
+body.tema-copa .bo,
+body[data-theme="copa"] .bo,
+body[data-tema="copa"] .bo,
+.tema-copa .bo{
+  background:#ffdf00 !important;
+  color:#002776 !important;
+}
+
+body.tema-copa .ct,
+body.tema-copa .ct2,
+body.tema-copa .mht,
+body.tema-copa .tb,
+body.tema-copa .pcard-p,
+body[data-theme="copa"] .ct,
+body[data-theme="copa"] .ct2,
+body[data-theme="copa"] .mht,
+body[data-theme="copa"] .tb,
+body[data-theme="copa"] .pcard-p,
+body[data-tema="copa"] .ct,
+body[data-tema="copa"] .ct2,
+body[data-tema="copa"] .mht,
+body[data-tema="copa"] .tb,
+body[data-tema="copa"] .pcard-p,
+.tema-copa .ct,
+.tema-copa .ct2,
+.tema-copa .mht,
+.tema-copa .tb,
+.tema-copa .pcard-p{
+  color:#009c3b !important;
+}
+
+body.tema-copa .stgo::after,
+body[data-theme="copa"] .stgo::after,
+body[data-tema="copa"] .stgo::after,
+.tema-copa .stgo::after{background:#ffdf00 !important;}
+body.tema-copa .stb::after,
+body[data-theme="copa"] .stb::after,
+body[data-tema="copa"] .stb::after,
+.tema-copa .stb::after{background:#002776 !important;}
+body.tema-copa .stg::after,
+body[data-theme="copa"] .stg::after,
+body[data-tema="copa"] .stg::after,
+.tema-copa .stg::after{background:#009c3b !important;}
