@@ -263,7 +263,28 @@
       var oldConf = window.confirmarPagamento;
       window.confirmarPagamento = function(){
         if(!validarVendedorVenda()) return;
-        return oldConf.apply(this, arguments);
+
+        // Em algumas versões do app-core, confirmarPagamento() chama a função
+        // finalizarVenda() original por referência interna. Por isso armamos a
+        // marcação aqui também, antes da venda ser salva em DB.set('vendas').
+        _idsAntesFinalizar = {};
+        try{
+          (temDB() ? (DB.get('vendas')||[]) : []).forEach(function(v){
+            if(v && v.id) _idsAntesFinalizar[String(v.id)] = true;
+          });
+        }catch(e){}
+        _marcandoVendaAtual = true;
+
+        try{
+          return oldConf.apply(this, arguments);
+        }finally{
+          setTimeout(function(){
+            _marcandoVendaAtual = false;
+            _idsAntesFinalizar = null;
+            setVal('v-vendedor','');
+            atualizarSelectVenda();
+          }, 350);
+        }
       };
       window.confirmarPagamento._bmVendHook = true;
     }
