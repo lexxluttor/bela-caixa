@@ -9,7 +9,10 @@
   var MOD = {};
   var STORE_VENDEDORES = 'vendedores';
   var STORE_COMISSOES = 'comissoes';
+  var REGRA_COMISSAO = 'BM_COMISSAO_V1_NAO_RETROATIVA';
   var _dbSetOriginal = null;
+  var _marcandoVendaAtual = false;
+  var _idsAntesFinalizar = null;
   var _irOriginal = null;
   var _hooksAplicados = false;
 
@@ -92,6 +95,18 @@
     return {valor:totalComissao, percentual_medio:percentualMedio, detalhes:detalhes};
   }
 
+
+
+  /*
+   * REGRA 001 — Comissão não retroativa
+   * Vendas antigas, criadas antes da implantação deste módulo, não recebem
+   * vendedor automaticamente e não entram no relatório de comissão.
+   * A comissão só é registrada durante a finalização da venda, quando o
+   * usuário seleciona um vendedor ativo no campo obrigatório da venda.
+   * O percentual e o valor ficam gravados no histórico da própria venda,
+   * preservando o fechamento caso a comissão do vendedor mude no futuro.
+   */
+
   function vendedorSelecionadoVenda(){ return val('v-vendedor'); }
 
   function vendaPrecisaVendedor(){
@@ -112,9 +127,20 @@
     return false;
   }
 
+  function vendaPodeReceberComissaoAgora(venda){
+    if(!_marcandoVendaAtual || !_idsAntesFinalizar) return false;
+    if(!venda || !venda.id) return false;
+    return !_idsAntesFinalizar[String(venda.id)];
+  }
+
+  function vendaMarcadaPeloModulo(venda){
+    return !!(venda && (venda.comissao_regra === REGRA_COMISSAO || venda.comissaoRegra === REGRA_COMISSAO || (venda.comissao && venda.comissao.regra === REGRA_COMISSAO)));
+  }
+
   function enriquecerVenda(venda){
     if(!venda || venda.deletedAt) return venda;
-    if(venda.vendedor_id || venda.vendedorId) return venda;
+    if(venda.vendedor_id || venda.vendedorId || vendaMarcadaPeloModulo(venda)) return venda;
+    if(!vendaPodeReceberComissaoAgora(venda)) return venda;
     var id = vendedorSelecionadoVenda();
     var vendedor = getVendedor(id);
     if(!vendedor) return venda;
@@ -123,11 +149,17 @@
     venda.vendedorId = vendedor.id;
     venda.vendedor_nome = vendedor.nome;
     venda.vendedorNome = vendedor.nome;
+    venda.comissao_regra = REGRA_COMISSAO;
+    venda.comissaoRegra = REGRA_COMISSAO;
+    venda.comissao_gerada_em = agora();
+    venda.comissaoGeradaEm = venda.comissao_gerada_em;
     venda.comissao_percentual = Number(calc.percentual_medio || 0);
     venda.comissao_valor = Number(calc.valor || 0);
     venda.comissao = {
       vendedor_id: vendedor.id,
       vendedor_nome: vendedor.nome,
+      regra: REGRA_COMISSAO,
+      gerada_em: venda.comissao_gerada_em,
       percentual_medio: Number(calc.percentual_medio || 0),
       valor: Number(calc.valor || 0),
       detalhes: calc.detalhes,
@@ -139,6 +171,7 @@
 
   function registrarComissaoDaVenda(venda){
     if(!temDB() || !venda || !venda.id || !venda.vendedor_id) return;
+    if(!vendaMarcadaPeloModulo(venda)) return;
     var lista = DB.get(STORE_COMISSOES) || [];
     var idx = lista.findIndex(function(c){ return String(c.venda_id) === String(venda.id); });
     var reg = {
@@ -148,6 +181,7 @@
       cliente: venda.cliNome || venda.cliente || 'Balcão',
       vendedor_id: venda.vendedor_id,
       vendedor_nome: venda.vendedor_nome || venda.vendedorNome || '',
+      regra: REGRA_COMISSAO,
       total_venda: dinheiro(venda.total),
       percentual_medio: dinheiro(venda.comissao_percentual || (venda.comissao && venda.comissao.percentual_medio)),
       valor: dinheiro(venda.comissao_valor || (venda.comissao && venda.comissao.valor)),
@@ -165,7 +199,7 @@
     if(!temDB() || DB._bmVendedoresHook) return;
     _dbSetOriginal = DB.set;
     DB.set = function(k,v){
-      if(k === 'vendas' && Array.isArray(v)){
+      if(k === 'vendas' && Array.isArray(v) && _marcandoVendaAtual){
         var alterou = false;
         v = v.map(function(venda){
           var antes = venda && (venda.vendedor_id || venda.vendedorId);
@@ -214,7 +248,14 @@
       var oldFin = window.finalizarVenda;
       window.finalizarVenda = function(){
         if(!validarVendedorVenda()) return;
-        return oldFin.apply(this, arguments);
+        _idsAntesFinalizar = {};
+        try{ (temDB() ? (DB.get('vendas')||[]) : []).forEach(function(v){ if(v && v.id) _idsAntesFinalizar[String(v.id)] = true; }); }catch(e){}
+        _marcandoVendaAtual = true;
+        try{
+          return oldFin.apply(this, arguments);
+        }finally{
+          setTimeout(function(){ _marcandoVendaAtual = false; _idsAntesFinalizar = null; }, 120);
+        }
       };
       window.finalizarVenda._bmVendHook = true;
     }
@@ -271,10 +312,10 @@
   function vendasValidas(){ return temDB() ? (DB.get('vendas')||[]).filter(function(v){ return v && !v.deletedAt; }) : []; }
   function comissoesGravadas(){ return temDB() ? (DB.get(STORE_COMISSOES)||[]).filter(function(c){ return c && !c.deletedAt; }) : []; }
 
-  function vendaTemComissao(venda){ return venda && (venda.comissao || venda.comissao_valor != null || venda.vendedor_id || venda.vendedorId); }
+  function vendaTemComissao(venda){ return vendaMarcadaPeloModulo(venda) && (venda.comissao || venda.comissao_valor != null || venda.vendedor_id || venda.vendedorId); }
 
   function normalizarComissaoVenda(venda){
-    if(!venda) return null;
+    if(!venda || !vendaMarcadaPeloModulo(venda)) return null;
     var vid = venda.vendedor_id || venda.vendedorId;
     var vendedor = getVendedor(vid);
     if(!vendedor && venda.vendedor_nome){ vendedor = {id:vid||'', nome:venda.vendedor_nome, comissoes:{}}; }
@@ -307,6 +348,7 @@
       if(r) porVenda[String(r.venda_id)] = r;
     });
     comissoesGravadas().forEach(function(c){
+      if(c.regra !== REGRA_COMISSAO) return;
       if(!porVenda[String(c.venda_id)]) porVenda[String(c.venda_id)] = c;
     });
     return Object.keys(porVenda).map(function(k){ return porVenda[k]; });
