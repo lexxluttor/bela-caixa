@@ -58,7 +58,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="nav-sec">Cadastros</div>
     <div class="nv" onclick="ir('clientes')">👥 Clientes</div>
     <div class="nv" onclick="ir('produtos')">👗 Produtos</div>
-    <div class="nv" onclick="ir('vendedores')">👩‍💼 Vendedores</div>
+    <div class="nv" onclick="if(typeof pedirSenha==='function'){pedirSenha(function(){ir('vendedores');});}else{ir('vendedores');}">👩‍💼 Vendedores</div>
     <div class="nv" onclick="ir('balanco')">📦 Balanço</div>
     <div class="nav-sec">Financeiro</div>
     <div class="nv" onclick="ir('caixa')">🗃️ Caixa do Dia</div>
@@ -106,15 +106,12 @@ document.addEventListener('DOMContentLoaded',function(){
           <button class="btn bh sm" onclick="abrirListaCliVenda()" title="Ver todos os clientes">📋 Lista</button>
         </div>
         <div id="v-sg"></div>
-        <div class="vend-venda-box" style="margin-top:8px;display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:end;">
+        <div class="vend-venda-box" style="margin-top:8px;">
           <div class="fg" style="margin:0;">
             <label class="fl">Vendedor <span style="color:var(--red2);">*</span></label>
-            <select class="fi" id="v-vendedor" required onchange="if(window.BMVendedoresComissoes&&BMVendedoresComissoes.atualizarResumoVenda)BMVendedoresComissoes.atualizarResumoVenda();">
+            <select class="fi" id="v-vendedor" required>
               <option value="">Selecione o vendedor...</option>
             </select>
-          </div>
-          <div class="imp-box" id="v-vendedor-resumo" style="padding:8px 10px;font-size:12px;min-height:38px;display:flex;align-items:center;justify-content:center;text-align:center;">
-            Comissão: —
           </div>
         </div>
       <!-- Adicionar Item - com abas -->
