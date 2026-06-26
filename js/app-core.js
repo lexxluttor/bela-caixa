@@ -2049,130 +2049,6 @@ function aplicarDescontoVenda(v){
   vDesconto=n;
   renderCart();
 }
-
-function bmvcFormaComissaoApp(forma){
-  forma = String(forma || '').toLowerCase();
-  if(forma === 'credito' || forma === 'debito' || forma === 'cartao' || forma === 'cartão') return 'cartao';
-  if(forma === 'fiado' || forma === 'crediario' || forma === 'crediário') return 'crediario';
-  if(forma === 'pix') return 'pix';
-  return 'dinheiro';
-}
-function bmvcRotuloFormaComissaoApp(forma){
-  var f = bmvcFormaComissaoApp(forma);
-  if(f === 'pix') return 'PIX';
-  if(f === 'dinheiro') return 'Dinheiro';
-  if(f === 'cartao') return 'Cartão';
-  if(f === 'crediario') return 'Crediário';
-  return f;
-}
-function bmvcComissoesVendedorApp(vendedor){
-  vendedor = vendedor || {};
-  var c = vendedor.comissoes || {};
-  return {
-    pix: dinheiroNum(c.pix != null ? c.pix : (vendedor.comissao_pix != null ? vendedor.comissao_pix : vendedor.percentual)),
-    dinheiro: dinheiroNum(c.dinheiro != null ? c.dinheiro : (vendedor.comissao_dinheiro != null ? vendedor.comissao_dinheiro : vendedor.percentual)),
-    cartao: dinheiroNum(c.cartao != null ? c.cartao : (vendedor.comissao_cartao != null ? vendedor.comissao_cartao : vendedor.percentual)),
-    crediario: dinheiroNum(c.crediario != null ? c.crediario : (vendedor.comissao_crediario != null ? vendedor.comissao_crediario : vendedor.percentual))
-  };
-}
-function bmvcVendedorSelecionadoApp(){
-  var s = document.getElementById('v-vendedor');
-  if(!s) return null;
-  var id = String(s.value || '').trim();
-  if(!id) return null;
-  return (DB.get('vendedores') || []).find(function(v){
-    return v && !v.deletedAt && String(v.id) === id;
-  }) || null;
-}
-function bmvcValidarVendedorObrigatorioApp(){
-  var s = document.getElementById('v-vendedor');
-  if(!s) return true;
-  var vendedor = bmvcVendedorSelecionadoApp();
-  if(vendedor) return true;
-  toast('⚠️ Selecione o vendedor antes de finalizar a venda.');
-  try{ s.focus(); s.style.borderColor='var(--red2)'; setTimeout(function(){ s.style.borderColor=''; },1600); }catch(e){}
-  return false;
-}
-function bmvcPagamentosComissaoApp(venda){
-  var lista=[];
-  if(venda && Array.isArray(venda.pagamentos) && venda.pagamentos.length){
-    venda.pagamentos.forEach(function(p){
-      var valor = dinheiroNum(p.valor != null ? p.valor : p.val);
-      if(valor > 0) lista.push({forma:bmvcFormaComissaoApp(p.forma || p.tipo), valor:valor});
-    });
-    return lista;
-  }
-  return [{forma:bmvcFormaComissaoApp(venda && venda.forma), valor:dinheiroNum(venda && venda.total)}];
-}
-function bmvcTextoFormasComissaoApp(detalhes){
-  var vistos={};
-  (detalhes || []).forEach(function(d){ vistos[bmvcFormaComissaoApp(d.forma)] = true; });
-  return Object.keys(vistos).map(bmvcRotuloFormaComissaoApp).join(' + ');
-}
-function bmvcCalcularComissaoVendaApp(venda, vendedor){
-  var conf = bmvcComissoesVendedorApp(vendedor);
-  var pagamentos = bmvcPagamentosComissaoApp(venda);
-  var totalBase = 0;
-  var totalComissao = 0;
-  var detalhes = pagamentos.map(function(p){
-    var forma = bmvcFormaComissaoApp(p.forma);
-    var valor = dinheiroNum(p.valor);
-    var pct = dinheiroNum(conf[forma]);
-    var com = valor * pct / 100;
-    totalBase += valor;
-    totalComissao += com;
-    return {forma:forma, valor:valor, percentual:pct, comissao:com};
-  });
-  return {valor:totalComissao, percentual_medio:totalBase > 0 ? (totalComissao / totalBase * 100) : 0, detalhes:detalhes};
-}
-function bmvcAplicarVendedorComissaoVendaApp(venda){
-  if(!venda) return venda;
-  var vendedor = bmvcVendedorSelecionadoApp();
-  if(!vendedor) return venda;
-  var calc = bmvcCalcularComissaoVendaApp(venda, vendedor);
-  var gerada = nowLocalISO();
-  venda.vendedor_id = vendedor.id;
-  venda.vendedorId = vendedor.id;
-  venda.vendedor_nome = vendedor.nome || '';
-  venda.vendedorNome = vendedor.nome || '';
-  venda.comissao_regra = 'BM_COMISSAO_V1';
-  venda.comissaoRegra = 'BM_COMISSAO_V1';
-  venda.comissao_gerada_em = gerada;
-  venda.comissaoGeradaEm = gerada;
-  venda.comissao_percentual = Number(calc.percentual_medio || 0);
-  venda.comissao_valor = Number(calc.valor || 0);
-  venda.comissao = {
-    vendedor_id: vendedor.id,
-    vendedor_nome: vendedor.nome || '',
-    regra: 'BM_COMISSAO_V1',
-    gerada_em: gerada,
-    percentual_medio: Number(calc.percentual_medio || 0),
-    valor: Number(calc.valor || 0),
-    detalhes: calc.detalhes,
-    forma_pagamento: bmvcTextoFormasComissaoApp(calc.detalhes),
-    status: 'pendente',
-    createdAt: gerada
-  };
-  return venda;
-}
-function bmvcLimparVendedorVendaApp(){
-  var s = document.getElementById('v-vendedor');
-  if(s) s.value = '';
-}
-function bmvcAtualizarSelectVendedoresVendaApp(){
-  if(window.BMVC && typeof window.BMVC.atualizarSelectVenda === 'function'){
-    try{ window.BMVC.atualizarSelectVenda(); return; }catch(e){}
-  }
-  var s = document.getElementById('v-vendedor');
-  if(!s) return;
-  var atual = s.value;
-  var vendedores = (DB.get('vendedores') || []).filter(function(v){ return v && !v.deletedAt && v.ativo !== false; });
-  s.innerHTML = '<option value="">Selecione o vendedor...</option>' + vendedores.map(function(v){
-    return '<option value="'+String(v.id).replace(/"/g,'&quot;')+'">'+String(v.nome || '').replace(/</g,'&lt;')+'</option>';
-  }).join('');
-  s.value = vendedores.some(function(v){ return String(v.id) === String(atual); }) ? atual : '';
-}
-
 function initVenda(){
   cart=[];vCli=null;vForma='dinheiro';vDesconto=0;vPagamentosDivididos=null;
   var vsc=document.getElementById('v-sc'); if(vsc) vsc.value='';
@@ -2181,8 +2057,6 @@ function initVenda(){
   var vpreco=document.getElementById('v-preco'); if(vpreco) vpreco.value='';
   var vqty=document.getElementById('v-qty'); if(vqty) vqty.value='1';
   var cdesc=document.getElementById('cdesc'); if(cdesc) cdesc.value='';
-  bmvcLimparVendedorVendaApp();
-  bmvcAtualizarSelectVendedoresVendaApp();
   var bfs=document.querySelectorAll('.bf');
   if(bfs && bfs.length){
     bfs.forEach(function(b){b.classList.remove('on');});
@@ -2886,7 +2760,6 @@ function obterPagamentoDividido(){
 }
 function abrirModalPagamento(){
   if(!cart.length){toast('⚠️ Carrinho vazio!');return;}
-  if(!bmvcValidarVendedorObrigatorioApp()) return;
   garantirPagamentoDivididoUI();
   var subtotal=getCartSubtotal();
   var desconto=getCartDiscount();
@@ -2995,7 +2868,6 @@ function finalizarVenda(){
   if(_finalizandoVenda) return;
   if(!cart.length){toast('⚠️ Carrinho vazio!');return;}
   if(vForma==='fiado'&&!vCli){toast('⚠️ Selecione um cliente para crediário!');return;}
-  if(!bmvcValidarVendedorObrigatorioApp()) return;
   _finalizandoVenda=true;
   try{
     var subtotal=getCartSubtotal();
@@ -3005,14 +2877,12 @@ function finalizarVenda(){
     var itensVenda=JSON.parse(JSON.stringify(cart));
     var venda={id:DB.uid(),data:stamp,createdAt:stamp,updatedAt:stamp,deletedAt:'',cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:itensVenda,subtotal:subtotal,desconto:desconto,total:total};
     if(vForma==='dividido') venda.pagamentos=JSON.parse(JSON.stringify(vPagamentosDivididos||[]));
-    bmvcAplicarVendedorComissaoVendaApp(venda);
 
     ajustarEstoqueVenda(venda.itens, 'subtrair');
 
     var vendas=DB.get('vendas')||[];
     vendas.push(venda);
     DB.set('vendas',vendas);
-    try{ if(window.BMVC && typeof window.BMVC.registrarComissaoVenda === 'function') window.BMVC.registrarComissaoVenda(venda); }catch(e){}
 
     if(vForma==='fiado'&&vCli){
       var crds=DB.get('creditos')||[];
@@ -3026,8 +2896,6 @@ function finalizarVenda(){
 
     remCli();
     cart=[];vCli=null;vForma='dinheiro';vDesconto=0;vPagamentosDivididos=null;
-    bmvcLimparVendedorVendaApp();
-    bmvcAtualizarSelectVendedoresVendaApp();
     var desc=document.getElementById('v-desc'); if(desc) desc.value='';
     var preco=document.getElementById('v-preco'); if(preco) preco.value='';
     var qty=document.getElementById('v-qty'); if(qty) qty.value='1';
@@ -3038,6 +2906,7 @@ function finalizarVenda(){
       try{renderProds();}catch(e){}
       try{renderPGrid();}catch(e){}
       try{if(typeof renderDash==='function') renderDash();}catch(e){}
+      try{if(typeof renderVendas==='function') renderVendas();}catch(e){}
       try{if(typeof renderCx==='function') renderCx();}catch(e){}
       try{if(typeof syncNow==='function') syncNow();}catch(e){}
     },60);
