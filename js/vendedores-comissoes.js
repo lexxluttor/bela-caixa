@@ -16,6 +16,8 @@
   var _idsAntesFinalizar = null;
   var _irOriginal = null;
   var _hooksAplicados = false;
+  var _vendedorPendenteFinalizacao = '';
+  var _capturaVendaNivel = 0;
 
   function temDB(){ return window.DB && typeof DB.get === 'function' && typeof DB.set === 'function'; }
   function uid(){ return temDB() && typeof DB.uid === 'function' ? DB.uid() : Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -131,6 +133,44 @@
 
   function vendedorSelecionadoVenda(){ return val('v-vendedor'); }
 
+  function vendedorPendenteOuSelecionado(){
+    return _vendedorPendenteFinalizacao || vendedorSelecionadoVenda();
+  }
+
+  function capturarIdsVendasAtuais(){
+    var mapa = {};
+    try{
+      (temDB() ? (DB.get('vendas')||[]) : []).forEach(function(v){
+        if(v && v.id) mapa[String(v.id)] = true;
+      });
+    }catch(e){}
+    return mapa;
+  }
+
+  function prepararCapturaVenda(){
+    if(!validarVendedorVenda()) return false;
+    _capturaVendaNivel++;
+    _vendedorPendenteFinalizacao = vendedorSelecionadoVenda() || _vendedorPendenteFinalizacao || '';
+    if(!_idsAntesFinalizar) _idsAntesFinalizar = capturarIdsVendasAtuais();
+    _marcandoVendaAtual = true;
+    return true;
+  }
+
+  function encerrarCapturaVenda(){
+    setTimeout(function(){
+      _capturaVendaNivel = Math.max(0, _capturaVendaNivel - 1);
+      if(_capturaVendaNivel <= 0){
+        _marcandoVendaAtual = false;
+        _idsAntesFinalizar = null;
+        _vendedorPendenteFinalizacao = '';
+        setVal('v-vendedor','');
+        atualizarSelectVenda();
+        try{ MOD.renderComissoes(); }catch(e){}
+        try{ if(typeof window.renderVendas === 'function') window.renderVendas(); }catch(e){}
+      }
+    }, 250);
+  }
+
   function vendaPrecisaVendedor(){
     var select = el('v-vendedor');
     if(!select) return false;
@@ -150,8 +190,9 @@
   }
 
   function vendaPodeReceberComissaoAgora(venda){
-    if(!_marcandoVendaAtual || !_idsAntesFinalizar) return false;
     if(!venda || !venda.id) return false;
+    if(!_vendedorPendenteFinalizacao && !_marcandoVendaAtual) return false;
+    if(!_idsAntesFinalizar) _idsAntesFinalizar = capturarIdsVendasAtuais();
     return !_idsAntesFinalizar[String(venda.id)];
   }
 
@@ -163,7 +204,7 @@
     if(!venda || venda.deletedAt) return venda;
     if(venda.vendedor_id || venda.vendedorId || vendaMarcadaPeloModulo(venda)) return venda;
     if(!vendaPodeReceberComissaoAgora(venda)) return venda;
-    var id = vendedorSelecionadoVenda();
+    var id = vendedorPendenteOuSelecionado();
     var vendedor = getVendedor(id);
     if(!vendedor) return venda;
     var calc = calcularComissaoVenda(venda, vendedor);
@@ -190,47 +231,6 @@
       createdAt: agora()
     };
     return venda;
-  }
-
-
-  function prepararMarcacaoVenda(){
-    _idsAntesFinalizar = {};
-    try{
-      (temDB() ? (DB.get('vendas')||[]) : []).forEach(function(v){
-        if(v && v.id) _idsAntesFinalizar[String(v.id)] = true;
-      });
-    }catch(e){}
-    _marcandoVendaAtual = true;
-  }
-
-  function finalizarMarcacaoVenda(){
-    setTimeout(function(){
-      try{
-        // Fallback: se alguma venda nova escapou do hook do DB.set, marca agora.
-        var vendas = temDB() ? (DB.get('vendas')||[]) : [];
-        var alterou = false;
-        vendas = vendas.map(function(venda){
-          if(venda && venda.id && _idsAntesFinalizar && !_idsAntesFinalizar[String(venda.id)] && !vendaMarcadaPeloModulo(venda)){
-            var nova = enriquecerVenda(venda);
-            if(vendaMarcadaPeloModulo(nova)){
-              registrarComissaoDaVenda(nova);
-              alterou = true;
-            }
-            return nova;
-          }
-          return venda;
-        });
-        if(alterou){
-          if(_dbSetOriginal) _dbSetOriginal.call(DB, 'vendas', vendas);
-          else DB.set('vendas', vendas);
-        }
-      }catch(e){}
-      _marcandoVendaAtual = false;
-      _idsAntesFinalizar = null;
-      setVal('v-vendedor','');
-      atualizarSelectVenda();
-      try{ MOD.renderComissoes(); }catch(e){}
-    }, 220);
   }
 
   function registrarComissaoDaVenda(venda){
@@ -264,24 +264,32 @@
     if(!temDB() || DB._bmVendedoresHook) return;
     _dbSetOriginal = DB.set;
     DB.set = function(k,v){
-      if(k === 'vendas' && Array.isArray(v) && _marcandoVendaAtual){
-        var alterou = false;
-        v = v.map(function(venda){
-          var antes = venda && (venda.vendedor_id || venda.vendedorId);
-          var nova = enriquecerVenda(venda);
-          var depois = nova && (nova.vendedor_id || nova.vendedorId);
-          if(!antes && depois) alterou = true;
-          return nova;
-        });
-        var ret = _dbSetOriginal.call(DB,k,v);
-        if(alterou){
-          try{
-            v.forEach(function(venda){
-              if(venda && venda.vendedor_id) registrarComissaoDaVenda(venda);
-            });
-          }catch(e){}
+      if(k === 'vendas' && Array.isArray(v)){
+        var deveTentarCaptura = !!(_vendedorPendenteFinalizacao || _marcandoVendaAtual);
+        if(deveTentarCaptura){
+          if(!_idsAntesFinalizar) _idsAntesFinalizar = capturarIdsVendasAtuais();
+          var alterou = false;
+          v = v.map(function(venda){
+            var antes = venda && (venda.vendedor_id || venda.vendedorId || vendaMarcadaPeloModulo(venda));
+            var nova = enriquecerVenda(venda);
+            var depois = nova && (nova.vendedor_id || nova.vendedorId || vendaMarcadaPeloModulo(nova));
+            if(!antes && depois) alterou = true;
+            return nova;
+          });
+          var ret = _dbSetOriginal.call(DB,k,v);
+          if(alterou){
+            try{
+              v.forEach(function(venda){
+                if(venda && venda.vendedor_id && vendaMarcadaPeloModulo(venda)) registrarComissaoDaVenda(venda);
+              });
+              setTimeout(function(){
+                try{ MOD.renderComissoes(); }catch(e){}
+                try{ if(typeof window.renderVendas === 'function') window.renderVendas(); }catch(e){}
+              },80);
+            }catch(e){}
+          }
+          return ret;
         }
-        return ret;
       }
       return _dbSetOriginal.call(DB,k,v);
     };
@@ -303,12 +311,11 @@
     if(typeof window.confirmarPagamento === 'function' && !window.confirmarPagamento._bmVendHook){
       var oldConf = window.confirmarPagamento;
       window.confirmarPagamento = function(){
-        if(!validarVendedorVenda()) return;
-        prepararMarcacaoVenda();
+        if(!prepararCapturaVenda()) return;
         try{
           return oldConf.apply(this, arguments);
         }finally{
-          finalizarMarcacaoVenda();
+          encerrarCapturaVenda();
         }
       };
       window.confirmarPagamento._bmVendHook = true;
@@ -317,12 +324,11 @@
     if(typeof window.finalizarVenda === 'function' && !window.finalizarVenda._bmVendHook){
       var oldFin = window.finalizarVenda;
       window.finalizarVenda = function(){
-        if(!validarVendedorVenda()) return;
-        prepararMarcacaoVenda();
+        if(!prepararCapturaVenda()) return;
         try{
           return oldFin.apply(this, arguments);
         }finally{
-          finalizarMarcacaoVenda();
+          encerrarCapturaVenda();
         }
       };
       window.finalizarVenda._bmVendHook = true;
