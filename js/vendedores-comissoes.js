@@ -9,6 +9,7 @@
   var MOD = {};
   var STORE_VENDEDORES = 'vendedores';
   var STORE_COMISSOES = 'comissoes';
+  var STORE_FECHAMENTOS = 'fechamentos_comissoes';
   var REGRA_COMISSAO = 'BM_COMISSAO_V1_NAO_RETROATIVA';
   var _dbSetOriginal = null;
   var _marcandoVendaAtual = false;
@@ -65,6 +66,27 @@
     if(f === 'credito' || f === 'crédito' || f === 'debito' || f === 'débito' || f === 'cartao' || f === 'cartão') return 'cartao';
     if(f === 'fiado' || f === 'crediario' || f === 'crediário') return 'crediario';
     return f || 'dinheiro';
+  }
+
+  function rotuloFormaComissao(forma){
+    var f = formaComissao(forma);
+    if(f === 'pix') return 'PIX';
+    if(f === 'dinheiro') return 'Dinheiro';
+    if(f === 'cartao') return 'Cartão';
+    if(f === 'crediario') return 'Crediário';
+    return forma ? String(forma) : '—';
+  }
+
+  function textoFormasComissao(detalhes){
+    detalhes = Array.isArray(detalhes) ? detalhes : [];
+    var mapa = {};
+    detalhes.forEach(function(d){
+      var f = formaComissao(d && d.forma);
+      if(f) mapa[f] = true;
+    });
+    var lista = Object.keys(mapa);
+    if(!lista.length) return '—';
+    return lista.map(rotuloFormaComissao).join(' + ');
   }
 
   function pagamentosDaVenda(venda){
@@ -163,6 +185,7 @@
       percentual_medio: Number(calc.percentual_medio || 0),
       valor: Number(calc.valor || 0),
       detalhes: calc.detalhes,
+      forma_pagamento: textoFormasComissao(calc.detalhes),
       status: 'pendente',
       createdAt: agora()
     };
@@ -186,6 +209,7 @@
       percentual_medio: dinheiro(venda.comissao_percentual || (venda.comissao && venda.comissao.percentual_medio)),
       valor: dinheiro(venda.comissao_valor || (venda.comissao && venda.comissao.valor)),
       detalhes: venda.comissao && venda.comissao.detalhes || [],
+      forma_pagamento: textoFormasComissao(venda.comissao && venda.comissao.detalhes || []),
       status: venda.comissao_status || 'pendente',
       updatedAt: agora()
     };
@@ -254,7 +278,12 @@
         try{
           return oldFin.apply(this, arguments);
         }finally{
-          setTimeout(function(){ _marcandoVendaAtual = false; _idsAntesFinalizar = null; }, 120);
+          setTimeout(function(){
+            _marcandoVendaAtual = false;
+            _idsAntesFinalizar = null;
+            setVal('v-vendedor','');
+            atualizarSelectVenda();
+          }, 180);
         }
       };
       window.finalizarVenda._bmVendHook = true;
@@ -337,6 +366,7 @@
       percentual_medio: calc.percentual_medio,
       valor: calc.valor,
       detalhes: calc.detalhes,
+      forma_pagamento: textoFormasComissao(calc.detalhes),
       status: venda.comissao_status || (venda.comissao && venda.comissao.status) || 'pendente'
     };
   }
@@ -496,18 +526,92 @@
     MOD.renderComissoes();
   };
 
-  MOD.renderComissoes = function(){
-    atualizarFiltroVendedor();
+  function garantirBotaoFecharComissao(){
+    if(el('com-fechar-btn')) return;
+    var ref = el('com-vendedor');
+    if(!ref) return;
+    var linha = ref.closest ? ref.closest('.fr') : ref.parentNode;
+    if(!linha) return;
+    var btn = document.createElement('button');
+    btn.id = 'com-fechar-btn';
+    btn.className = 'btn bg2';
+    btn.type = 'button';
+    btn.innerHTML = '✅ Fechar comissão';
+    btn.onclick = function(){ MOD.fecharComissao(); };
+    linha.appendChild(btn);
+  }
+
+  function ajustarCabecalhoRelatorioComissao(){
+    var tb = el('com-tb');
+    if(!tb) return;
+    var table = tb.closest ? tb.closest('table') : null;
+    var ths = table ? table.querySelectorAll('thead th') : [];
+    if(ths && ths.length >= 8){
+      ths[4].textContent = 'Forma';
+      ths[5].textContent = 'Total venda';
+      ths[6].textContent = '%';
+      ths[7].textContent = 'Comissão';
+    }
+  }
+
+  function listaComissaoFiltrada(){
     var ini = val('com-ini');
     var fim = val('com-fim');
     var vendedorId = val('com-vendedor');
-    var lista = registrosComissao().filter(function(c){
+    return registrosComissao().filter(function(c){
       var d = String(c.data || '').slice(0,10);
       if(ini && d < ini) return false;
       if(fim && d > fim) return false;
       if(vendedorId && String(c.vendedor_id) !== String(vendedorId)) return false;
       return true;
     }).sort(function(a,b){ return String(b.data||'').localeCompare(String(a.data||'')); });
+  }
+
+  MOD.fecharComissao = function(){
+    if(!temDB()){ toastBM('⚠️ Banco local não carregado.'); return; }
+    var lista = listaComissaoFiltrada();
+    if(!lista.length){ toastBM('⚠️ Nenhuma comissão encontrada para fechar.'); return; }
+    var ini = val('com-ini') || 'início';
+    var fim = val('com-fim') || 'hoje';
+    var vendedorId = val('com-vendedor');
+    var vend = vendedorId ? getVendedor(vendedorId) : null;
+    var totalVendido = lista.reduce(function(s,c){ return s + dinheiro(c.total_venda); },0);
+    var totalComissao = lista.reduce(function(s,c){ return s + dinheiro(c.valor); },0);
+    var msg = 'Fechar comissão do período '+ini+' até '+fim+'?\n\n'+
+      'Vendedor: '+(vend ? vend.nome : 'Todos os vendedores')+'\n'+
+      'Vendas: '+lista.length+'\n'+
+      'Total vendido: '+moeda(totalVendido)+'\n'+
+      'Comissão: '+moeda(totalComissao)+'\n\n'+
+      'Esse fechamento ficará salvo no histórico.';
+    if(!confirm(msg)) return;
+
+    var fechamentos = DB.get(STORE_FECHAMENTOS) || [];
+    var fechamento = {
+      id: uid(),
+      regra: REGRA_COMISSAO,
+      data_inicial: val('com-ini') || '',
+      data_final: val('com-fim') || '',
+      vendedor_id: vendedorId || '',
+      vendedor_nome: vend ? vend.nome : 'Todos os vendedores',
+      vendas: lista.length,
+      total_vendido: totalVendido,
+      total_comissao: totalComissao,
+      comissoes_ids: lista.map(function(c){ return c.id || c.venda_id; }),
+      vendas_ids: lista.map(function(c){ return c.venda_id; }),
+      fechado_em: agora(),
+      createdAt: agora()
+    };
+    fechamentos.push(fechamento);
+    DB.set(STORE_FECHAMENTOS, fechamentos);
+    toastBM('✅ Comissão fechada: '+moeda(totalComissao),'ok');
+    MOD.renderComissoes();
+  };
+
+  MOD.renderComissoes = function(){
+    atualizarFiltroVendedor();
+    garantirBotaoFecharComissao();
+    ajustarCabecalhoRelatorioComissao();
+    var lista = listaComissaoFiltrada();
 
     var totalVendido = lista.reduce(function(s,c){ return s + dinheiro(c.total_venda); },0);
     var totalComissao = lista.reduce(function(s,c){ return s + dinheiro(c.valor); },0);
@@ -530,10 +634,10 @@
           '<td><span class="tm">'+esc(c.venda_id || '')+'</span></td>'+
           '<td>'+esc(c.cliente || 'Balcão')+'</td>'+
           '<td><b>'+esc(c.vendedor_nome || '')+'</b></td>'+
+          '<td>'+esc(c.forma_pagamento || textoFormasComissao(c.detalhes))+'</td>'+
           '<td>'+moeda(c.total_venda)+'</td>'+
           '<td>'+fmtPct(c.percentual_medio)+'</td>'+
           '<td><b class="txt-g">'+moeda(c.valor)+'</b></td>'+
-          '<td>'+(c.status === 'pago' ? '<span class="txt-g">Pago</span>' : '<span class="txt-o">Pendente</span>')+'</td>'+
         '</tr>';
       }).join('') || '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--txt2);">Nenhuma comissão encontrada no período.</td></tr>';
     }
@@ -560,6 +664,7 @@
     aplicarHookIr();
     atualizarSelectVenda();
     atualizarFiltroVendedor();
+    garantirBotaoFecharComissao();
     MOD.renderVendedores();
     if(!val('com-ini')) setVal('com-ini', hoje().slice(0,8)+'01');
     if(!val('com-fim')) setVal('com-fim', hoje());
