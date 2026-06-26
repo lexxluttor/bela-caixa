@@ -58,6 +58,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="nav-sec">Cadastros</div>
     <div class="nv" onclick="ir('clientes')">👥 Clientes</div>
     <div class="nv" onclick="ir('produtos')">👗 Produtos</div>
+    <div class="nv" onclick="ir('vendedores')">👩‍💼 Vendedores</div>
     <div class="nv" onclick="ir('balanco')">📦 Balanço</div>
     <div class="nav-sec">Financeiro</div>
     <div class="nv" onclick="ir('caixa')">🗃️ Caixa do Dia</div>
@@ -105,6 +106,17 @@ document.addEventListener('DOMContentLoaded',function(){
           <button class="btn bh sm" onclick="abrirListaCliVenda()" title="Ver todos os clientes">📋 Lista</button>
         </div>
         <div id="v-sg"></div>
+        <div class="vend-venda-box" style="margin-top:8px;display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:end;">
+          <div class="fg" style="margin:0;">
+            <label class="fl">Vendedor <span style="color:var(--red2);">*</span></label>
+            <select class="fi" id="v-vendedor" required onchange="if(window.BMVendedoresComissoes&&BMVendedoresComissoes.atualizarResumoVenda)BMVendedoresComissoes.atualizarResumoVenda();">
+              <option value="">Selecione o vendedor...</option>
+            </select>
+          </div>
+          <div class="imp-box" id="v-vendedor-resumo" style="padding:8px 10px;font-size:12px;min-height:38px;display:flex;align-items:center;justify-content:center;text-align:center;">
+            Comissão: —
+          </div>
+        </div>
       <!-- Adicionar Item - com abas -->
       <div class="card" id="venda-cat-card" style="margin-bottom:0;display:flex;flex-direction:column;overflow:hidden;">
         <div class="ct">➕ Adicionar Item</div>
@@ -529,6 +541,112 @@ document.addEventListener('DOMContentLoaded',function(){
   </div>
 </div>
 
+
+<!-- VENDEDORES E COMISSÕES -->
+<div class="pg" id="pg-vendedores">
+  <div class="ph">
+    <div class="ph-t">👩‍💼 Vendedores e Comissões</div>
+    <div class="fr" style="gap:8px;flex-wrap:wrap;">
+      <button class="btn br sm" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.novoVendedor();">➕ Novo vendedor</button>
+      <button class="btn bb sm" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.renderComissoes();">🔄 Atualizar</button>
+    </div>
+  </div>
+  <div class="pb">
+    <div class="vtabs" style="margin-bottom:14px;">
+      <button class="vtab on" id="vend-tab-cadastro" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.trocarAba('cadastro')">👥 Cadastro</button>
+      <button class="vtab" id="vend-tab-comissoes" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.trocarAba('comissoes')">💰 Comissões</button>
+    </div>
+
+    <div class="vtab-panel on" id="vend-panel-cadastro" style="display:block;">
+      <div class="g2" style="align-items:start;">
+        <div class="card">
+          <div class="ct">📝 Cadastro de vendedor</div>
+          <input type="hidden" id="vend-id">
+          <div class="fg">
+            <label class="fl">Nome do vendedor</label>
+            <input class="fi" id="vend-nome" placeholder="Ex: Maria" autocomplete="off">
+          </div>
+          <div class="g2">
+            <div class="fg">
+              <label class="fl">Comissão %</label>
+              <input class="fi" id="vend-comissao" type="number" step="0.01" min="0" placeholder="Ex: 2">
+            </div>
+            <div class="fg">
+              <label class="fl">Meta mensal R$</label>
+              <input class="fi" id="vend-meta" type="number" step="0.01" min="0" placeholder="Opcional">
+            </div>
+          </div>
+          <div class="fg">
+            <label class="fl">Status</label>
+            <select class="fi" id="vend-ativo">
+              <option value="1">Ativo</option>
+              <option value="0">Inativo</option>
+            </select>
+          </div>
+          <div class="fr" style="justify-content:flex-end;">
+            <button class="btn bh" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.limparFormVendedor();">Limpar</button>
+            <button class="btn br" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.salvarVendedor();">💾 Salvar</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="ct">📌 Regras</div>
+          <div class="imp-note">
+            O vendedor será obrigatório na finalização da venda. A comissão será calculada sobre o valor da venda e gravada junto ao histórico, sem alterar estoque, caixa ou crediário.
+          </div>
+          <div class="sep"></div>
+          <div class="stats" id="vend-stats"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="fs" style="gap:10px;align-items:center;margin-bottom:10px;">
+          <div class="ct" style="margin:0;">👥 Vendedores cadastrados</div>
+          <input class="fi" id="vend-busca" placeholder="🔍 Buscar vendedor..." oninput="if(window.BMVendedoresComissoes)BMVendedoresComissoes.renderVendedores();" style="max-width:260px;">
+        </div>
+        <div class="tw" style="max-height:360px;overflow:auto;">
+          <table>
+            <thead><tr><th>Vendedor</th><th>Comissão</th><th>Meta</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="vend-tb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="vtab-panel" id="vend-panel-comissoes">
+      <div class="card">
+        <div class="ct">🔍 Filtros de comissão</div>
+        <div class="fr" style="align-items:end;gap:10px;">
+          <div class="fg" style="margin:0;min-width:150px;">
+            <label class="fl">Data inicial</label>
+            <input class="fi" id="com-ini" type="date">
+          </div>
+          <div class="fg" style="margin:0;min-width:150px;">
+            <label class="fl">Data final</label>
+            <input class="fi" id="com-fim" type="date">
+          </div>
+          <div class="fg" style="margin:0;min-width:220px;flex:1;">
+            <label class="fl">Vendedor</label>
+            <select class="fi" id="com-vendedor"><option value="">Todos os vendedores</option></select>
+          </div>
+          <button class="btn bb" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.renderComissoes();">Filtrar</button>
+          <button class="btn bh" type="button" onclick="if(window.BMVendedoresComissoes)BMVendedoresComissoes.limparFiltroComissao();">Limpar</button>
+        </div>
+      </div>
+
+      <div class="stats" id="com-stats"></div>
+      <div class="card">
+        <div class="ct">💰 Relatório de comissões</div>
+        <div class="tw" style="max-height:420px;overflow:auto;">
+          <table>
+            <thead><tr><th>Data</th><th>Venda</th><th>Cliente</th><th>Vendedor</th><th>Total venda</th><th>%</th><th>Comissão</th><th>Status</th></tr></thead>
+            <tbody id="com-tb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="pg" id="pg-vendas">
   <div class="ph">
@@ -1022,6 +1140,7 @@ document.addEventListener('DOMContentLoaded',function(){
 
 
 <script src="./js/app-core.js"></script>
+<script src="./js/vendedores-comissoes.js"></script>
 <script>
 
 function finVenda12(){
