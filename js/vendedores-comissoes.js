@@ -192,6 +192,47 @@
     return venda;
   }
 
+
+  function prepararMarcacaoVenda(){
+    _idsAntesFinalizar = {};
+    try{
+      (temDB() ? (DB.get('vendas')||[]) : []).forEach(function(v){
+        if(v && v.id) _idsAntesFinalizar[String(v.id)] = true;
+      });
+    }catch(e){}
+    _marcandoVendaAtual = true;
+  }
+
+  function finalizarMarcacaoVenda(){
+    setTimeout(function(){
+      try{
+        // Fallback: se alguma venda nova escapou do hook do DB.set, marca agora.
+        var vendas = temDB() ? (DB.get('vendas')||[]) : [];
+        var alterou = false;
+        vendas = vendas.map(function(venda){
+          if(venda && venda.id && _idsAntesFinalizar && !_idsAntesFinalizar[String(venda.id)] && !vendaMarcadaPeloModulo(venda)){
+            var nova = enriquecerVenda(venda);
+            if(vendaMarcadaPeloModulo(nova)){
+              registrarComissaoDaVenda(nova);
+              alterou = true;
+            }
+            return nova;
+          }
+          return venda;
+        });
+        if(alterou){
+          if(_dbSetOriginal) _dbSetOriginal.call(DB, 'vendas', vendas);
+          else DB.set('vendas', vendas);
+        }
+      }catch(e){}
+      _marcandoVendaAtual = false;
+      _idsAntesFinalizar = null;
+      setVal('v-vendedor','');
+      atualizarSelectVenda();
+      try{ MOD.renderComissoes(); }catch(e){}
+    }, 220);
+  }
+
   function registrarComissaoDaVenda(venda){
     if(!temDB() || !venda || !venda.id || !venda.vendedor_id) return;
     if(!vendaMarcadaPeloModulo(venda)) return;
@@ -263,27 +304,11 @@
       var oldConf = window.confirmarPagamento;
       window.confirmarPagamento = function(){
         if(!validarVendedorVenda()) return;
-
-        // Em algumas versões do app-core, confirmarPagamento() chama a função
-        // finalizarVenda() original por referência interna. Por isso armamos a
-        // marcação aqui também, antes da venda ser salva em DB.set('vendas').
-        _idsAntesFinalizar = {};
-        try{
-          (temDB() ? (DB.get('vendas')||[]) : []).forEach(function(v){
-            if(v && v.id) _idsAntesFinalizar[String(v.id)] = true;
-          });
-        }catch(e){}
-        _marcandoVendaAtual = true;
-
+        prepararMarcacaoVenda();
         try{
           return oldConf.apply(this, arguments);
         }finally{
-          setTimeout(function(){
-            _marcandoVendaAtual = false;
-            _idsAntesFinalizar = null;
-            setVal('v-vendedor','');
-            atualizarSelectVenda();
-          }, 350);
+          finalizarMarcacaoVenda();
         }
       };
       window.confirmarPagamento._bmVendHook = true;
@@ -293,18 +318,11 @@
       var oldFin = window.finalizarVenda;
       window.finalizarVenda = function(){
         if(!validarVendedorVenda()) return;
-        _idsAntesFinalizar = {};
-        try{ (temDB() ? (DB.get('vendas')||[]) : []).forEach(function(v){ if(v && v.id) _idsAntesFinalizar[String(v.id)] = true; }); }catch(e){}
-        _marcandoVendaAtual = true;
+        prepararMarcacaoVenda();
         try{
           return oldFin.apply(this, arguments);
         }finally{
-          setTimeout(function(){
-            _marcandoVendaAtual = false;
-            _idsAntesFinalizar = null;
-            setVal('v-vendedor','');
-            atualizarSelectVenda();
-          }, 180);
+          finalizarMarcacaoVenda();
         }
       };
       window.finalizarVenda._bmVendHook = true;
