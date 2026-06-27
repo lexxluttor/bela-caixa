@@ -129,7 +129,10 @@ function gerarHashSync() {
       produtos: lerLocal("produtos"),
       vendas: lerLocal("vendas"),
       pagamentos: lerLocal("pagamentos"),
-      creditos: lerLocal("creditos")
+      creditos: lerLocal("creditos"),
+      vendedores: lerLocal("vendedores"),
+      comissoes: lerLocal("comissoes"),
+      fechamentos_comissoes: lerLocal("fechamentos_comissoes")
     });
   } catch (e) {
     return String(Date.now());
@@ -269,21 +272,17 @@ function normalizarVenda(v) {
     cliente: v.cliente || v.cliNome || nomeClientePorId(v.cid) || "",
     forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
+    vendedor_id: v.vendedor_id || v.vendedorId || "",
+    vendedor_nome: v.vendedor_nome || v.vendedorNome || "",
+    comissao_regra: v.comissao_regra || v.comissaoRegra || (v.comissao && v.comissao.regra) || "",
+    comissao_percentual: numeroSeguro(v.comissao_percentual ?? (v.comissao && v.comissao.percentual_medio)),
+    comissao_valor: numeroSeguro(v.comissao_valor ?? (v.comissao && v.comissao.valor)),
+    comissao_forma_pagamento: v.comissao_forma_pagamento || (v.comissao && v.comissao.forma_pagamento) || "",
+    comissao_gerada_em: v.comissao_gerada_em || v.comissaoGeradaEm || (v.comissao && v.comissao.gerada_em) || "",
     itens_json: JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     data: v.data || v.createdAt || agoraISO(),
     createdAt: v.createdAt || v.data || agoraISO(),
-    updatedAt: v.updatedAt || agoraISO(),
-
-    // Campos opcionais do módulo de vendedores/comissões.
-    // Mantidos dentro da venda para não alterar o fluxo principal do sync.
-    vendedor_id: v.vendedor_id || v.vendedorId || "",
-    vendedor_nome: v.vendedor_nome || v.vendedorNome || "",
-    comissao_percentual: numeroSeguro(v.comissao_percentual ?? v.percentualComissao ?? (v.comissao && v.comissao.percentual_medio)),
-    comissao_valor: numeroSeguro(v.comissao_valor ?? v.valorComissao ?? (v.comissao && v.comissao.valor)),
-    comissao_forma: v.comissao_forma || (v.comissao && v.comissao.forma_pagamento) || "",
-    comissao_regra: v.comissao_regra || v.comissaoRegra || (v.comissao && v.comissao.regra) || "",
-    comissao_gerada_em: v.comissao_gerada_em || v.comissaoGeradaEm || (v.comissao && v.comissao.gerada_em) || "",
-    comissao_json: v.comissao_json || (v.comissao ? JSON.stringify(v.comissao) : "")
+    updatedAt: v.updatedAt || agoraISO()
   };
 }
 
@@ -318,6 +317,66 @@ function normalizarCobranca(c) {
     data: c.data || c.createdAt || agoraISO(),
     createdAt: c.createdAt || c.data || agoraISO(),
     updatedAt: c.updatedAt || agoraISO()
+  };
+}
+
+
+function normalizarVendedor(v) {
+  return {
+    id: v.id || "",
+    nome: v.nome || "",
+    percentual: numeroSeguro(v.percentual),
+    comissoes_json: JSON.stringify(v.comissoes || {}),
+    comissao_pix: numeroSeguro(v.comissao_pix ?? (v.comissoes && v.comissoes.pix)),
+    comissao_dinheiro: numeroSeguro(v.comissao_dinheiro ?? (v.comissoes && v.comissoes.dinheiro)),
+    comissao_cartao: numeroSeguro(v.comissao_cartao ?? (v.comissoes && v.comissoes.cartao)),
+    comissao_crediario: numeroSeguro(v.comissao_crediario ?? (v.comissoes && v.comissoes.crediario)),
+    meta: numeroSeguro(v.meta),
+    ativo: v.ativo === false ? "0" : "1",
+    deletedAt: v.deletedAt || "",
+    createdAt: v.createdAt || agoraISO(),
+    updatedAt: v.updatedAt || agoraISO()
+  };
+}
+
+function normalizarComissao(c) {
+  return {
+    id: c.id || "",
+    venda_id: c.venda_id || c.vendaId || "",
+    data: c.data || c.createdAt || agoraISO(),
+    cliente: c.cliente || "",
+    vendedor_id: c.vendedor_id || c.vendedorId || "",
+    vendedor_nome: c.vendedor_nome || c.vendedorNome || "",
+    regra: c.regra || "",
+    total_venda: numeroSeguro(c.total_venda ?? c.totalVenda),
+    percentual_medio: numeroSeguro(c.percentual_medio ?? c.percentualMedio),
+    valor: numeroSeguro(c.valor),
+    forma_pagamento: c.forma_pagamento || c.formaPagamento || "",
+    detalhes_json: JSON.stringify(c.detalhes || []),
+    status: c.status || "",
+    deletedAt: c.deletedAt || "",
+    createdAt: c.createdAt || c.data || agoraISO(),
+    updatedAt: c.updatedAt || agoraISO()
+  };
+}
+
+function normalizarFechamentoComissao(f) {
+  return {
+    id: f.id || "",
+    regra: f.regra || "",
+    data_inicial: f.data_inicial || "",
+    data_final: f.data_final || "",
+    vendedor_id: f.vendedor_id || "",
+    vendedor_nome: f.vendedor_nome || "",
+    vendas: numeroSeguro(f.vendas),
+    total_vendido: numeroSeguro(f.total_vendido),
+    total_comissao: numeroSeguro(f.total_comissao),
+    comissoes_ids_json: JSON.stringify(f.comissoes_ids || []),
+    vendas_ids_json: JSON.stringify(f.vendas_ids || []),
+    fechado_em: f.fechado_em || "",
+    deletedAt: f.deletedAt || "",
+    createdAt: f.createdAt || agoraISO(),
+    updatedAt: f.updatedAt || agoraISO()
   };
 }
 
@@ -379,11 +438,6 @@ function normalizarProdutoRestauracao(p) {
 
 function normalizarVendaRestauracao(v) {
   const itens = safeParseJson(v.itens_json, v.itens || []);
-  const comissao = safeParseJson(v.comissao_json, v.comissao || null) || null;
-  const vendedorId = v.vendedor_id || v.vendedorId || "";
-  const vendedorNome = v.vendedor_nome || v.vendedorNome || "";
-  const comissaoRegra = v.comissao_regra || v.comissaoRegra || (comissao && comissao.regra) || "";
-  const comissaoGeradaEm = v.comissao_gerada_em || v.comissaoGeradaEm || (comissao && comissao.gerada_em) || "";
 
   return {
     id: v.id || "",
@@ -393,24 +447,22 @@ function normalizarVendaRestauracao(v) {
     forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     forma: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
+    vendedor_id: v.vendedor_id || v.vendedorId || "",
+    vendedorId: v.vendedor_id || v.vendedorId || "",
+    vendedor_nome: v.vendedor_nome || v.vendedorNome || "",
+    vendedorNome: v.vendedor_nome || v.vendedorNome || "",
+    comissao_regra: v.comissao_regra || v.comissaoRegra || "",
+    comissaoRegra: v.comissao_regra || v.comissaoRegra || "",
+    comissao_percentual: numeroSeguro(v.comissao_percentual),
+    comissao_valor: numeroSeguro(v.comissao_valor),
+    comissao_forma_pagamento: v.comissao_forma_pagamento || "",
+    comissao_gerada_em: v.comissao_gerada_em || v.comissaoGeradaEm || "",
+    comissaoGeradaEm: v.comissao_gerada_em || v.comissaoGeradaEm || "",
     itens_json: typeof v.itens_json === "string" ? v.itens_json : JSON.stringify(itens),
     itens,
     data: v.data || v.createdAt || "",
     createdAt: v.createdAt || v.data || "",
-    updatedAt: v.updatedAt || v.createdAt || v.data || "",
-
-    vendedor_id: vendedorId,
-    vendedorId: vendedorId,
-    vendedor_nome: vendedorNome,
-    vendedorNome: vendedorNome,
-    comissao_percentual: numeroSeguro(v.comissao_percentual ?? v.percentualComissao ?? (comissao && comissao.percentual_medio)),
-    comissao_valor: numeroSeguro(v.comissao_valor ?? v.valorComissao ?? (comissao && comissao.valor)),
-    comissao_forma: v.comissao_forma || (comissao && comissao.forma_pagamento) || "",
-    comissao_regra: comissaoRegra,
-    comissaoRegra: comissaoRegra,
-    comissao_gerada_em: comissaoGeradaEm,
-    comissaoGeradaEm: comissaoGeradaEm,
-    comissao: comissao
+    updatedAt: v.updatedAt || v.createdAt || v.data || ""
   };
 }
 
@@ -466,7 +518,10 @@ async function syncNow(origem) {
       produtos: lerLocal("produtos").map(normalizarProduto),
       vendas: lerLocal("vendas").map(normalizarVenda),
       recebimentos: lerLocal("pagamentos").map(normalizarRecebimento),
-      cobrancas: lerLocal("creditos").map(normalizarCobranca)
+      cobrancas: lerLocal("creditos").map(normalizarCobranca),
+      vendedores: lerLocal("vendedores").map(normalizarVendedor),
+      comissoes: lerLocal("comissoes").filter(function(c){ return !c.deletedAt; }).map(normalizarComissao),
+      fechamentos_comissoes: lerLocal("fechamentos_comissoes").filter(function(f){ return !f.deletedAt; }).map(normalizarFechamentoComissao)
     };
 
     const res = await post(payload);
@@ -547,6 +602,12 @@ async function restoreNow() {
     salvarLocal("vendas", (dados.vendas || []).map(normalizarVendaRestauracao));
     salvarLocal("pagamentos", (dados.recebimentos || []).map(normalizarRecebimentoRestauracao));
     salvarLocal("creditos", (dados.cobrancas || []).map(normalizarCobrancaRestauracao));
+    if (dados.vendedores) salvarLocal("vendedores", dados.vendedores || []);
+    if (dados.comissoes) salvarLocal("comissoes", dados.comissoes || []);
+    if (dados.fechamentos_comissoes) salvarLocal("fechamentos_comissoes", dados.fechamentos_comissoes || []);
+    if (dados.vendedores) salvarLocal("vendedores", dados.vendedores || []);
+    if (dados.comissoes) salvarLocal("comissoes", dados.comissoes || []);
+    if (dados.fechamentos_comissoes) salvarLocal("fechamentos_comissoes", dados.fechamentos_comissoes || []);
 
     ignorarHook = false;
 
@@ -578,7 +639,7 @@ localStorage.setItem = function (k, v) {
 
   const nome = String(k).replace("bm_", "");
 
-  if (["clientes", "produtos", "vendas", "pagamentos", "creditos"].includes(nome)) {
+  if (["clientes", "produtos", "vendas", "pagamentos", "creditos", "vendedores", "comissoes", "fechamentos_comissoes"].includes(nome)) {
     agendarSync(nome);
   }
 };
