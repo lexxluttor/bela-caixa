@@ -85,36 +85,6 @@ function normalizarDescricaoCobranca_(v) {
   return s;
 }
 
-const REGRA_COMISSAO_BM = "BM_COMISSAO_V1_NAO_RETROATIVA";
-
-function vendaCanceladaOuExcluida_(v) {
-  const status = String((v && (v.status || v.status_venda || v.situacao)) || "").toLowerCase();
-  return !!(v && (v.deletedAt || v.cancelada || v.cancelado || status.indexOf("cancel") >= 0));
-}
-
-function vendaTemRegraComissao_(v) {
-  if (!v) return false;
-  return String(v.comissao_regra || v.comissaoRegra || (v.comissao && v.comissao.regra) || "") === REGRA_COMISSAO_BM;
-}
-
-function idsVendasAtivasComComissao_() {
-  const ids = {};
-  lerLocal("vendas").forEach(function(v){
-    if (v && v.id && !vendaCanceladaOuExcluida_(v) && vendaTemRegraComissao_(v)) {
-      ids[String(v.id)] = true;
-    }
-  });
-  return ids;
-}
-
-function comissaoEhValidaParaSync_(c, idsAtivos) {
-  if (!c || c.deletedAt) return false;
-  const vendaId = String(c.venda_id || c.vendaId || "");
-  if (!vendaId || !idsAtivos[vendaId]) return false;
-  if (String(c.regra || "") !== REGRA_COMISSAO_BM) return false;
-  return true;
-}
-
 /* ================= STORAGE ================= */
 
 const originalSetItem = localStorage.setItem.bind(localStorage);
@@ -296,21 +266,19 @@ function normalizarProduto(p) {
 }
 
 function normalizarVenda(v) {
-  const comissaoValida = vendaTemRegraComissao_(v) && !vendaCanceladaOuExcluida_(v);
-
   return {
     id: v.id,
     cid: v.cid || "",
     cliente: v.cliente || v.cliNome || nomeClientePorId(v.cid) || "",
     forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
-    vendedor_id: comissaoValida ? (v.vendedor_id || v.vendedorId || "") : "",
-    vendedor_nome: comissaoValida ? (v.vendedor_nome || v.vendedorNome || "") : "Sem vendedor",
-    comissao_regra: comissaoValida ? (v.comissao_regra || v.comissaoRegra || (v.comissao && v.comissao.regra) || "") : "",
-    comissao_percentual: comissaoValida ? numeroSeguro(v.comissao_percentual ?? (v.comissao && v.comissao.percentual_medio)) : 0,
-    comissao_valor: comissaoValida ? numeroSeguro(v.comissao_valor ?? (v.comissao && v.comissao.valor)) : 0,
-    comissao_forma_pagamento: comissaoValida ? (v.comissao_forma_pagamento || (v.comissao && v.comissao.forma_pagamento) || "") : "",
-    comissao_gerada_em: comissaoValida ? (v.comissao_gerada_em || v.comissaoGeradaEm || (v.comissao && v.comissao.gerada_em) || "") : "",
+    vendedor_id: v.vendedor_id || v.vendedorId || "",
+    vendedor_nome: v.vendedor_nome || v.vendedorNome || "",
+    comissao_regra: v.comissao_regra || v.comissaoRegra || (v.comissao && v.comissao.regra) || "",
+    comissao_percentual: numeroSeguro(v.comissao_percentual ?? (v.comissao && v.comissao.percentual_medio)),
+    comissao_valor: numeroSeguro(v.comissao_valor ?? (v.comissao && v.comissao.valor)),
+    comissao_forma_pagamento: v.comissao_forma_pagamento || (v.comissao && v.comissao.forma_pagamento) || "",
+    comissao_gerada_em: v.comissao_gerada_em || v.comissaoGeradaEm || (v.comissao && v.comissao.gerada_em) || "",
     itens_json: JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     data: v.data || v.createdAt || agoraISO(),
     createdAt: v.createdAt || v.data || agoraISO(),
@@ -543,7 +511,6 @@ async function syncNow(origem) {
   syncEmAndamento = true;
 
   try {
-    const idsVendasComissao = idsVendasAtivasComComissao_();
     const payload = {
       action: "syncAll",
       origem: origem || "manual",
@@ -553,7 +520,7 @@ async function syncNow(origem) {
       recebimentos: lerLocal("pagamentos").map(normalizarRecebimento),
       cobrancas: lerLocal("creditos").map(normalizarCobranca),
       vendedores: lerLocal("vendedores").map(normalizarVendedor),
-      comissoes: lerLocal("comissoes").filter(function(c){ return comissaoEhValidaParaSync_(c, idsVendasComissao); }).map(normalizarComissao),
+      comissoes: lerLocal("comissoes").filter(function(c){ return !c.deletedAt; }).map(normalizarComissao),
       fechamentos_comissoes: lerLocal("fechamentos_comissoes").filter(function(f){ return !f.deletedAt; }).map(normalizarFechamentoComissao)
     };
 
