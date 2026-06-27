@@ -272,7 +272,18 @@ function normalizarVenda(v) {
     itens_json: JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     data: v.data || v.createdAt || agoraISO(),
     createdAt: v.createdAt || v.data || agoraISO(),
-    updatedAt: v.updatedAt || agoraISO()
+    updatedAt: v.updatedAt || agoraISO(),
+
+    // Campos opcionais do módulo de vendedores/comissões.
+    // Mantidos dentro da venda para não alterar o fluxo principal do sync.
+    vendedor_id: v.vendedor_id || v.vendedorId || "",
+    vendedor_nome: v.vendedor_nome || v.vendedorNome || "",
+    comissao_percentual: numeroSeguro(v.comissao_percentual ?? v.percentualComissao ?? (v.comissao && v.comissao.percentual_medio)),
+    comissao_valor: numeroSeguro(v.comissao_valor ?? v.valorComissao ?? (v.comissao && v.comissao.valor)),
+    comissao_forma: v.comissao_forma || (v.comissao && v.comissao.forma_pagamento) || "",
+    comissao_regra: v.comissao_regra || v.comissaoRegra || (v.comissao && v.comissao.regra) || "",
+    comissao_gerada_em: v.comissao_gerada_em || v.comissaoGeradaEm || (v.comissao && v.comissao.gerada_em) || "",
+    comissao_json: v.comissao_json || (v.comissao ? JSON.stringify(v.comissao) : "")
   };
 }
 
@@ -368,6 +379,11 @@ function normalizarProdutoRestauracao(p) {
 
 function normalizarVendaRestauracao(v) {
   const itens = safeParseJson(v.itens_json, v.itens || []);
+  const comissao = safeParseJson(v.comissao_json, v.comissao || null) || null;
+  const vendedorId = v.vendedor_id || v.vendedorId || "";
+  const vendedorNome = v.vendedor_nome || v.vendedorNome || "";
+  const comissaoRegra = v.comissao_regra || v.comissaoRegra || (comissao && comissao.regra) || "";
+  const comissaoGeradaEm = v.comissao_gerada_em || v.comissaoGeradaEm || (comissao && comissao.gerada_em) || "";
 
   return {
     id: v.id || "",
@@ -381,7 +397,20 @@ function normalizarVendaRestauracao(v) {
     itens,
     data: v.data || v.createdAt || "",
     createdAt: v.createdAt || v.data || "",
-    updatedAt: v.updatedAt || v.createdAt || v.data || ""
+    updatedAt: v.updatedAt || v.createdAt || v.data || "",
+
+    vendedor_id: vendedorId,
+    vendedorId: vendedorId,
+    vendedor_nome: vendedorNome,
+    vendedorNome: vendedorNome,
+    comissao_percentual: numeroSeguro(v.comissao_percentual ?? v.percentualComissao ?? (comissao && comissao.percentual_medio)),
+    comissao_valor: numeroSeguro(v.comissao_valor ?? v.valorComissao ?? (comissao && comissao.valor)),
+    comissao_forma: v.comissao_forma || (comissao && comissao.forma_pagamento) || "",
+    comissao_regra: comissaoRegra,
+    comissaoRegra: comissaoRegra,
+    comissao_gerada_em: comissaoGeradaEm,
+    comissaoGeradaEm: comissaoGeradaEm,
+    comissao: comissao
   };
 }
 
