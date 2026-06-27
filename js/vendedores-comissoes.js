@@ -159,108 +159,6 @@
     return !!(venda && (venda.comissao_regra === REGRA_COMISSAO || venda.comissaoRegra === REGRA_COMISSAO || (venda.comissao && venda.comissao.regra === REGRA_COMISSAO)));
   }
 
-
-  function vendaCanceladaOuRemovida(venda){
-    if(!venda) return true;
-    if(venda.deletedAt || venda.cancelada === true || venda.cancelado === true) return true;
-    var st = norm(venda.status || venda.situacao || venda.nfce_status || venda.status_nfce || venda.statusNfce || '');
-    if(st === 'cancelada' || st === 'cancelado' || st === 'cancelada_manual') return true;
-    if(st.indexOf('cancelada') >= 0 || st.indexOf('cancelado') >= 0) return true;
-    var nc = venda.nfce_cancelamento || venda.cancelamento_nfce || {};
-    if(nc && (nc.cancelado === true || nc.cancelada === true)) return true;
-    return false;
-  }
-
-  function limparCamposComissaoVendaAntiga(venda){
-    if(!venda || vendaMarcadaPeloModulo(venda)) return venda;
-
-    var tinhaInfo =
-      venda.vendedor_id || venda.vendedorId || venda.vendedor_nome || venda.vendedorNome ||
-      venda.comissao || venda.comissao_regra || venda.comissaoRegra ||
-      venda.comissao_percentual != null || venda.comissao_valor != null ||
-      venda.comissao_forma_pagamento || venda.comissao_gerada_em || venda.comissaoGeradaEm;
-
-    if(!tinhaInfo) return venda;
-
-    venda.vendedor_id = '';
-    venda.vendedorId = '';
-    venda.vendedor_nome = 'Sem vendedor';
-    venda.vendedorNome = 'Sem vendedor';
-    venda.comissao_regra = '';
-    venda.comissaoRegra = '';
-    venda.comissao_percentual = 0;
-    venda.comissao_valor = 0;
-    venda.comissao_forma_pagamento = '';
-    venda.comissao_gerada_em = '';
-    venda.comissaoGeradaEm = '';
-    venda.comissao = null;
-    venda.updatedAt = venda.updatedAt || agora();
-    return venda;
-  }
-
-  function mapaVendasComComissaoValida(){
-    var mapa = {};
-    (temDB() ? (DB.get('vendas') || []) : []).forEach(function(v){
-      if(!v || !v.id) return;
-      if(vendaCanceladaOuRemovida(v)) return;
-      if(!vendaMarcadaPeloModulo(v)) return;
-      mapa[String(v.id)] = v;
-    });
-    return mapa;
-  }
-
-  function sincronizarComissoesComVendas(){
-    if(!temDB()) return;
-
-    var vendas = DB.get('vendas') || [];
-    var alterouVendas = false;
-    vendas = vendas.map(function(v){
-      if(!v || !v.id) return v;
-      var antes = JSON.stringify({
-        vendedor_id:v.vendedor_id, vendedorId:v.vendedorId,
-        vendedor_nome:v.vendedor_nome, vendedorNome:v.vendedorNome,
-        regra:v.comissao_regra || v.comissaoRegra,
-        pct:v.comissao_percentual, valor:v.comissao_valor,
-        comissao: v.comissao ? 1 : 0
-      });
-      var nova = limparCamposComissaoVendaAntiga(v);
-      var depois = JSON.stringify({
-        vendedor_id:nova.vendedor_id, vendedorId:nova.vendedorId,
-        vendedor_nome:nova.vendedor_nome, vendedorNome:nova.vendedorNome,
-        regra:nova.comissao_regra || nova.comissaoRegra,
-        pct:nova.comissao_percentual, valor:nova.comissao_valor,
-        comissao: nova.comissao ? 1 : 0
-      });
-      if(antes !== depois) alterouVendas = true;
-      return nova;
-    });
-    if(alterouVendas){
-      if(_dbSetOriginal) _dbSetOriginal.call(DB, 'vendas', vendas);
-      else DB.set('vendas', vendas);
-    }
-
-    var validas = mapaVendasComComissaoValida();
-    var lista = DB.get(STORE_COMISSOES) || [];
-    var mudou = false;
-
-    lista.forEach(function(c){
-      if(!c) return;
-      var vid = String(c.venda_id || c.vendaId || '');
-      var invalida = !vid || !validas[vid] || c.regra !== REGRA_COMISSAO;
-      if(invalida && !c.deletedAt){
-        c.deletedAt = agora();
-        c.updatedAt = agora();
-        c.status = 'removida';
-        mudou = true;
-      }
-    });
-
-    if(mudou){
-      if(_dbSetOriginal) _dbSetOriginal.call(DB, STORE_COMISSOES, lista);
-      else DB.set(STORE_COMISSOES, lista);
-    }
-  }
-
   function enriquecerVenda(venda){
     if(!venda || venda.deletedAt) return venda;
     if(venda.vendedor_id || venda.vendedorId || vendaMarcadaPeloModulo(venda)) return venda;
@@ -325,36 +223,23 @@
     if(!temDB() || DB._bmVendedoresHook) return;
     _dbSetOriginal = DB.set;
     DB.set = function(k,v){
-      if(k === 'vendas' && Array.isArray(v)){
+      if(k === 'vendas' && Array.isArray(v) && _marcandoVendaAtual){
         var alterou = false;
-
         v = v.map(function(venda){
-          if(!venda) return venda;
-
-          if(_marcandoVendaAtual){
-            var antes = venda && (venda.vendedor_id || venda.vendedorId);
-            venda = enriquecerVenda(venda);
-            var depois = venda && (venda.vendedor_id || venda.vendedorId);
-            if(!antes && depois) alterou = true;
-          }
-
-          venda = limparCamposComissaoVendaAntiga(venda);
-          return venda;
+          var antes = venda && (venda.vendedor_id || venda.vendedorId);
+          var nova = enriquecerVenda(venda);
+          var depois = nova && (nova.vendedor_id || nova.vendedorId);
+          if(!antes && depois) alterou = true;
+          return nova;
         });
-
         var ret = _dbSetOriginal.call(DB,k,v);
-
         if(alterou){
           try{
             v.forEach(function(venda){
-              if(venda && venda.vendedor_id && vendaMarcadaPeloModulo(venda) && !vendaCanceladaOuRemovida(venda)){
-                registrarComissaoDaVenda(venda);
-              }
+              if(venda && venda.vendedor_id) registrarComissaoDaVenda(venda);
             });
           }catch(e){}
         }
-
-        try{ sincronizarComissoesComVendas(); }catch(e){}
         return ret;
       }
       return _dbSetOriginal.call(DB,k,v);
@@ -453,7 +338,7 @@
     if(atual) s.value = atual;
   }
 
-  function vendasValidas(){ return temDB() ? (DB.get('vendas')||[]).filter(function(v){ return v && !v.deletedAt && !vendaCanceladaOuRemovida(v); }) : []; }
+  function vendasValidas(){ return temDB() ? (DB.get('vendas')||[]).filter(function(v){ return v && !v.deletedAt; }) : []; }
   function comissoesGravadas(){ return temDB() ? (DB.get(STORE_COMISSOES)||[]).filter(function(c){ return c && !c.deletedAt; }) : []; }
 
   function vendaTemComissao(venda){ return vendaMarcadaPeloModulo(venda) && (venda.comissao || venda.comissao_valor != null || venda.vendedor_id || venda.vendedorId); }
@@ -494,25 +379,18 @@
 
   function removerComissaoVendaCancelada(vendaId){
     if(!temDB() || !vendaId) return;
-    var vendas = DB.get('vendas') || [];
-    var venda = vendas.find(function(v){ return String(v && v.id || '') === String(vendaId); });
-    var deveRemover = !venda || vendaCanceladaOuRemovida(venda) || !vendaMarcadaPeloModulo(venda);
-    if(!deveRemover) return;
-
+    var aindaExiste = vendasValidas().some(function(v){ return String(v.id) === String(vendaId); });
+    if(aindaExiste) return;
     var lista = DB.get(STORE_COMISSOES) || [];
     var mudou = false;
     lista.forEach(function(c){
       if(c && String(c.venda_id || c.vendaId || '') === String(vendaId) && !c.deletedAt){
         c.deletedAt = agora();
         c.updatedAt = agora();
-        c.status = 'removida';
         mudou = true;
       }
     });
-    if(mudou){
-      if(_dbSetOriginal) _dbSetOriginal.call(DB, STORE_COMISSOES, lista);
-      else DB.set(STORE_COMISSOES, lista);
-    }
+    if(mudou) DB.set(STORE_COMISSOES, lista);
   }
 
   function aplicarHookCancelamentoVenda(){
@@ -530,23 +408,17 @@
   }
 
   function registrosComissao(){
-    sincronizarComissoesComVendas();
-
     var porVenda = {};
-    var vendasAtivas = mapaVendasComComissaoValida();
-
-    Object.keys(vendasAtivas).forEach(function(id){
-      var r = normalizarComissaoVenda(vendasAtivas[id]);
+    var vendasAtivas = mapaVendasAtivas();
+    vendasValidas().forEach(function(v){
+      var r = normalizarComissaoVenda(v);
       if(r) porVenda[String(r.venda_id)] = r;
     });
-
     comissoesGravadas().forEach(function(c){
-      if(!c || c.regra !== REGRA_COMISSAO) return;
-      var vid = String(c.venda_id || c.vendaId || '');
-      if(!vendasAtivas[vid]) return;
-      if(!porVenda[vid]) porVenda[vid] = c;
+      if(c.regra !== REGRA_COMISSAO) return;
+      if(!vendasAtivas[String(c.venda_id || c.vendaId || '')]) return;
+      if(!porVenda[String(c.venda_id)]) porVenda[String(c.venda_id)] = c;
     });
-
     return Object.keys(porVenda).map(function(k){ return porVenda[k]; });
   }
 
@@ -829,7 +701,6 @@
     aplicarHooksVenda();
     aplicarHookIr();
     aplicarHookCancelamentoVenda();
-    try{ sincronizarComissoesComVendas(); }catch(e){}
     atualizarSelectVenda();
     atualizarFiltroVendedor();
     garantirBotaoFecharComissao();
