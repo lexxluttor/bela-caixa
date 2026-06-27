@@ -338,12 +338,7 @@
     if(atual) s.value = atual;
   }
 
-  function vendaCanceladaOuExcluida(v){
-    var status = String((v && (v.status || v.status_venda || v.situacao || v.nfce_status || v.status_nfce || v.statusNfce)) || '').toLowerCase();
-    return !!(v && (v.deletedAt || v.cancelada || v.cancelado || status.indexOf('cancel') >= 0));
-  }
-
-  function vendasValidas(){ return temDB() ? (DB.get('vendas')||[]).filter(function(v){ return v && !vendaCanceladaOuExcluida(v); }) : []; }
+  function vendasValidas(){ return temDB() ? (DB.get('vendas')||[]).filter(function(v){ return v && !v.deletedAt; }) : []; }
   function comissoesGravadas(){ return temDB() ? (DB.get(STORE_COMISSOES)||[]).filter(function(c){ return c && !c.deletedAt; }) : []; }
 
   function vendaTemComissao(venda){ return vendaMarcadaPeloModulo(venda) && (venda.comissao || venda.comissao_valor != null || venda.vendedor_id || venda.vendedorId); }
