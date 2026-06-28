@@ -4382,7 +4382,8 @@ function confirmarRecSenha(){
   alert('Senha alterada com sucesso!');
 }
 
-restaurarSenhaPadrao();
+// Senha não deve ser restaurada automaticamente ao abrir o sistema.
+// A função restaurarSenhaPadrao() continua disponível apenas para uso manual/recuperação.
 
 function pedirSenha(callback){
   _senhaCallback=callback;
