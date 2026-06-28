@@ -266,19 +266,15 @@ function normalizarProduto(p) {
 }
 
 function normalizarVenda(v) {
+  // Opção 1: a aba vendas guarda somente dados da venda.
+  // Dados de vendedor/comissão ficam exclusivamente nas abas vendedores,
+  // comissoes e fechamentos_comissoes.
   return {
     id: v.id,
     cid: v.cid || "",
     cliente: v.cliente || v.cliNome || nomeClientePorId(v.cid) || "",
     forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
-    vendedor_id: v.vendedor_id || v.vendedorId || "",
-    vendedor_nome: v.vendedor_nome || v.vendedorNome || "",
-    comissao_regra: v.comissao_regra || v.comissaoRegra || (v.comissao && v.comissao.regra) || "",
-    comissao_percentual: numeroSeguro(v.comissao_percentual ?? (v.comissao && v.comissao.percentual_medio)),
-    comissao_valor: numeroSeguro(v.comissao_valor ?? (v.comissao && v.comissao.valor)),
-    comissao_forma_pagamento: v.comissao_forma_pagamento || (v.comissao && v.comissao.forma_pagamento) || "",
-    comissao_gerada_em: v.comissao_gerada_em || v.comissaoGeradaEm || (v.comissao && v.comissao.gerada_em) || "",
     itens_json: JSON.stringify(safeParseJson(v.itens_json, v.itens || [])),
     data: v.data || v.createdAt || agoraISO(),
     createdAt: v.createdAt || v.data || agoraISO(),
@@ -439,6 +435,8 @@ function normalizarProdutoRestauracao(p) {
 function normalizarVendaRestauracao(v) {
   const itens = safeParseJson(v.itens_json, v.itens || []);
 
+  // Opção 1: venda restaurada não recebe campos de vendedor/comissão.
+  // Esses dados são restaurados pelas abas próprias.
   return {
     id: v.id || "",
     cid: v.cid || "",
@@ -447,17 +445,6 @@ function normalizarVendaRestauracao(v) {
     forma_pagamento: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     forma: normalizarFormaPagamento_(v.forma_pagamento || v.forma || ""),
     total: numeroSeguro(v.total),
-    vendedor_id: v.vendedor_id || v.vendedorId || "",
-    vendedorId: v.vendedor_id || v.vendedorId || "",
-    vendedor_nome: v.vendedor_nome || v.vendedorNome || "",
-    vendedorNome: v.vendedor_nome || v.vendedorNome || "",
-    comissao_regra: v.comissao_regra || v.comissaoRegra || "",
-    comissaoRegra: v.comissao_regra || v.comissaoRegra || "",
-    comissao_percentual: numeroSeguro(v.comissao_percentual),
-    comissao_valor: numeroSeguro(v.comissao_valor),
-    comissao_forma_pagamento: v.comissao_forma_pagamento || "",
-    comissao_gerada_em: v.comissao_gerada_em || v.comissaoGeradaEm || "",
-    comissaoGeradaEm: v.comissao_gerada_em || v.comissaoGeradaEm || "",
     itens_json: typeof v.itens_json === "string" ? v.itens_json : JSON.stringify(itens),
     itens,
     data: v.data || v.createdAt || "",
