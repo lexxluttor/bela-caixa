@@ -3034,12 +3034,163 @@ function confirmarPag(){
   var pgs=DB.get('pagamentos');pgs.push(pag);DB.set('pagamentos',pgs);
   toast('✅ Pagamento registrado!','ok');var cliComp=rCli;document.getElementById('r-obs').value='';renderRecebPainel();mostrarComp(null,cliComp,pag);
 }
+function telefoneWhatsAppClienteBM(cli){
+  var num = String((cli && (cli.tel || cli.telefone)) || '').replace(/\D/g,'');
+  if(!num) return '';
+
+  // Se vier com 10 ou 11 dígitos, considera Brasil e acrescenta DDI 55.
+  if(!num.startsWith('55')) num = '55' + num;
+
+  return num;
+}
+
+function dataMovimentoMsBM(valor){
+  var d = parseAnyDate(valor);
+  return d ? d.getTime() : 0;
+}
+
+
+function calcularProximoVencimentoCrediarioBM(cli){
+  if(!cli || !cli.id) return null;
+
+  var TOLERANCIA_QUITACAO = 1.00;
+  var crds = creditosValidos()
+    .filter(function(f){ return String((f && f.cid) || '') === String(cli.id); })
+    .sort(function(a,b){ return dataMovimentoMsBM(a.data || a.createdAt) - dataMovimentoMsBM(b.data || b.createdAt); });
+
+  var pgs = pagamentosValidos()
+    .filter(function(p){ return String((p && p.cid) || '') === String(cli.id); });
+
+  if(!crds.length) return null;
+
+  var totalPagamentos = pgs.reduce(function(s,p){
+    return s + dinheiroNum(p.val != null ? p.val : p.valor);
+  }, 0);
+
+  var acumuladoCompras = 0;
+  var compraAberta = null;
+
+  for(var i=0; i<crds.length; i++){
+    acumuladoCompras += dinheiroNum(crds[i].val != null ? crds[i].val : crds[i].valor);
+    if(acumuladoCompras - totalPagamentos > TOLERANCIA_QUITACAO){
+      compraAberta = crds[i];
+      break;
+    }
+  }
+
+  if(!compraAberta) return null;
+
+  var base = parseAnyDate(compraAberta.data || compraAberta.createdAt);
+  if(!base) return null;
+
+  var venc = new Date(base.getTime());
+  venc.setDate(venc.getDate() + 30);
+
+  return {
+    data: venc,
+    emAtraso: venc.getTime() < new Date().setHours(0,0,0,0),
+    compraData: base
+  };
+}
+
+function montarExtratoWpp60DiasBM(cli){
+  var hoje = new Date();
+  var inicio = new Date(hoje.getTime() - (60 * 24 * 60 * 60 * 1000));
+  var inicioMs = inicio.getTime();
+  var fimMs = hoje.getTime();
+  var s = saldo(cli.id);
+
+  var creditos = creditosValidos().filter(function(f){
+    if(String((f && f.cid) || '') !== String(cli.id)) return false;
+    var ms = dataMovimentoMsBM(f.data || f.createdAt);
+    return ms && ms >= inicioMs && ms <= fimMs;
+  }).map(function(f){
+    return {
+      tipo:'compra',
+      data:f.data || f.createdAt || '',
+      desc:f.desc || f.descricao || 'Compra no crediário',
+      valor:dinheiroNum(f.val != null ? f.val : f.valor)
+    };
+  });
+
+  var pagamentos = pagamentosValidos().filter(function(p){
+    if(String((p && p.cid) || '') !== String(cli.id)) return false;
+    var ms = dataMovimentoMsBM(p.data || p.createdAt);
+    return ms && ms >= inicioMs && ms <= fimMs;
+  }).map(function(p){
+    var forma = String(p.forma || p.forma_pagamento || '').trim();
+    var obs = String(p.obs || '').trim();
+    var desc = 'Pagamento';
+    if(forma) desc += ' ' + FF(forma).replace(/^.*? /,'');
+    if(obs) desc += ' - ' + obs;
+    return {
+      tipo:'pagamento',
+      data:p.data || p.createdAt || '',
+      desc:desc,
+      valor:dinheiroNum(p.val != null ? p.val : p.valor)
+    };
+  });
+
+  var movs = creditos.concat(pagamentos).sort(function(a,b){
+    return dataMovimentoMsBM(a.data) - dataMovimentoMsBM(b.data);
+  });
+
+  var totalComprasPeriodo = creditos.reduce(function(t,m){ return t + dinheiroNum(m.valor); }, 0);
+  var totalPagamentosPeriodo = pagamentos.reduce(function(t,m){ return t + dinheiroNum(m.valor); }, 0);
+  var saldoAnterior = Math.max(0, dinheiroNum(s.sd) - totalComprasPeriodo + totalPagamentosPeriodo);
+
+  var linhas = [];
+  linhas.push('🛍️ *BELA MODAS*');
+  linhas.push('');
+  linhas.push('Olá, ' + (cli.nome || 'cliente') + '!');
+  linhas.push('Segue seu extrato de crediário dos últimos 60 dias.');
+  linhas.push('');
+  linhas.push('*Período:* ' + FD(inicio.toISOString()) + ' a ' + FD(hoje.toISOString()));
+  linhas.push('');
+  linhas.push('Saldo anterior: ' + R(saldoAnterior));
+  linhas.push('');
+
+  if(!movs.length){
+    linhas.push('Nenhuma movimentação nos últimos 60 dias.');
+  }else{
+    linhas.push('*Movimentações:*');
+    movs.forEach(function(m){
+      var sinal = m.tipo === 'compra' ? '+' : '-';
+      linhas.push(FD(m.data) + ' - ' + m.desc + ': ' + sinal + ' ' + R(m.valor));
+    });
+  }
+
+  linhas.push('');
+  linhas.push('------------------------------');
+  linhas.push('Compras no período: ' + R(totalComprasPeriodo));
+  linhas.push('Pagamentos no período: ' + R(totalPagamentosPeriodo));
+  linhas.push('*Saldo atual: ' + R(s.sd) + '*');
+
+  var proxVenc = calcularProximoVencimentoCrediarioBM(cli);
+  if(dinheiroNum(s.sd) <= 0.01){
+    linhas.push('Situação: ✅ Sem pendências');
+  }else if(proxVenc && proxVenc.data){
+    linhas.push('Próximo vencimento: ' + FD(proxVenc.data) + (proxVenc.emAtraso ? ' ⚠️ Em atraso' : ''));
+  }else{
+    linhas.push('Próximo vencimento: não identificado');
+  }
+
+  linhas.push('------------------------------');
+  linhas.push('');
+  linhas.push('Obrigada pela preferência!');
+  linhas.push('Bela Modas');
+
+  return linhas.join('\n');
+}
+
 function wppExtrato(){
-  if(!rCli||!rCli.tel){toast('⚠️ Cliente sem telefone!');return;}
-  var s=saldo(rCli.id),num=rCli.tel.replace(/\D/g,'');if(!num.startsWith('55'))num='55'+num;
-  var tpl=getCfg('msg_ext',MSG_EXT_PAD);
-  var msg=tpl.replace(/{nome}/g,rCli.nome).replace(/{total_cred}/g,R(s.tf)).replace(/{total_pago}/g,R(s.tp)).replace(/{saldo}/g,R(s.sd));
-  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
+  if(!rCli){toast('⚠️ Selecione um cliente!');return;}
+
+  var num = telefoneWhatsAppClienteBM(rCli);
+  if(!num){toast('⚠️ Cliente sem telefone!');return;}
+
+  var msg = montarExtratoWpp60DiasBM(rCli);
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(msg), '_blank');
 }
 
 function obterMovimentacoesCli(cid){
