@@ -1500,24 +1500,6 @@ function textoBuscaProdBM(p){
   ].map(function(v){return String(v||'').toLowerCase();}).join(' ');
 }
 
-function produtoArquivadoBM(p){
-  return !!(p && (p.arquivado || p.unificadoEm || p.unificadoParaId || p.deletedAt));
-}
-function produtosAtivosBM(lista){
-  return (lista||[]).filter(function(p){ return !produtoArquivadoBM(p); });
-}
-function buscarProdutosAtivosBM(q, excluirId){
-  q=String(q||'').trim().toLowerCase();
-  return produtosAtivosBM(DB.get('produtos')||[]).filter(function(p){
-    if(excluirId && String(p.id)===String(excluirId)) return false;
-    return !q || textoBuscaProdBM(p).includes(q);
-  }).slice(0,60);
-}
-function rotuloProdutoBM(p){
-  if(!p) return '';
-  return (p.cod||p.codigo||'')+' — '+(p.nome||'')+' — '+R(numBM(p.preco||0))+' — Estq: '+estoqueProdBM(p);
-}
-
 // PRODUTOS — versão otimizada para busca rápida
 var _timerRenderProds=null;
 var _estoquesNormalizadosUmaVez=false;
@@ -1532,7 +1514,7 @@ function renderProds(){
   }
   var inp=document.getElementById('p-sc');
   var q=(inp?inp.value:'').trim().toLowerCase();
-  var todos=produtosAtivosBM(DB.get('produtos')||[]);
+  var todos=DB.get('produtos')||[];
   var limite=q ? 150 : 220;
   var prods=[];
   for(var i=0;i<todos.length;i++){
@@ -1552,7 +1534,6 @@ function renderProds(){
       '<td><span style="display:flex;gap:4px;">'+
         '<button class="btn bb xs" onclick="abrirModalEtiquetas(\''+p.id+'\')">🏷️</button>'+
         '<button class="btn bh xs" onclick="abrirMdProd(\''+p.id+'\')">✏️</button>'+
-        '<button class="btn bo xs" title="Unificar produto" onclick="abrirUnificarProdutoBM(\''+p.id+'\')">🔗</button>'+
         '<button class="btn bd2 xs" onclick="delProd(\''+p.id+'\')">🗑️</button>'+
       '</span></td></tr>';
   }).join('');
@@ -1664,7 +1645,7 @@ function codigoPertenceProduto(prod, valor){
 }
 function buscarProdutoPorCodigoOuCodigoBarras(valor){
   var alvo=normalizarCodigoBarra(valor);
-  return produtosAtivosBM(DB.get('produtos')||[]).find(function(p){
+  return (DB.get('produtos')||[]).find(function(p){
     return codigoPertenceProduto(p, alvo) || normalizarCodigoBarra(p && (p.cod||p.codigo||''))===alvo;
   }) || null;
 }
@@ -1816,152 +1797,6 @@ function delProd(id){
 }
 
 
-/* ==============================
-   MÓDULO: UNIFICAÇÃO DE PRODUTOS
-============================== */
-var _unificarProdutoOrigemIdBM=null;
-function garantirModalUnificarProdutoBM(){
-  if(document.getElementById('mo-unificar-prod')) return;
-  var div=document.createElement('div');
-  div.className='ov';
-  div.id='mo-unificar-prod';
-  div.innerHTML='<div class="modal" style="max-width:720px;">'+
-    '<div class="mh"><b>🔗 Unificar produto</b><button class="x" onclick="fMd(\'mo-unificar-prod\')">×</button></div>'+
-    '<div class="mb">'+
-      '<div class="tm" id="unificar-origem-info" style="margin-bottom:10px;"></div>'+
-      '<div class="fg"><label class="fl">Produto que vai ficar</label><input class="fi" id="unificar-busca" placeholder="Digite nome, código ou preço" oninput="renderBuscaUnificarProdutoBM()"></div>'+
-      '<div id="unificar-lista" style="max-height:360px;overflow:auto;"></div>'+
-      '<div class="tm" style="margin-top:10px;line-height:1.4;">O produto escolhido recebe o estoque. O produto antigo fica arquivado, sem apagar o histórico.</div>'+
-    '</div>'+
-  '</div>';
-  document.body.appendChild(div);
-}
-function abrirUnificarProdutoBM(id){
-  var origem=produtosAtivosBM(DB.get('produtos')||[]).find(function(p){return String(p.id)===String(id);});
-  if(!origem){toast('⚠️ Produto não encontrado.','warn');return;}
-  _unificarProdutoOrigemIdBM=id;
-  garantirModalUnificarProdutoBM();
-  var info=document.getElementById('unificar-origem-info');
-  if(info) info.innerHTML='<b>Produto que será arquivado:</b><br>'+rotuloProdutoBM(origem);
-  var inp=document.getElementById('unificar-busca');
-  if(inp) inp.value='';
-  renderBuscaUnificarProdutoBM();
-  abrirMd('mo-unificar-prod');
-  setTimeout(function(){try{document.getElementById('unificar-busca').focus();}catch(e){}},80);
-}
-function renderBuscaUnificarProdutoBM(){
-  var box=document.getElementById('unificar-lista');
-  if(!box) return;
-  var q=(document.getElementById('unificar-busca')||{}).value||'';
-  var lista=buscarProdutosAtivosBM(q, _unificarProdutoOrigemIdBM);
-  box.innerHTML=lista.map(function(p){
-    return '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px;border-bottom:1px solid var(--bdr);">'+
-      '<div><b>'+((p.cod||p.codigo||''))+'</b> — '+(p.nome||'')+'<br><span class="tm">'+(p.subcategoria||p.subcat||p.cat||'')+' · '+R(numBM(p.preco||0))+' · Estoque: '+estoqueProdBM(p)+'</span></div>'+
-      '<button class="btn br xs" onclick="confirmarUnificarProdutoBM(\''+p.id+'\')">Escolher</button>'+
-    '</div>';
-  }).join('') || '<div class="empty">Nenhum produto encontrado.</div>';
-}
-function confirmarUnificarProdutoBM(destinoId){
-  var prods=DB.get('produtos')||[];
-  var oi=prods.findIndex(function(p){return String(p.id)===String(_unificarProdutoOrigemIdBM);});
-  var di=prods.findIndex(function(p){return String(p.id)===String(destinoId);});
-  if(oi<0 || di<0 || oi===di){toast('⚠️ Produto inválido.','warn');return;}
-  var origem=prods[oi], destino=prods[di];
-  if(produtoArquivadoBM(origem) || produtoArquivadoBM(destino)){toast('⚠️ Produto arquivado não pode ser usado.','warn');return;}
-  var msg='Unificar este produto?\n\nARQUIVAR:\n'+rotuloProdutoBM(origem)+'\n\nMANTER:\n'+rotuloProdutoBM(destino)+'\n\nO estoque será somado no produto mantido.';
-  if(!confirm(msg)) return;
-  var agora=nowLocalISO();
-  try{localStorage.setItem('bm_backup_unificacao_produtos', JSON.stringify({data:agora, origem:origem, destino:destino}));}catch(e){}
-  var estOrigem=estoqueProdBM(origem), estDestino=estoqueProdBM(destino);
-  destino.estq=estDestino+estOrigem;
-  destino.estoque=destino.estq;
-  var eans=extrairCodigosBarras((destino.ean||'')+','+(origem.ean||''));
-  if(eans.length) destino.ean=eans.join(',');
-  destino.unificados=Array.isArray(destino.unificados)?destino.unificados:[];
-  destino.unificados.push({id:origem.id,cod:origem.cod||origem.codigo||'',nome:origem.nome||'',estoque:estOrigem,data:agora});
-  destino.updatedAt=agora;
-  origem.arquivado=true;
-  origem.arquivadoMotivo='unificado';
-  origem.unificadoParaId=destino.id;
-  origem.unificadoParaNome=destino.nome||'';
-  origem.unificadoEm=agora;
-  origem.estq=0;
-  origem.estoque=0;
-  origem.updatedAt=agora;
-  prods[oi]=origem; prods[di]=destino;
-  DB.set('produtos', prods);
-  fMd('mo-unificar-prod');
-  renderProds();
-  try{renderPGrid();}catch(e){}
-  toast('✅ Produtos unificados com segurança.','ok');
-}
-
-var _xmlVincularIdxBM=null;
-function garantirModalVincularXMLBM(){
-  if(document.getElementById('mo-vincular-xml')) return;
-  var div=document.createElement('div');
-  div.className='ov';
-  div.id='mo-vincular-xml';
-  div.innerHTML='<div class="modal" style="max-width:720px;">'+
-    '<div class="mh"><b>🔗 Adicionar XML a produto existente</b><button class="x" onclick="fMd(\'mo-vincular-xml\')">×</button></div>'+
-    '<div class="mb">'+
-      '<div class="tm" id="xml-vincular-info" style="margin-bottom:10px;"></div>'+
-      '<div class="fg"><label class="fl">Pesquisar produto da loja</label><input class="fi" id="xml-vincular-busca" placeholder="Digite nome, código ou preço" oninput="renderBuscaVincularXMLBM()"></div>'+
-      '<div id="xml-vincular-lista" style="max-height:360px;overflow:auto;"></div>'+
-    '</div>'+
-  '</div>';
-  document.body.appendChild(div);
-}
-function abrirVincularItemXMLBM(idx){
-  if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[idx]) return;
-  _xmlVincularIdxBM=idx;
-  garantirModalVincularXMLBM();
-  var it=importacaoXMLAtual.itens[idx];
-  var info=document.getElementById('xml-vincular-info');
-  if(info) info.innerHTML='<b>Item da nota:</b><br>'+(it.nome||'')+'<br><span class="tm">Qtd: '+(it.qtd||0)+' · Custo: '+R(it.custo||0)+'</span>';
-  var inp=document.getElementById('xml-vincular-busca');
-  if(inp) inp.value='';
-  renderBuscaVincularXMLBM();
-  abrirMd('mo-vincular-xml');
-  setTimeout(function(){try{document.getElementById('xml-vincular-busca').focus();}catch(e){}},80);
-}
-function renderBuscaVincularXMLBM(){
-  var box=document.getElementById('xml-vincular-lista');
-  if(!box) return;
-  var q=(document.getElementById('xml-vincular-busca')||{}).value||'';
-  var lista=buscarProdutosAtivosBM(q, null);
-  box.innerHTML=lista.map(function(p){
-    return '<div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px;border-bottom:1px solid var(--bdr);">'+
-      '<div><b>'+((p.cod||p.codigo||''))+'</b> — '+(p.nome||'')+'<br><span class="tm">'+(p.subcategoria||p.subcat||p.cat||'')+' · '+R(numBM(p.preco||0))+' · Estoque: '+estoqueProdBM(p)+'</span></div>'+
-      '<button class="btn br xs" onclick="confirmarVincularItemXMLBM(\''+p.id+'\')">Adicionar aqui</button>'+
-    '</div>';
-  }).join('') || '<div class="empty">Nenhum produto encontrado.</div>';
-}
-function confirmarVincularItemXMLBM(prodId){
-  if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[_xmlVincularIdxBM]) return;
-  var p=produtosAtivosBM(DB.get('produtos')||[]).find(function(x){return String(x.id)===String(prodId);});
-  if(!p){toast('⚠️ Produto não encontrado.','warn');return;}
-  var it=importacaoXMLAtual.itens[_xmlVincularIdxBM];
-  if(!confirm('Adicionar '+(it.qtd||0)+' unidade(s) de "'+(it.nome||'')+'" ao produto "'+(p.nome||'')+'"?')) return;
-  it.existenteId=prodId;
-  it.produtoExistenteNome=p.nome||'';
-  it.precoVenda=Number(p.preco||it.precoVenda||0);
-  it.grupo=p.grupo || categoriaPrincipalPorSubcategoria(p.subcategoria||p.subcat||p.cat||'') || it.grupo;
-  it.cat=p.subcategoria||p.subcat||p.cat||it.cat;
-  it.subcat=it.cat;
-  it.subcategoria=it.cat;
-  fMd('mo-vincular-xml');
-  renderPreviewImportacaoXML();
-  toast('✅ Item do XML vinculado ao produto existente.','ok');
-}
-function limparVinculoItemXMLBM(idx){
-  if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[idx]) return;
-  delete importacaoXMLAtual.itens[idx].existenteId;
-  delete importacaoXMLAtual.itens[idx].produtoExistenteNome;
-  renderPreviewImportacaoXML();
-}
-
-
 var etiquetasSelecao=[];
 var etqBuscaLista=[];
 var etqFormato='6x4';
@@ -1969,14 +1804,14 @@ var etqModoImpressao='a4';
 
 function getProdutosFiltradosLista(){
   var q=((document.getElementById('p-sc')||{}).value||'').trim().toLowerCase();
-  return produtosAtivosBM(DB.get('produtos')||[]).filter(function(p){
+  return (DB.get('produtos')||[]).filter(function(p){
     return !q || textoBuscaProdBM(p).includes(q);
   });
 }
 
 function getEtiquetaSearchResults(q){
   q=String(q||'').trim().toLowerCase();
-  var lista=produtosAtivosBM(DB.get('produtos')||[]).filter(function(p){
+  var lista=(DB.get('produtos')||[]).filter(function(p){
     if(!q) return true;
     return String(p.nome||'').toLowerCase().includes(q) ||
            String(p.cod||'').toLowerCase().includes(q) ||
@@ -2242,7 +2077,7 @@ function renderPGrid(){
   }
   var el=document.getElementById('pgrid');if(!el)return;
   var q=(document.getElementById('v-psrch')?document.getElementById('v-psrch').value||'':'').trim().toLowerCase();
-  var todos=produtosAtivosBM(DB.get('produtos')||[]);
+  var todos=DB.get('produtos')||[];
   var limite=q ? 160 : 240;
   var prods=[];
   for(var i=0;i<todos.length;i++){
@@ -2265,7 +2100,7 @@ function renderPGrid(){
   }).join('')||'<div style="color:var(--txt2);padding:16px;font-size:13px;">Nenhum produto cadastrado</div>';
 }
 function addProd(pid){
-  var p=produtosAtivosBM(DB.get('produtos')||[]).find(function(x){return x.id===pid;});
+  var p=(DB.get('produtos')||[]).find(function(x){return x.id===pid;});
   if(!p)return;
   var ex=cart.find(function(i){return String(i.pid||'')===String(pid);});
   if(ex){
@@ -2529,7 +2364,7 @@ function lerArquivoXML(ev){
         var custo = Number(txtXmlFiscalBM(prod,'vUnCom') || 0);
         var ean = txtXmlFiscalBM(prod,'cEAN');
         var ncm = txtXmlFiscalBM(prod,'NCM');
-        var existente = produtosAtivosBM(DB.get('produtos')||[]).find(function(p){
+        var existente = (DB.get('produtos')||[]).find(function(p){
           return (ean && codigoPertenceProduto(p, ean)) || (cod && String(p.cod||'')===String(cod));
         });
         var precoVenda = existente
@@ -2616,7 +2451,7 @@ function renderPreviewImportacaoXML(){
       '<div><input class="imp-preco-input" type="number" step="0.01" min="0" value="'+Number(it.precoVenda||0).toFixed(2)+'" onchange="alterarPrecoVendaXML('+idx+', this.value)"></div>'+
       '<div><select class="fi" onchange="alterarCategoriaXML('+idx+', this.value)">'+montarOptionsXML(CATEGORIAS_PRINCIPAIS, grupo)+'</select></div>'+
       '<div><select class="fi" onchange="alterarSubcategoriaXML('+idx+', this.value)">'+montarOptionsXML(listaSub, sub)+'</select></div>'+
-      '<div>'+(it.existenteId?('<b>Adicionar em:</b><br><span class="tm">'+(it.produtoExistenteNome||'Produto existente')+'</span><br><button class="btn bo xs" onclick="abrirVincularItemXMLBM('+idx+')">Trocar</button> <button class="btn bd2 xs" onclick="limparVinculoItemXMLBM('+idx+')">Criar novo</button>'):(it.existenteId===null?'Criar produto':'Criar produto<br><button class="btn bo xs" onclick="abrirVincularItemXMLBM('+idx+')">Adicionar existente</button>'))+'</div>'+
+      '<div>'+(it.existenteId?'Somar estoque':'Criar produto')+'</div>'+
     '</div>';
   }).join('');
 }
@@ -2637,15 +2472,9 @@ function confirmarImportacaoXML(){
   var origemFiscalStatusXML = classificarOrigemFiscalProdutoApp({origem_estoque:'xml_nfe', xml_destinatario_cnpj:destinatarioCnpj});
 
   importacaoXMLAtual.itens.forEach(function(it){
-    var idx = -1;
-    if(it.existenteId){
-      idx = produtos.findIndex(function(p){ return String(p.id)===String(it.existenteId) && !produtoArquivadoBM(p); });
-    }
-    if(idx < 0){
-      idx = produtos.findIndex(function(p){
-        return !produtoArquivadoBM(p) && ((it.ean && codigoPertenceProduto(p, it.ean)) || String(p.cod||'')===String(it.cod));
-      });
-    }
+    var idx = produtos.findIndex(function(p){
+      return (it.ean && codigoPertenceProduto(p, it.ean)) || String(p.cod||'')===String(it.cod);
+    });
 
     if(idx >= 0){
       var p = produtos[idx];
