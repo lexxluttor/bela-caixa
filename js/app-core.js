@@ -1603,10 +1603,13 @@ function calcEAN13CheckDigit(base12){
   return String((10 - (sum % 10)) % 10);
 }
 function gerarEANInternoUnico(produtos, ignorarId){
-  var usados=new Set((produtos||[])
+  var usados=new Set();
+  (produtos||[])
     .filter(function(p){ return !ignorarId || String(p.id)!==String(ignorarId); })
-    .map(function(p){ return String(p.ean||'').replace(/\D/g,''); })
-    .filter(Boolean));
+    .forEach(function(p){
+      extrairCodigosBarras([p.ean,p.codigo_barras,p.codBarras,p.codigoDeBarras,p.codigos_barras,p.codigosBarras].filter(Boolean).join(','))
+        .forEach(function(c){ usados.add(String(c).replace(/\D/g,'')); });
+    });
   var prefixo='7899900';
   var maior=0;
   usados.forEach(function(ean){
@@ -1698,7 +1701,7 @@ function salvarProd(){
   var codigosAtuais=extrairCodigosBarras(atual.ean||'');
   var codigosFinais=codigosDigitados.length ? codigosDigitados : codigosAtuais;
 
-  if(!codigosFinais.length && origemEstoque==='manual_sem_xml'){
+  if(!codigosFinais.length){
     codigosFinais=[gerarEANInternoUnico(list, id)];
   }
 
@@ -1757,7 +1760,7 @@ function salvarProd(){
   document.getElementById('prod-ean').value=eanFinal;
   fMd('mo-prod');renderProds();renderPGrid();
   var gerouRef = !codInformado && !!codFinal;
-  var gerouEan = !eanInformado && origemEstoque==='manual_sem_xml' && !!extrairCodigosBarras(eanFinal).length;
+  var gerouEan = !eanInformado && !!extrairCodigosBarras(eanFinal).length;
   var msg = '✅ Produto salvo!';
   if(gerouRef && gerouEan) msg = '✅ Produto salvo com referência e código de barras automáticos!';
   else if(gerouRef) msg = '✅ Produto salvo com referência automática!';
