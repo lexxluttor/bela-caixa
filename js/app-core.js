@@ -1633,14 +1633,22 @@ function extrairCodigosBarras(valor){
     .filter(Boolean)
     .filter(function(v, i, arr){ return arr.indexOf(v)===i; });
 }
+function primeiroCodigoBarraEtiqueta(valor){
+  var codigos=extrairCodigosBarras(valor);
+  var code=codigos[0] || normalizarCodigoBarra(valor);
+  var dig=String(code||'').replace(/\D/g,'');
+  if(dig.length>14) code=dig.slice(0,13);
+  return code;
+}
 function obterEanPrincipalProduto(prod){
-  var codigos=extrairCodigosBarras(prod && (prod.ean||prod.codigo_barras||prod.codBarras||prod.codigoDeBarras||''));
-  return codigos[0] || '';
+  var bruto=[prod&&prod.ean,prod&&prod.codigo_barras,prod&&prod.codBarras,prod&&prod.codigoDeBarras,prod&&prod.codigos_barras,prod&&prod.codigosBarras].filter(Boolean).join(',');
+  return primeiroCodigoBarraEtiqueta(bruto);
 }
 function codigoPertenceProduto(prod, valor){
   var alvo=normalizarCodigoBarra(valor);
   if(!alvo) return false;
-  var codigos=extrairCodigosBarras(prod && (prod.ean||prod.codigo_barras||prod.codBarras||prod.codigoDeBarras||''));
+  var bruto=[prod&&prod.ean,prod&&prod.codigo_barras,prod&&prod.codBarras,prod&&prod.codigoDeBarras,prod&&prod.codigos_barras,prod&&prod.codigosBarras].filter(Boolean).join(',');
+  var codigos=extrairCodigosBarras(bruto);
   return codigos.indexOf(alvo)>=0;
 }
 function buscarProdutoPorCodigoOuCodigoBarras(valor){
@@ -1965,7 +1973,7 @@ function etiquetaCardHTML(p, idx, formato){
 function renderBarcodeSvgs(root){
   if(typeof JsBarcode==='undefined') return;
   (root||document).querySelectorAll('.etq-barcode').forEach(function(svg){
-    var code=String(svg.getAttribute('data-code')||'').replace(/\D/g,'');
+    var code=primeiroCodigoBarraEtiqueta(svg.getAttribute('data-code')||'').replace(/\D/g,'');
     if(!code) code='000000000000';
     var cls = String(svg.getAttribute('data-formatocfg')||'size-6x4');
     var cfg = cls.indexOf('6x2')>=0 ? {w13:0.72,w128:0.66,h:16} : {w13:0.9,w128:0.8,h:26};
