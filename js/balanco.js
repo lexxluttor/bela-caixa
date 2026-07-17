@@ -48,7 +48,36 @@ function balGarantirCache(){
 function balBuscarProduto(codigo){
   var alvo=balNormalizarCodigo(codigo); if(!alvo) return null;
   balGarantirCache();
-  return balCachePorCodigo[alvo]||null;
+
+  // Busca rápida pelo índice próprio do balanço.
+  var produto=balCachePorCodigo[alvo]||null;
+  if(produto) return produto;
+
+  // Segurança: reutiliza a busca já consolidada do sistema.
+  // Isso cobre produtos carregados/sincronizados depois da criação do cache.
+  if(typeof buscarProdutoPorCodigoOuCodigoBarras==='function'){
+    produto=buscarProdutoPorCodigoOuCodigoBarras(alvo);
+    if(produto && balCategoriaProduto(produto)===balCategoriaSelecionada()){
+      balCachePorId[String(produto.id||produto.cod||'')]=produto;
+      balCodigosProduto(produto).forEach(function(c){
+        if(c) balCachePorCodigo[c]=produto;
+      });
+      return produto;
+    }
+  }
+
+  // Última tentativa pontual, sem reconstruir a tabela nem a tela.
+  var todos=DB.get('produtos')||[];
+  for(var i=0;i<todos.length;i++){
+    var p=todos[i];
+    if(balCategoriaProduto(p)!==balCategoriaSelecionada()) continue;
+    if(balCodigosProduto(p).indexOf(alvo)>=0){
+      balCachePorId[String(p.id||p.cod||'')]=p;
+      balCodigosProduto(p).forEach(function(c){if(c) balCachePorCodigo[c]=p;});
+      return p;
+    }
+  }
+  return null;
 }
 function balEstoqueProduto(p){var n=Number(String((p&&(p.estoque!=null?p.estoque:p.estq))||0).replace(',','.'));return Number.isFinite(n)?n:0;}
 function balNomeProduto(p){return (p&&(p.nome||p.descricao||p.desc))||'Produto sem nome';}
