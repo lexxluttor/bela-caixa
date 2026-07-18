@@ -331,8 +331,8 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="ct">📲 Leitura de código de barras</div>
       <div class="bal-grid">
         <div class="fg" style="margin-bottom:0">
-          <label class="fl">Código de barras / referência</label>
-          <input class="fi" id="bal-cod" placeholder="Bipe ou digite o código..." autocomplete="off">
+          <label class="fl">Código, referência ou nome do produto</label>
+          <input class="fi" id="bal-cod" placeholder="Bipe o código ou digite o nome..." autocomplete="off">
         </div>
         <div class="fg" style="margin-bottom:0">
           <label class="fl">Qtd opcional</label>
@@ -341,7 +341,8 @@ document.addEventListener('DOMContentLoaded',function(){
         <button class="btn br" type="button" onclick="balAdicionarLeitura()">➕ Adicionar</button>
         <button class="btn bh" type="button" onclick="balLimparCampos()">🧹 Limpar</button>
       </div>
-      <div class="bal-found" id="bal-found">Bipe um produto para iniciar a contagem.</div>
+      <div class="bal-found" id="bal-found">Bipe um produto ou pesquise pelo nome.</div>
+      <div id="bal-sugestoes" style="display:none;margin-top:8px;border:1px solid #d9dee7;border-radius:10px;background:#fff;max-height:230px;overflow:auto;"></div>
       <div class="bal-mini" style="margin-top:8px;">Dica: cada bipe soma automaticamente. Se a quantidade ficar vazia, soma +1. Para produtos em lote, informe a quantidade primeiro, exemplo: 30, e depois bipe o código. A quantidade limpa após a leitura.</div>
     </div>
 
@@ -2702,12 +2703,14 @@ var balCacheCategoria = '';
 var balCacheProdutos = [];
 var balCachePorCodigo = Object.create(null);
 var balCachePorId = Object.create(null);
+var balCacheNomes = [];
 
 function balInvalidarCache(){
   balCacheCategoria='';
   balCacheProdutos=[];
   balCachePorCodigo=Object.create(null);
   balCachePorId=Object.create(null);
+  balCacheNomes=[];
 }
 function balPrepararCache(){
   var cat=balCategoriaSelecionada();
@@ -2716,9 +2719,11 @@ function balPrepararCache(){
   balCacheProdutos=(DB.get('produtos')||[]).filter(function(p){return balCategoriaProduto(p)===cat;});
   balCachePorCodigo=Object.create(null);
   balCachePorId=Object.create(null);
+  balCacheNomes=[];
   balCacheProdutos.forEach(function(p){
     var id=String(p.id||p.cod||'');
     if(id) balCachePorId[id]=p;
+    balCacheNomes.push({produto:p,nome:balNormalizarTexto(balNomeProduto(p))});
     balCodigosProduto(p).forEach(function(c){if(c&&!balCachePorCodigo[c])balCachePorCodigo[c]=p;});
   });
 }
@@ -2729,6 +2734,8 @@ function balNovoEstado(){
 function balGet(){try{return JSON.parse(localStorage.getItem(balKeyAtual())||'null')||balNovoEstado();}catch(e){return balNovoEstado();}}
 function balSet(st){localStorage.setItem(balKeyAtual(),JSON.stringify(st||balNovoEstado()));}
 function balNormalizarCodigo(v){return String(v==null?'':v).replace(/\s+/g,'').trim();}
+function balNormalizarTexto(v){return String(v==null?'':v).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\s+/g,' ').trim();}
+function balEscapeHtml(v){return String(v==null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function balCodigosProduto(p){
   var bruto=[p&&p.ean,p&&p.codigo_barras,p&&p.codBarras,p&&p.codigoDeBarras,p&&p.codigos_barras,p&&p.codigosBarras].filter(Boolean).join(',');
   var arr=String(bruto).split(/[\n,;|]+/).map(function(x){return balNormalizarCodigo(x);}).filter(Boolean);
@@ -2739,6 +2746,29 @@ function balBuscarProduto(codigo){
   var alvo=balNormalizarCodigo(codigo); if(!alvo) return null;
   balPrepararCache();
   return balCachePorCodigo[alvo]||null;
+}
+function balBuscarProdutosPorNome(termo){
+  var alvo=balNormalizarTexto(termo); if(!alvo) return [];
+  balPrepararCache();
+  return balCacheNomes.filter(function(x){return x.nome.indexOf(alvo)>=0;}).map(function(x){return x.produto;}).slice(0,30);
+}
+function balFecharSugestoes(){var el=document.getElementById('bal-sugestoes');if(el){el.style.display='none';el.innerHTML='';}}
+function balMostrarSugestoes(lista){
+  var el=document.getElementById('bal-sugestoes'); if(!el)return;
+  if(!lista||!lista.length){balFecharSugestoes();return;}
+  el.innerHTML=lista.map(function(p){
+    var id=String(p.id||p.cod||'').replace(/'/g,"\'");
+    var cod=balCodigosProduto(p)[0]||'';
+    return '<button type="button" onclick="balSelecionarProdutoNome(\''+id+'\')" style="display:block;width:100%;padding:10px 12px;text-align:left;border:0;border-bottom:1px solid #eef1f5;background:#fff;cursor:pointer;"><strong>'+balEscapeHtml(balNomeProduto(p))+'</strong><div class="tm">Código: '+balEscapeHtml(cod||'sem código')+' · estoque: '+balFmt(balEstoqueProduto(p))+'</div></button>';
+  }).join('');
+  el.style.display='block';
+}
+function balSelecionarProdutoNome(id){
+  var p=balProdutoPorId(id); if(!p)return;
+  var campo=document.getElementById('bal-cod');
+  if(campo){campo.value=balCodigosProduto(p)[0]||String(p.id||p.cod||''); campo.dataset.produtoSelecionado=String(id);}
+  balFecharSugestoes();
+  balAdicionarLeitura(p);
 }
 function balEstoqueProduto(p){var n=Number(String((p&&(p.estoque!=null?p.estoque:p.estq))||0).replace(',','.'));return Number.isFinite(n)?n:0;}
 function balNomeProduto(p){return (p&&(p.nome||p.descricao||p.desc))||'Produto sem nome';}
@@ -2792,47 +2822,83 @@ function initBalancoReal(){
       }
     });
     cod.addEventListener('input',function(){
-      var valorAtual=balNormalizarCodigo(this.value);
-      var p=balBuscarProduto(this.value), el=document.getElementById('bal-found'); if(!el)return;
-      if(p) el.innerHTML='Encontrado: <strong>'+balNomeProduto(p)+'</strong> · estoque atual: <strong>'+balFmt(balEstoqueProduto(p))+'</strong>';
-      else el.textContent=this.value.trim()?'Nenhum produto encontrado para este código.':'Bipe um produto para iniciar a contagem.';
+      delete this.dataset.produtoSelecionado;
+      var texto=String(this.value||'').trim(), valorAtual=balNormalizarCodigo(texto);
+      var p=balBuscarProduto(texto), el=document.getElementById('bal-found'); if(!el)return;
+      if(p){
+        balFecharSugestoes();
+        el.innerHTML='Encontrado: <strong>'+balEscapeHtml(balNomeProduto(p))+'</strong> · estoque atual: <strong>'+balFmt(balEstoqueProduto(p))+'</strong>';
+      }else if(texto){
+        var nomes=balBuscarProdutosPorNome(texto);
+        if(nomes.length===1){
+          el.innerHTML='Encontrado pelo nome: <strong>'+balEscapeHtml(balNomeProduto(nomes[0]))+'</strong> · pressione Enter para adicionar.';
+          this.dataset.produtoSelecionado=String(nomes[0].id||nomes[0].cod||'');
+          balFecharSugestoes();
+        }else if(nomes.length>1){
+          el.textContent=nomes.length+' produtos encontrados. Escolha um na lista abaixo.';
+          balMostrarSugestoes(nomes);
+        }else{
+          el.textContent='Nenhum produto encontrado por código ou nome.';
+          balFecharSugestoes();
+        }
+      }else{
+        el.textContent='Bipe um produto ou pesquise pelo nome.';
+        balFecharSugestoes();
+      }
 
       if(balAutoAddTimer){clearTimeout(balAutoAddTimer);balAutoAddTimer=null;}
-      // MODO TESTE: leitura automática. Scanners normalmente enviam Enter; este timer cobre leitores que só digitam o código.
-      // Só dispara automático para códigos numéricos longos, evitando adicionar enquanto alguém digita referência curta manualmente.
-      if(/^\d{6,}$/.test(valorAtual)){
+      if(/^\d{6,}$/.test(valorAtual) && p){
         balAutoAddTimer=setTimeout(function(){
           var campo=document.getElementById('bal-cod');
-          if(campo && balNormalizarCodigo(campo.value)===valorAtual){
-            balAdicionarLeitura();
-          }
+          if(campo && balNormalizarCodigo(campo.value)===valorAtual){balAdicionarLeitura();}
         },260);
       }
     });
   }
 }
-function balAdicionarLeitura(){
+function balAdicionarLeitura(prodSelecionado){
   if(balAutoAddTimer){clearTimeout(balAutoAddTimer);balAutoAddTimer=null;}
   var codEl=document.getElementById('bal-cod'), qtdEl=document.getElementById('bal-qtd');
-  var codigo=balNormalizarCodigo(codEl&&codEl.value);
+  var texto=String((codEl&&codEl.value)||'').trim();
+  var codigo=balNormalizarCodigo(texto);
   var qtdTxt=String((qtdEl&&qtdEl.value)||'').trim();
   var qtd=qtdTxt?Number(qtdTxt.replace(',','.')):1;
-  if(!codigo){if(typeof toast==='function')toast('Informe ou bipe um código.');return;}
+  if(!texto){if(typeof toast==='function')toast('Informe o código ou o nome do produto.');return;}
   if(!Number.isFinite(qtd)||qtd<=0){if(typeof toast==='function')toast('Quantidade inválida.');return;}
-  var prod=balBuscarProduto(codigo);
-  if(!prod){if(typeof toast==='function')toast('Produto não encontrado para o código: '+codigo);return;}
-  var id=String(prod.id||prod.cod||codigo), st=balGet();
+  var prod=prodSelecionado||balBuscarProduto(texto);
+  if(!prod && codEl&&codEl.dataset.produtoSelecionado) prod=balProdutoPorId(codEl.dataset.produtoSelecionado);
+  if(!prod){
+    var nomes=balBuscarProdutosPorNome(texto);
+    if(nomes.length===1) prod=nomes[0];
+    else if(nomes.length>1){balMostrarSugestoes(nomes);if(typeof toast==='function')toast('Escolha o produto correto na lista.');return;}
+  }
+  if(!prod){if(typeof toast==='function')toast('Produto não encontrado por código ou nome: '+texto);return;}
+  var codigoUsado=balBuscarProduto(texto)?codigo:(balCodigosProduto(prod)[0]||String(prod.cod||prod.id||texto));
+  var id=String(prod.id||prod.cod||codigoUsado), st=balGet();
+  if(!st.visiveis)st.visiveis={};
+  if(!Number.isFinite(Number(st.leiturasPagina)))st.leiturasPagina=0;
   st.contagens[id]=Number(st.contagens[id]||0)+qtd;
-  st.codigos[id]=codigo;
-  st.leituras.push({produto_id:id,codigo:codigo,qtd:qtd,data:new Date().toISOString(),produto_nome:balNomeProduto(prod)});
+  st.codigos[id]=codigoUsado;
+  st.visiveis[id]=true;
+  st.leiturasPagina=Number(st.leiturasPagina||0)+1;
+  st.leituras.push({produto_id:id,codigo:codigoUsado,qtd:qtd,data:new Date().toISOString(),produto_nome:balNomeProduto(prod)});
+  var atingiuLimite=st.leiturasPagina>=200;
   balSet(st);
-  if(codEl)codEl.value=''; if(qtdEl)qtdEl.value='';
+  if(codEl){codEl.value='';delete codEl.dataset.produtoSelecionado;} if(qtdEl)qtdEl.value='';
+  balFecharSugestoes();
   var found=document.getElementById('bal-found');
-  if(found)found.innerHTML='Adicionado: <strong>'+balNomeProduto(prod)+'</strong> · quantidade: <strong>'+balFmt(qtd)+'</strong>';
+  if(found)found.innerHTML='Adicionado: <strong>'+balEscapeHtml(balNomeProduto(prod))+'</strong> · quantidade: <strong>'+balFmt(qtd)+'</strong>';
   balAtualizarLinha(id,prod,st);
-  setTimeout(function(){if(codEl)codEl.focus();},50);
+  if(atingiuLimite){
+    setTimeout(function(){
+      alert('Foram concluídas 200 leituras. A lista visível será limpa para manter o balanço rápido. As quantidades já contadas continuarão salvas normalmente.');
+      var atual=balGet(); atual.visiveis={}; atual.leiturasPagina=0; balSet(atual); balRender();
+      var aviso=document.getElementById('bal-found');if(aviso)aviso.textContent='Nova sequência iniciada. As leituras anteriores continuam acumuladas no balanço.';
+      if(codEl)codEl.focus();
+    },40);
+  }else setTimeout(function(){if(codEl)codEl.focus();},50);
 }
-function balLimparCampos(){var cod=document.getElementById('bal-cod'),qtd=document.getElementById('bal-qtd');if(cod)cod.value='';if(qtd)qtd.value='';var f=document.getElementById('bal-found');if(f)f.textContent='Bipe um produto para iniciar a contagem.';if(cod)cod.focus();}
+function balLimparCampos(){var cod=document.getElementById('bal-cod'),qtd=document.getElementById('bal-qtd');if(cod)cod.value='';if(qtd)qtd.value='';var f=document.getElementById('bal-found');if(f)f.textContent='Bipe um produto ou pesquise pelo nome.';balFecharSugestoes();if(cod)cod.focus();}
 function balProdutoPorId(id){id=String(id);balPrepararCache();return balCachePorId[id]||null;}
 function balRemoverItem(id){var st=balGet();delete st.contagens[String(id)];delete st.codigos[String(id)];st.leituras=(st.leituras||[]).filter(function(l){return String(l.produto_id)!==String(id);});balSet(st);balRender();}
 function balAlterarQtd(id,val){var qtd=Number(String(val||'').replace(',','.')), st=balGet(); if(!Number.isFinite(qtd)||qtd<0)return; if(qtd===0){delete st.contagens[String(id)];delete st.codigos[String(id)];}else st.contagens[String(id)]=qtd; balSet(st);balRenderStats();}
@@ -2864,7 +2930,7 @@ function balAtualizarLinha(id,p,st){
 }
 function balRender(){
   balRenderStats();
-  var st=balGet(), ids=Object.keys(st.contagens||{}).filter(function(id){return !!balProdutoPorId(id);}), tb=document.getElementById('bal-lidos');
+  var st=balGet(), todosIds=Object.keys(st.contagens||{}).filter(function(id){return !!balProdutoPorId(id);}), ids=st.visiveis?todosIds.filter(function(id){return !!st.visiveis[id];}):todosIds, tb=document.getElementById('bal-lidos');
   if(tb){
     if(!ids.length) tb.innerHTML='<tr><td colspan="5" class="empty">Nenhum produto lido ainda.</td></tr>';
     else tb.innerHTML=ids.map(function(id){return balHtmlLinha(id,balProdutoPorId(id),st);}).join('');
