@@ -413,3 +413,200 @@ td{padding:8px 9px !important;font-size:12px !important;}
   border:1px solid rgba(255,255,255,.25);
   font-weight:800;
 }
+
+/* ============================================================
+   IMPORTAÇÃO DE XML — LAYOUT AMPLO E ISOLADO
+   Todos os ajustes abaixo afetam somente #mo-importa-xml.
+   ============================================================ */
+#mo-importa-xml{
+  padding:18px !important;
+}
+
+#mo-importa-xml .md.wide{
+  width:min(96vw,1240px) !important;
+  max-width:1240px !important;
+  height:min(92vh,860px) !important;
+  max-height:92vh !important;
+  overflow:hidden !important;
+  display:flex !important;
+  flex-direction:column !important;
+}
+
+#mo-importa-xml .mh{
+  flex-shrink:0 !important;
+  padding:14px 18px 11px !important;
+}
+
+#mo-importa-xml .mb{
+  flex:1 !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+  display:flex !important;
+  flex-direction:column !important;
+  padding:14px 18px !important;
+  gap:10px !important;
+}
+
+#mo-importa-xml .mb > .imp-box{
+  flex-shrink:0 !important;
+  margin-bottom:0 !important;
+  padding:10px 12px !important;
+}
+
+#mo-importa-xml .imp-actions{
+  align-items:center !important;
+  margin-bottom:7px !important;
+}
+
+#mo-importa-xml #xml-file{
+  max-width:420px !important;
+  font-size:12px !important;
+}
+
+#mo-importa-xml .imp-note{
+  font-size:11px !important;
+  line-height:1.35 !important;
+}
+
+#mo-importa-xml .imp-bulk-grid{
+  grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) auto !important;
+  gap:8px !important;
+  margin-top:8px !important;
+}
+
+#mo-importa-xml .imp-bulk-grid .fg{
+  margin-bottom:0 !important;
+}
+
+#mo-importa-xml .imp-bulk-grid .btn{
+  width:auto !important;
+  grid-column:auto !important;
+  min-height:32px !important;
+  white-space:nowrap !important;
+}
+
+#mo-importa-xml .imp-head{
+  grid-template-columns:minmax(0,1.45fr) minmax(0,1fr) !important;
+  gap:10px !important;
+  margin-bottom:0 !important;
+  flex-shrink:0 !important;
+}
+
+#mo-importa-xml .imp-head .imp-box{
+  padding:10px 14px !important;
+  min-height:66px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center !important;
+}
+
+#mo-importa-xml .imp-head .tm{
+  margin-bottom:2px !important;
+}
+
+#mo-importa-xml #ix-forn,
+#mo-importa-xml #ix-nota{
+  margin-top:2px !important;
+  line-height:1.3 !important;
+  font-size:14px !important;
+}
+
+#mo-importa-xml .imp-list{
+  flex:1 !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:auto !important;
+  border-radius:10px !important;
+}
+
+#mo-importa-xml .imp-row.xml-edit{
+  grid-template-columns:minmax(270px,2.15fr) minmax(235px,1.55fr) 58px 82px 96px 132px 145px 112px !important;
+  min-width:1210px !important;
+  gap:12px !important;
+  padding:12px 14px !important;
+  align-items:center !important;
+  font-size:12px !important;
+}
+
+#mo-importa-xml .imp-row.head.xml-edit{
+  padding-top:10px !important;
+  padding-bottom:10px !important;
+  position:sticky !important;
+  top:0 !important;
+  z-index:4 !important;
+  background:var(--s2) !important;
+}
+
+#mo-importa-xml .imp-row:not(.head):hover{
+  background:rgba(192,57,43,.035) !important;
+}
+
+#mo-importa-xml .imp-prod{
+  line-height:1.3 !important;
+  overflow-wrap:anywhere !important;
+}
+
+#mo-importa-xml .imp-sub{
+  line-height:1.3 !important;
+  margin-top:4px !important;
+}
+
+#mo-importa-xml .imp-row.xml-edit .fi,
+#mo-importa-xml .imp-row.xml-edit .imp-preco-input{
+  width:100% !important;
+  min-width:0 !important;
+  padding:8px 9px !important;
+  font-size:12px !important;
+}
+
+#mo-importa-xml .imp-row.xml-edit input[type="text"]{
+  min-width:215px !important;
+}
+
+#mo-importa-xml .imp-row.xml-edit > div:last-child{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  min-height:30px !important;
+  padding:6px 9px !important;
+  border-radius:999px !important;
+  background:#e8f3fb !important;
+  border:1px solid #9bc7e4 !important;
+  color:#1a5276 !important;
+  font-size:11px !important;
+  font-weight:900 !important;
+  text-align:center !important;
+  line-height:1.15 !important;
+}
+
+#mo-importa-xml .mf{
+  flex-shrink:0 !important;
+  padding:11px 18px !important;
+  background:var(--s1) !important;
+  position:relative !important;
+  z-index:5 !important;
+}
+
+#mo-importa-xml .mf .btn{
+  min-height:36px !important;
+}
+
+@media (max-width:900px){
+  #mo-importa-xml{padding:8px !important;}
+  #mo-importa-xml .md.wide{
+    width:98vw !important;
+    height:96vh !important;
+    max-height:96vh !important;
+  }
+  #mo-importa-xml .imp-bulk-grid{
+    grid-template-columns:1fr 1fr !important;
+  }
+  #mo-importa-xml .imp-bulk-grid .btn{
+    grid-column:1/-1 !important;
+    width:100% !important;
+    justify-content:center !important;
+  }
+  #mo-importa-xml .imp-head{
+    grid-template-columns:1fr !important;
+  }
+}
