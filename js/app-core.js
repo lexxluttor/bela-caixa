@@ -2272,7 +2272,7 @@ function limparImportacaoXML(){
   var f=document.getElementById('ix-forn'); if(f) f.textContent='—';
   var n=document.getElementById('ix-nota'); if(n) n.textContent='—';
   var l=document.getElementById('ix-lista');
-  if(l) l.innerHTML='<div class="imp-row head xml-edit"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Categoria</div><div>Subcategoria</div><div>Ação</div></div><div class="imp-row"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>';
+  if(l) l.innerHTML='<div class="imp-row head xml-edit" style="grid-template-columns:minmax(190px,2fr) minmax(190px,1.5fr) 55px 80px 90px 110px 120px 105px;min-width:1080px;"><div>Produto</div><div>Código(s) de barras</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Categoria</div><div>Subcategoria</div><div>Ação</div></div><div class="imp-row" style="min-width:1080px;"><div style="grid-column:1/-1;color:var(--txt2);text-align:center;">Nenhum XML carregado</div></div>';
 }
 function txt(node, tag){
   var el = node.getElementsByTagName(tag)[0];
@@ -2342,6 +2342,27 @@ function parseInfAdProd(s){
   cor=cor.replace(/\s+/g,' ').trim();
   return {cor:cor,tam:tam};
 }
+function normalizarCodigosBarrasXML(valor){
+  var invalidos=['SEMGTIN','SEMCEAN','NAOINFORMADO','NÃOINFORMADO','0'];
+  return extrairCodigosBarras(valor).filter(function(codigo){
+    var chave=String(codigo||'').replace(/\s+/g,'').toUpperCase();
+    return chave && invalidos.indexOf(chave)<0;
+  }).join(',');
+}
+function buscarProdutoImportacaoXML(item, produtos){
+  produtos=produtos || (DB.get('produtos')||[]);
+  var cod=String(item && item.cod || '').trim();
+  var porCodigo=cod ? produtos.find(function(p){
+    return String(p && p.cod || '').trim()===cod;
+  }) : null;
+  if(porCodigo) return porCodigo;
+
+  var codigos=extrairCodigosBarras(item && item.ean || '');
+  if(!codigos.length) return null;
+  return produtos.find(function(p){
+    return codigos.some(function(codigo){ return codigoPertenceProduto(p,codigo); });
+  }) || null;
+}
 function lerArquivoXML(ev){
   var file = ev.target.files && ev.target.files[0];
   if(!file) return;
@@ -2373,11 +2394,10 @@ function lerArquivoXML(ev){
         var nome = nomeBase + (info.cor||info.tam ? ' — ' + [info.cor, info.tam].filter(Boolean).join(' / ') : '');
         var q = Number(txtXmlFiscalBM(prod,'qCom') || 0);
         var custo = Number(txtXmlFiscalBM(prod,'vUnCom') || 0);
-        var ean = txtXmlFiscalBM(prod,'cEAN');
+        var eanOriginal = txtXmlFiscalBM(prod,'cEAN');
+        var ean = normalizarCodigosBarrasXML(eanOriginal);
         var ncm = txtXmlFiscalBM(prod,'NCM');
-        var existente = (DB.get('produtos')||[]).find(function(p){
-          return (ean && codigoPertenceProduto(p, ean)) || (cod && String(p.cod||'')===String(cod));
-        });
+        var existente = buscarProdutoImportacaoXML({cod:cod,ean:ean}, DB.get('produtos')||[]);
         var precoVenda = existente
           ? Number(existente.preco || 0)
           : Number(custo || 0);
@@ -2396,6 +2416,7 @@ function lerArquivoXML(ev){
           nome: nome.trim(),
           nomeBase:nomeBase,
           ean: ean,
+          eanInformadoXML: Boolean(ean),
           ncm: ncm || NCM_POR_CATEGORIA[subcat] || '',
           ncm_origem: ncmValidoApp(ncm) ? 'xml_entrada' : 'automatico',
           origem_fiscal: 'xml_entrada',
@@ -2445,7 +2466,8 @@ function renderPreviewImportacaoXML(){
   preencherCategoriasXML(primeiro.grupo || categoriaPrincipalPorSubcategoria(primeiro.subcategoria || primeiro.subcat || primeiro.cat || '') || 'CALÇADOS');
   preencherSubcatsXML((document.getElementById('ix-cat-principal')||{}).value, primeiro.subcategoria || primeiro.subcat || primeiro.cat || '');
 
-  box.innerHTML = '<div class="imp-row head xml-edit"><div>Produto</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Categoria</div><div>Subcategoria</div><div>Ação</div></div>' + importacaoXMLAtual.itens.map(function(it, idx){
+  var colunasXML='grid-template-columns:minmax(190px,2fr) minmax(190px,1.5fr) 55px 80px 90px 110px 120px 105px;min-width:1080px;';
+  box.innerHTML = '<div class="imp-row head xml-edit" style="'+colunasXML+'"><div>Produto</div><div>Código(s) de barras</div><div>Qtd</div><div>Custo</div><div>Venda</div><div>Categoria</div><div>Subcategoria</div><div>Ação</div></div>' + importacaoXMLAtual.itens.map(function(it, idx){
     var grupo = it.grupo || categoriaPrincipalPorSubcategoria(it.subcategoria || it.subcat || it.cat || '') || 'OUTROS';
     if(CATEGORIAS_PRINCIPAIS.indexOf(grupo) < 0) grupo = 'OUTROS';
     var sub = it.subcategoria || it.subcat || it.cat || 'Outros';
@@ -2455,8 +2477,12 @@ function renderPreviewImportacaoXML(){
     it.cat = sub;
     it.subcat = sub;
     it.subcategoria = sub;
-    return '<div class="imp-row xml-edit">'+
-      '<div><div class="imp-prod">'+it.nome+'</div><div class="imp-sub">'+it.cod+(it.ncm?' · NCM '+it.ncm:'')+(it.ean?' · EAN '+it.ean:'')+'</div></div>'+
+    var campoEAN = it.eanInformadoXML
+      ? '<div><div class="imp-prod">'+(it.ean||'')+'</div><div class="imp-sub">Informado no XML</div></div>'
+      : '<div><input class="fi" type="text" value="'+(it.ean||'')+'" placeholder="Digite ou use o leitor" onchange="alterarCodigosBarrasXML('+idx+', this.value)"><div class="imp-sub">Vários códigos separados por vírgula</div></div>';
+    return '<div class="imp-row xml-edit" style="'+colunasXML+'">'+
+      '<div><div class="imp-prod">'+it.nome+'</div><div class="imp-sub">'+it.cod+(it.ncm?' · NCM '+it.ncm:'')+'</div></div>'+
+      campoEAN+
       '<div>'+it.qtd+'</div>'+
       '<div>'+R(it.custo)+'</div>'+
       '<div><input class="imp-preco-input" type="number" step="0.01" min="0" value="'+Number(it.precoVenda||0).toFixed(2)+'" onchange="alterarPrecoVendaXML('+idx+', this.value)"></div>'+
@@ -2465,6 +2491,28 @@ function renderPreviewImportacaoXML(){
       '<div>'+(it.existenteId?'Somar estoque':'Criar produto')+'</div>'+
     '</div>';
   }).join('');
+}
+function alterarCodigosBarrasXML(idx, valor){
+  if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[idx]) return;
+  var item=importacaoXMLAtual.itens[idx];
+  var codigos=normalizarCodigosBarrasXML(valor);
+  item.ean=codigos;
+
+  if(codigos){
+    var duplicado=importacaoXMLAtual.itens.some(function(outro, outroIdx){
+      if(outroIdx===idx) return false;
+      var codigosOutro=extrairCodigosBarras(outro.ean||'');
+      return extrairCodigosBarras(codigos).some(function(codigo){ return codigosOutro.indexOf(codigo)>=0; });
+    });
+    if(duplicado){
+      toast('⚠️ Um dos códigos já foi usado em outro item desta nota.','warn');
+    }
+  }
+
+  var existente=buscarProdutoImportacaoXML(item, DB.get('produtos')||[]);
+  item.existenteId=existente ? existente.id : '';
+  if(existente && Number(existente.preco||0)>0) item.precoVenda=Number(existente.preco||0);
+  renderPreviewImportacaoXML();
 }
 function alterarPrecoVendaXML(idx, valor){
   if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens[idx]) return;
@@ -2483,9 +2531,9 @@ function confirmarImportacaoXML(){
   var origemFiscalStatusXML = classificarOrigemFiscalProdutoApp({origem_estoque:'xml_nfe', xml_destinatario_cnpj:destinatarioCnpj});
 
   importacaoXMLAtual.itens.forEach(function(it){
-    var idx = produtos.findIndex(function(p){
-      return (it.ean && codigoPertenceProduto(p, it.ean)) || String(p.cod||'')===String(it.cod);
-    });
+    it.ean=normalizarCodigosBarrasXML(it.ean||'');
+    var existenteImportacao=buscarProdutoImportacaoXML(it, produtos);
+    var idx=existenteImportacao ? produtos.findIndex(function(p){ return String(p.id)===String(existenteImportacao.id); }) : -1;
 
     if(idx >= 0){
       var p = produtos[idx];
