@@ -2040,12 +2040,34 @@ document.addEventListener('DOMContentLoaded',function(){
     return normalizarForma(v && (v.forma || v.forma_pagamento || v.pagamento || v.tipo_pagamento || ''));
   }
 
+  function statusNfce(v){
+    return String((v && (v.nfce_status || v.status_nfce)) || '').toLowerCase();
+  }
+
   function temNotaValida(v){
     if(!v) return false;
-    var st = String(v.nfce_status || v.status_nfce || '').toLowerCase();
-    if(st && !st.includes('cancelada')) return true;
-    if(v.nfce_numero || v.nfce_chave || v.nfce_xml_url || v.nfce_pdf_url) return !st.includes('cancelada');
-    return false;
+    var st = statusNfce(v);
+    return st === 'autorizada' || String(v.nfce_cstat || '') === '100';
+  }
+
+  function temDadosNfce(v){
+    return !!(v && (
+      v.nfce_numero ||
+      v.nfce_chave ||
+      v.nfce_xml_url ||
+      v.nfce_pdf_url ||
+      v.nfce_id
+    ));
+  }
+
+  function nfcePendente(v){
+    if(!v || temNotaValida(v)) return false;
+    var st = statusNfce(v);
+    return v.nfce_pendente_reenvio === true ||
+      st === 'pendente_transmissao' ||
+      st === 'rejeitada' ||
+      st === 'emitida_homologacao' ||
+      (temDadosNfce(v) && st !== 'cancelada');
   }
 
   function nomeCliente(v){
@@ -2098,6 +2120,7 @@ document.addEventListener('DOMContentLoaded',function(){
       if(!v || !v.id) return false;
       if(dataVendaISO(v) !== data) return false;
       if(temNotaValida(v)) return false;
+      if(temDadosNfce(v) && !nfcePendente(v)) return false;
       if(forma !== 'todas' && formaVenda(v) !== forma) return false;
       return true;
     });
@@ -2142,7 +2165,11 @@ document.addEventListener('DOMContentLoaded',function(){
       var venda = cachePendentes[i];
       try{
         if(resumo) resumo.textContent = 'Emitindo ' + (i+1) + ' de ' + cachePendentes.length + '...';
-        await window.emitirNfceCaixa(venda.id);
+        if(temDadosNfce(venda) && typeof window.reenviarNfceCaixa === 'function'){
+          await window.reenviarNfceCaixa(venda.id);
+        }else{
+          await window.emitirNfceCaixa(venda.id);
+        }
         var vendasAtualizadas = DB.get('vendas') || [];
         var atual = vendasAtualizadas.find(function(x){ return String(x.id) === String(venda.id); });
         if(temNotaValida(atual)) ok++; else falhas++;
@@ -2314,14 +2341,32 @@ document.addEventListener('DOMContentLoaded',function(){
     if(idx < 0) return;
 
     var nfce = (data && data.nfce) || {};
-    var idNota = String(nfce.id || ('nfce-' + Date.now()));
+    var idNota = String(nfce.id || vendas[idx].nfce_id || vid);
     var base = apiBase();
+    var status = String(
+      nfce.status ||
+      (nfce.autorizado ? 'autorizada' : '') ||
+      (nfce.pendente_reenvio ? 'pendente_transmissao' : '') ||
+      (nfce.cStat ? 'rejeitada' : '') ||
+      vendas[idx].nfce_status ||
+      'emitida_homologacao'
+    );
 
-    vendas[idx].nfce_status = nfce.status || 'emitida_homologacao';
-    vendas[idx].nfce_numero = nfce.numero || idNota;
-    vendas[idx].nfce_chave = nfce.chave || idNota;
-    vendas[idx].nfce_xml_url = nfce.xml_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/xml');
-    vendas[idx].nfce_pdf_url = nfce.pdf_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/pdf');
+    vendas[idx].nfce_id = idNota;
+    vendas[idx].nfce_status = status;
+    vendas[idx].status_nfce = status;
+    vendas[idx].nfce_numero = nfce.numero || vendas[idx].nfce_numero || '';
+    vendas[idx].nfce_chave = nfce.chave || nfce.chNFe || vendas[idx].nfce_chave || '';
+    vendas[idx].nfce_xml_url = nfce.xml_url || vendas[idx].nfce_xml_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/xml');
+    vendas[idx].nfce_pdf_url = nfce.pdf_url || vendas[idx].nfce_pdf_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/pdf');
+    vendas[idx].nfce_cstat = nfce.cStat || '';
+    vendas[idx].nfce_xmotivo = nfce.xMotivo || '';
+    vendas[idx].nfce_protocolo = nfce.nProt || '';
+    vendas[idx].nfce_autorizada = !!nfce.autorizado;
+    vendas[idx].nfce_transmitida = !!nfce.transmitido;
+    vendas[idx].nfce_pendente_reenvio = !!nfce.pendente_reenvio;
+    vendas[idx].nfce_erro_comunicacao = !!nfce.erro_comunicacao;
+    vendas[idx].nfce_tentativas = Number(nfce.tentativas_sefaz || vendas[idx].nfce_tentativas || 0);
     vendas[idx].nfce_data = new Date().toISOString();
     vendas[idx].updatedAt = new Date().toISOString();
 
@@ -2358,17 +2403,76 @@ document.addEventListener('DOMContentLoaded',function(){
         throw new Error('Resposta inválida da API.');
       }
 
-      if(!resp.ok || !data || data.ok !== true){
-        throw new Error((data && (data.mensagem || data.error)) || 'Falha ao emitir NFC-e.');
+      if(data && data.nfce){
+        salvarRetornoNota(vid, data);
+        try{ renderCaixa(); }catch(e){}
+        try{ renderVendas(); }catch(e){}
+        try{ renderDash(); }catch(e){}
       }
 
-      salvarRetornoNota(vid, data);
+      if(!resp.ok || !data || data.ok !== true){
+        throw new Error(
+          (data && data.nfce && data.nfce.xMotivo) ||
+          (data && (data.mensagem || data.error)) ||
+          'Falha ao emitir NFC-e.'
+        );
+      }
+
+      if(typeof toast==='function') toast('✅ NFC-e autorizada com sucesso!','ok');
+    }catch(err){
+      if(typeof toast==='function') toast('❌ ' + (err.message || 'Erro ao emitir NFC-e.'));
+    }
+  };
+
+
+  window.reenviarNfceCaixa = async function(vid){
+    try{
+      var venda = acharVenda(vid);
+      if(!venda){
+        throw new Error('Venda não encontrada.');
+      }
+
+      if(!confirm('Reenviar esta mesma NFC-e para a SEFAZ? O número e a chave serão preservados.')){
+        return;
+      }
+
+      var base = apiBase();
+      if(typeof toast === 'function') toast('⏳ Reenviando NFC-e pendente...');
+
+      var resp = await fetch(base + '/nfce/' + encodeURIComponent(vid) + '/enviar-sefaz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      var data;
+      try{
+        data = await resp.json();
+      }catch(e){
+        throw new Error('Resposta inválida da API.');
+      }
+
+      salvarRetornoNota(vid, {
+        ok: data && data.ok,
+        nfce: Object.assign({
+          id: venda.nfce_id || vid,
+          numero: venda.nfce_numero || '',
+          chave: venda.nfce_chave || '',
+          xml_url: venda.nfce_xml_url || '',
+          pdf_url: venda.nfce_pdf_url || ''
+        }, data || {})
+      });
+
       try{ renderCaixa(); }catch(e){}
       try{ renderVendas(); }catch(e){}
       try{ renderDash(); }catch(e){}
-      if(typeof toast==='function') toast('✅ NFC-e enviada com sucesso!','ok');
+
+      if(!resp.ok || !data || data.ok !== true){
+        throw new Error((data && (data.xMotivo || data.error)) || 'Falha ao reenviar NFC-e.');
+      }
+
+      if(typeof toast === 'function') toast('✅ NFC-e autorizada no reenvio!','ok');
     }catch(err){
-      if(typeof toast==='function') toast('❌ ' + (err.message || 'Erro ao emitir NFC-e.'));
+      if(typeof toast === 'function') toast('❌ ' + (err.message || 'Erro ao reenviar NFC-e.'));
     }
   };
 
