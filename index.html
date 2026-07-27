@@ -2381,7 +2381,8 @@ document.addEventListener('DOMContentLoaded',function(){
         return;
       }
 
-      if(venda.nfce_status && !confirm('Essa venda já possui dados de nota. Deseja emitir novamente?')){
+      if(temDadosNfce(venda)){
+        await window.reenviarNfceCaixa(vid);
         return;
       }
 
