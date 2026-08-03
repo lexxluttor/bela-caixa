@@ -549,3 +549,16 @@ td{padding:8px 9px !important;font-size:12px !important;}
     padding-right:7px !important;
   }
 }
+
+/* Botão para consultar novamente o status fiscal da NFC-e */
+.nfce-refresh-btn{
+  background:#6c5ce7 !important;
+  color:#fff !important;
+  border:1px solid rgba(255,255,255,.24) !important;
+  font-weight:900 !important;
+}
+.nfce-refresh-btn:hover{
+  filter:brightness(1.12);
+  transform:translateY(-1px);
+}
+
