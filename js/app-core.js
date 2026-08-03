@@ -3508,12 +3508,13 @@ function nfceStatusInfo(v){
     return {classe:'cancelada', label:'CANCELADA', icone:'⚫', cor:'var(--txt2)', detalhe: prot ? 'Prot. cancelamento: '+prot : motivo};
   }
 
-  if(raw.indexOf('rejeit') >= 0 || raw.indexOf('erro') >= 0 || raw.indexOf('falha') >= 0){
-    return {classe:'rejeitada', label:'REJEITADA', icone:'🔴', cor:'var(--red2)', detalhe: motivo || (cStat ? 'SEFAZ '+cStat : '')};
-  }
-
+  // A resposta fiscal atual prevalece sobre um rótulo antigo salvo no navegador.
   if(raw.indexOf('autoriz') >= 0 || cStat === '100' || prot){
     return {classe:'autorizada', label:'AUTORIZADA', icone:'🟢', cor:'var(--green)', detalhe: prot ? 'Protocolo: '+prot : ''};
+  }
+
+  if(raw.indexOf('rejeit') >= 0 || raw.indexOf('erro') >= 0 || raw.indexOf('falha') >= 0){
+    return {classe:'rejeitada', label:'REJEITADA', icone:'🔴', cor:'var(--red2)', detalhe: motivo || (cStat ? 'SEFAZ '+cStat : '')};
   }
 
   if(raw.indexOf('pend') >= 0 || raw.indexOf('homolog') >= 0 || raw.indexOf('emitida') >= 0 || temNota){
@@ -3544,19 +3545,12 @@ function nfceBadgeHTML(v, compacto){
     ? '<div style="font-size:10px;color:var(--txt2);margin-top:2px;max-width:220px;white-space:normal;">'+s.detalhe+'</div>'
     : '';
 
-  var podeAtualizar = s.classe === 'rejeitada' || s.classe === 'pendente';
-  var idVenda = String(v && v.id || '').replace(/'/g, "\'");
-  var botaoAtualizar = podeAtualizar && idVenda
-    ? '<button type="button" class="btn bo xs" onclick="event.stopPropagation();window.atualizarStatusNfceCaixa(\''+idVenda+'\')" '+
-      'title="Consultar o status já registrado da NFC-e" style="margin-left:6px;padding:3px 7px;font-size:10px;">🔄 Atualizar</button>'
-    : '';
-
   return '<div class="nfce-status-line" title="'+title+'" style="margin-top:4px;display:block;">'+
     '<span class="nfce-badge nfce-'+s.classe+'" style="display:inline-flex;align-items:center;gap:4px;'+
       'font-size:10px;font-weight:900;line-height:1;padding:3px 7px;border-radius:999px;'+
       'border:1px solid var(--bdr);color:'+s.cor+';background:rgba(255,255,255,.7);white-space:nowrap;">'+
       s.icone+' '+s.label+
-    '</span>'+botaoAtualizar+
+    '</span>'+
     detalhe+
   '</div>';
 }
@@ -3978,8 +3972,12 @@ function renderCaixa(){
       if(vx.nfce_xml_url){
         btns+='<button class="btn bo xs" onclick="abrirNotaXml(\''+m.sid+'\')" style="padding:3px 4px;font-size:11px;min-width:46px;height:34px;display:inline-flex;align-items:center;justify-content:center;" title="Abrir XML da nota">XML</button>';
       }
-      var nfceStatus=String(vx.nfce_status||'').toLowerCase();
-      var temNfce=!!(vx.nfce_numero||vx.nfce_chave||vx.nfce_xml_url||vx.nfce_pdf_url);
+      var nfceStatus=String(vx.nfce_status||vx.status_nfce||'').toLowerCase();
+      var temNfce=!!(vx.nfce_numero||vx.nfce_chave||vx.nfce_xml_url||vx.nfce_pdf_url||vx.nfce_id);
+      var infoNfceAtual=nfceStatusInfo(vx);
+      if(temNfce && (infoNfceAtual.classe==='rejeitada'||infoNfceAtual.classe==='pendente')){
+        btns+='<button class="btn nfce-refresh-btn xs" onclick="atualizarStatusNfceCaixa(\''+m.sid+'\')" style="padding:3px 4px;font-size:16px;min-width:46px;height:34px;display:inline-flex;align-items:center;justify-content:center;" title="Consultar e atualizar o status da NFC-e">🔄</button>';
+      }
       if(temNfce && nfceStatus.indexOf('cancel')<0){
         btns+='<button class="btn bd2 xs nfce-cancel-btn" onclick="cancelarNfceCaixa(\''+m.sid+'\')" style="padding:3px 4px;font-size:11px;min-width:46px;height:34px;display:inline-flex;align-items:center;justify-content:center;" title="Cancelar NFC-e na SEFAZ">NFC-e 🚫</button>';
       }
