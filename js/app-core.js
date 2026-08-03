@@ -3508,12 +3508,14 @@ function nfceStatusInfo(v){
     return {classe:'cancelada', label:'CANCELADA', icone:'⚫', cor:'var(--txt2)', detalhe: prot ? 'Prot. cancelamento: '+prot : motivo};
   }
 
-  if(raw.indexOf('rejeit') >= 0 || raw.indexOf('erro') >= 0 || raw.indexOf('falha') >= 0){
-    return {classe:'rejeitada', label:'REJEITADA', icone:'🔴', cor:'var(--red2)', detalhe: motivo || (cStat ? 'SEFAZ '+cStat : '')};
-  }
-
+  // A autorização atual sempre prevalece sobre um rótulo antigo de rejeição.
+  // Isso é importante quando uma venda rejeitada é recriada e recebe cStat 100.
   if(raw.indexOf('autoriz') >= 0 || cStat === '100' || prot){
     return {classe:'autorizada', label:'AUTORIZADA', icone:'🟢', cor:'var(--green)', detalhe: prot ? 'Protocolo: '+prot : ''};
+  }
+
+  if(raw.indexOf('rejeit') >= 0 || raw.indexOf('erro') >= 0 || raw.indexOf('falha') >= 0){
+    return {classe:'rejeitada', label:'REJEITADA', icone:'🔴', cor:'var(--red2)', detalhe: motivo || (cStat ? 'SEFAZ '+cStat : '')};
   }
 
   if(raw.indexOf('pend') >= 0 || raw.indexOf('homolog') >= 0 || raw.indexOf('emitida') >= 0 || temNota){
