@@ -2426,107 +2426,6 @@ document.addEventListener('DOMContentLoaded',function(){
   };
 
 
-  window.atualizarStatusNfceCaixa = async function(vid){
-    try{
-      var venda = acharVenda(vid);
-      if(!venda){
-        throw new Error('Venda não encontrada.');
-      }
-
-      var statusAtual = String(venda.nfce_status || venda.status_nfce || '').toLowerCase();
-      if(statusAtual.indexOf('autoriz') >= 0 || String(venda.nfce_cstat || '') === '100'){
-        if(typeof toast === 'function') toast('✅ Esta NFC-e já consta como autorizada.','ok');
-        return;
-      }
-
-      var base = apiBase();
-      var idsConsulta = [];
-      [venda.nfce_id, vid].forEach(function(id){
-        id = String(id || '').trim();
-        if(id && idsConsulta.indexOf(id) < 0) idsConsulta.push(id);
-      });
-
-      if(!idsConsulta.length){
-        throw new Error('A venda não possui identificador de NFC-e para consulta.');
-      }
-
-      if(typeof toast === 'function') toast('🔄 Consultando o status da NFC-e...');
-
-      var data = null;
-      var ultimaMensagem = '';
-      for(var i = 0; i < idsConsulta.length; i++){
-        var resp = await fetch(base + '/nfce/' + encodeURIComponent(idsConsulta[i]) + '/status', {
-          method: 'GET',
-          cache: 'no-store'
-        });
-
-        try{
-          data = await resp.json();
-        }catch(e){
-          data = null;
-        }
-
-        if(resp.ok && data && data.ok === true) break;
-        ultimaMensagem = (data && data.error) || ('Falha HTTP ' + resp.status);
-        data = null;
-      }
-
-      if(!data){
-        throw new Error(ultimaMensagem || 'Não foi possível consultar o status da NFC-e.');
-      }
-
-      var resumo = data.resumoFiscal || {};
-      var sefaz = data.sefaz || {};
-      var cancelamento = data.cancelamento || {};
-      var cStat = String(resumo.cStat || sefaz.cStat || '').trim();
-      var protocolo = String(resumo.protocolo || sefaz.nProt || '').trim();
-      var autorizada = resumo.autorizada === true || cStat === '100' || !!protocolo;
-      var cancelada = resumo.cancelada === true || cancelamento.cancelado === true || cStat === '135' || cStat === '155';
-
-      var vendas = DB.get('vendas') || [];
-      var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
-      if(idx < 0) throw new Error('Venda não encontrada no armazenamento local.');
-
-      if(cancelada){
-        vendas[idx].nfce_status = 'cancelada';
-        vendas[idx].status_nfce = 'cancelada';
-      }else if(autorizada){
-        vendas[idx].nfce_status = 'autorizada';
-        vendas[idx].status_nfce = 'autorizada';
-      }else{
-        vendas[idx].nfce_status = String(resumo.status || vendas[idx].nfce_status || 'pendente_transmissao');
-        vendas[idx].status_nfce = vendas[idx].nfce_status;
-      }
-
-      vendas[idx].nfce_numero = resumo.numero || vendas[idx].nfce_numero || '';
-      vendas[idx].nfce_chave = resumo.chave || vendas[idx].nfce_chave || '';
-      vendas[idx].nfce_cstat = cStat || vendas[idx].nfce_cstat || '';
-      vendas[idx].nfce_xmotivo = resumo.xMotivo || sefaz.xMotivo || vendas[idx].nfce_xmotivo || '';
-      vendas[idx].nfce_protocolo = protocolo || vendas[idx].nfce_protocolo || '';
-      vendas[idx].nfce_autorizada = autorizada;
-      vendas[idx].nfce_transmitida = autorizada || sefaz.transmitido === true;
-      vendas[idx].nfce_pendente_reenvio = !autorizada && !cancelada;
-      vendas[idx].nfce_status_consultado_em = new Date().toISOString();
-      vendas[idx].updatedAt = new Date().toISOString();
-      DB.set('vendas', vendas);
-
-      try{ renderCaixa(); }catch(e){}
-      try{ renderVendas(); }catch(e){}
-      try{ renderDash(); }catch(e){}
-
-      if(cancelada){
-        if(typeof toast === 'function') toast('⚫ NFC-e consta como cancelada.','ok');
-      }else if(autorizada){
-        if(typeof toast === 'function') toast('✅ Status atualizado: NFC-e autorizada.','ok');
-      }else{
-        if(typeof toast === 'function') toast('⚠️ A NFC-e ainda não possui autorização registrada.');
-      }
-    }catch(err){
-      if(typeof toast === 'function') toast('❌ ' + (err.message || 'Erro ao atualizar o status da NFC-e.'));
-    }
-  };
-
-
   window.reenviarNfceCaixa = async function(vid){
     try{
       var venda = acharVenda(vid);
@@ -2575,6 +2474,126 @@ document.addEventListener('DOMContentLoaded',function(){
       if(typeof toast === 'function') toast('✅ NFC-e autorizada no reenvio!','ok');
     }catch(err){
       if(typeof toast === 'function') toast('❌ ' + (err.message || 'Erro ao reenviar NFC-e.'));
+    }
+  };
+
+
+  function normalizarConsultaStatusNfce_(data){
+    data = data || {};
+    var resumo = data.resumoFiscal || data.nfce || data.nota || {};
+    var sefaz = data.sefaz || resumo.sefaz || {};
+    var cancel = data.cancelamento || resumo.cancelamento || {};
+
+    var cStat = String(
+      resumo.cStat || sefaz.cStat || data.cStat || ''
+    ).trim();
+    var protocolo = String(
+      resumo.protocolo || resumo.nProt || sefaz.nProt || data.nProt || ''
+    ).trim();
+    var status = String(
+      resumo.status || data.status || ''
+    ).toLowerCase();
+    var autorizada = resumo.autorizada === true ||
+      data.autorizada === true ||
+      cStat === '100' ||
+      !!protocolo ||
+      status.indexOf('autoriz') >= 0;
+    var cancelada = resumo.cancelada === true ||
+      data.cancelada === true ||
+      cancel.cancelado === true ||
+      cStat === '101' ||
+      cStat === '135' ||
+      cStat === '155' ||
+      status.indexOf('cancel') >= 0;
+
+    return {
+      id: resumo.id || data.id || '',
+      numero: resumo.numero || data.numero || '',
+      chave: resumo.chave || resumo.chNFe || data.chave || data.chNFe || '',
+      cStat: cStat,
+      xMotivo: resumo.xMotivo || sefaz.xMotivo || data.xMotivo || '',
+      nProt: protocolo,
+      autorizado: autorizada,
+      transmitido: autorizada || !!cStat,
+      cancelado: cancelada,
+      status: cancelada ? 'cancelada' : (autorizada ? 'autorizada' : (status || 'pendente_transmissao'))
+    };
+  }
+
+  window.atualizarStatusNfceCaixa = async function(vid){
+    try{
+      var venda = acharVenda(vid);
+      if(!venda){
+        throw new Error('Venda não encontrada.');
+      }
+
+      var idConsulta = venda.nfce_id || vid;
+      var base = apiBase();
+      if(typeof toast === 'function') toast('🔄 Consultando status da NFC-e...');
+
+      async function consultar(id){
+        var resposta = await fetch(base + '/nfce/' + encodeURIComponent(id) + '/status', {
+          method: 'GET',
+          headers: { 'Accept': 'application/json' },
+          cache: 'no-store'
+        });
+        var corpo;
+        try{
+          corpo = await resposta.json();
+        }catch(e){
+          throw new Error('Resposta inválida da consulta de status.');
+        }
+        return { resposta: resposta, corpo: corpo };
+      }
+
+      var consulta = await consultar(idConsulta);
+
+      // Alguns registros antigos guardam nfce_id diferente do ID da venda.
+      if((!consulta.resposta.ok || !consulta.corpo || consulta.corpo.ok !== true) &&
+         String(idConsulta) !== String(vid)){
+        consulta = await consultar(vid);
+      }
+
+      if(!consulta.resposta.ok || !consulta.corpo || consulta.corpo.ok !== true){
+        throw new Error(
+          (consulta.corpo && (consulta.corpo.error || consulta.corpo.xMotivo)) ||
+          'Não foi possível consultar o status da NFC-e.'
+        );
+      }
+
+      var nfceAtual = normalizarConsultaStatusNfce_(consulta.corpo);
+      nfceAtual.id = nfceAtual.id || venda.nfce_id || vid;
+      nfceAtual.numero = nfceAtual.numero || venda.nfce_numero || '';
+      nfceAtual.chave = nfceAtual.chave || venda.nfce_chave || '';
+
+      salvarRetornoNota(vid, { ok:true, nfce:nfceAtual });
+
+      // O cancelamento precisa prevalecer sobre a autorização original.
+      if(nfceAtual.cancelado){
+        var vendas = DB.get('vendas') || [];
+        var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
+        if(idx >= 0){
+          vendas[idx].nfce_status = 'cancelada';
+          vendas[idx].status_nfce = 'cancelada';
+          vendas[idx].nfce_autorizada = false;
+          vendas[idx].updatedAt = new Date().toISOString();
+          DB.set('vendas', vendas);
+        }
+      }
+
+      try{ renderCaixa(); }catch(e){}
+      try{ renderVendas(); }catch(e){}
+      try{ renderDash(); }catch(e){}
+
+      if(nfceAtual.cancelado){
+        if(typeof toast === 'function') toast('⚫ NFC-e consta como cancelada.','ok');
+      }else if(nfceAtual.autorizado){
+        if(typeof toast === 'function') toast('✅ Status atualizado: NFC-e autorizada.','ok');
+      }else{
+        if(typeof toast === 'function') toast('⚠️ Consulta concluída: ' + (nfceAtual.xMotivo || 'NFC-e ainda não autorizada.'));
+      }
+    }catch(err){
+      if(typeof toast === 'function') toast('❌ ' + (err.message || 'Erro ao atualizar o status da NFC-e.'));
     }
   };
 
