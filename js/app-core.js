@@ -3508,14 +3508,12 @@ function nfceStatusInfo(v){
     return {classe:'cancelada', label:'CANCELADA', icone:'⚫', cor:'var(--txt2)', detalhe: prot ? 'Prot. cancelamento: '+prot : motivo};
   }
 
-  // A autorização atual sempre prevalece sobre um rótulo antigo de rejeição.
-  // Isso é importante quando uma venda rejeitada é recriada e recebe cStat 100.
-  if(raw.indexOf('autoriz') >= 0 || cStat === '100' || prot){
-    return {classe:'autorizada', label:'AUTORIZADA', icone:'🟢', cor:'var(--green)', detalhe: prot ? 'Protocolo: '+prot : ''};
-  }
-
   if(raw.indexOf('rejeit') >= 0 || raw.indexOf('erro') >= 0 || raw.indexOf('falha') >= 0){
     return {classe:'rejeitada', label:'REJEITADA', icone:'🔴', cor:'var(--red2)', detalhe: motivo || (cStat ? 'SEFAZ '+cStat : '')};
+  }
+
+  if(raw.indexOf('autoriz') >= 0 || cStat === '100' || prot){
+    return {classe:'autorizada', label:'AUTORIZADA', icone:'🟢', cor:'var(--green)', detalhe: prot ? 'Protocolo: '+prot : ''};
   }
 
   if(raw.indexOf('pend') >= 0 || raw.indexOf('homolog') >= 0 || raw.indexOf('emitida') >= 0 || temNota){
@@ -3546,12 +3544,19 @@ function nfceBadgeHTML(v, compacto){
     ? '<div style="font-size:10px;color:var(--txt2);margin-top:2px;max-width:220px;white-space:normal;">'+s.detalhe+'</div>'
     : '';
 
+  var podeAtualizar = s.classe === 'rejeitada' || s.classe === 'pendente';
+  var idVenda = String(v && v.id || '').replace(/'/g, "\'");
+  var botaoAtualizar = podeAtualizar && idVenda
+    ? '<button type="button" class="btn bo xs" onclick="event.stopPropagation();window.atualizarStatusNfceCaixa(\''+idVenda+'\')" '+
+      'title="Consultar o status já registrado da NFC-e" style="margin-left:6px;padding:3px 7px;font-size:10px;">🔄 Atualizar</button>'
+    : '';
+
   return '<div class="nfce-status-line" title="'+title+'" style="margin-top:4px;display:block;">'+
     '<span class="nfce-badge nfce-'+s.classe+'" style="display:inline-flex;align-items:center;gap:4px;'+
       'font-size:10px;font-weight:900;line-height:1;padding:3px 7px;border-radius:999px;'+
       'border:1px solid var(--bdr);color:'+s.cor+';background:rgba(255,255,255,.7);white-space:nowrap;">'+
       s.icone+' '+s.label+
-    '</span>'+
+    '</span>'+botaoAtualizar+
     detalhe+
   '</div>';
 }
