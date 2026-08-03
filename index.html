@@ -2340,14 +2340,20 @@ document.addEventListener('DOMContentLoaded',function(){
     var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
     if(idx < 0) return;
 
-    var nfce = (data && data.nfce) || {};
-    var idNota = String(nfce.id || vendas[idx].nfce_id || vid);
+    // A API pode devolver os dados fiscais dentro de `nfce` ou diretamente
+    // no objeto principal. Une os dois formatos para a reemissão atualizar a
+    // venda original com a NOVA nota autorizada.
+    var nfce = Object.assign({}, data || {}, (data && data.nfce) || {});
+    var cStatAtual = String(nfce.cStat || nfce.cstat || '').trim();
+    var statusRecebido = String(nfce.status || '').trim().toLowerCase();
+    var autorizada = nfce.autorizado === true || cStatAtual === '100' || statusRecebido === 'autorizada';
+    var idNota = String(nfce.id || nfce.nfceId || vendas[idx].nfce_id || vid);
     var base = apiBase();
     var status = String(
-      nfce.status ||
-      (nfce.autorizado ? 'autorizada' : '') ||
+      (autorizada ? 'autorizada' : '') ||
+      statusRecebido ||
       (nfce.pendente_reenvio ? 'pendente_transmissao' : '') ||
-      (nfce.cStat ? 'rejeitada' : '') ||
+      (cStatAtual ? 'rejeitada' : '') ||
       vendas[idx].nfce_status ||
       'emitida_homologacao'
     );
@@ -2452,15 +2458,21 @@ document.addEventListener('DOMContentLoaded',function(){
         throw new Error('Resposta inválida da API.');
       }
 
-      salvarRetornoNota(vid, {
-        ok: data && data.ok,
-        nfce: Object.assign({
+      var retornoNfce = Object.assign(
+        {
           id: venda.nfce_id || vid,
           numero: venda.nfce_numero || '',
           chave: venda.nfce_chave || '',
           xml_url: venda.nfce_xml_url || '',
           pdf_url: venda.nfce_pdf_url || ''
-        }, data || {})
+        },
+        data || {},
+        (data && data.nfce) || {}
+      );
+
+      salvarRetornoNota(vid, {
+        ok: data && data.ok,
+        nfce: retornoNfce
       });
 
       try{ renderCaixa(); }catch(e){}
