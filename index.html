@@ -2340,53 +2340,37 @@ document.addEventListener('DOMContentLoaded',function(){
     var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
     if(idx < 0) return;
 
-    // A API pode responder de duas formas:
-    // 1) emissão/recriação: { ok, nfce: {...} }
-    // 2) reenvio direto:   { ok, cStat, nProt, chNFe, ... }
-    var nfce = (data && data.nfce && typeof data.nfce === 'object')
-      ? data.nfce
-      : (data || {});
-
-    var cStat = String(nfce.cStat || nfce.cstat || '').trim();
-    var protocolo = String(nfce.nProt || nfce.protocolo || '').trim();
-    var statusRecebido = String(nfce.status || '').toLowerCase();
-    var autorizada = nfce.autorizado === true || cStat === '100' || !!protocolo || statusRecebido.indexOf('autoriz') >= 0;
-    var idNota = String(nfce.id || nfce.nfce_id || vendas[idx].nfce_id || vid);
+    var nfce = (data && data.nfce) || {};
+    var idNota = String(nfce.id || vendas[idx].nfce_id || vid);
     var base = apiBase();
-
-    var status;
-    if(autorizada){
-      status = 'autorizada';
-    }else if(nfce.pendente_reenvio){
-      status = 'pendente_transmissao';
-    }else if(statusRecebido){
-      status = statusRecebido;
-    }else if(cStat){
-      status = 'rejeitada';
-    }else{
-      status = vendas[idx].nfce_status || 'emitida_homologacao';
-    }
+    var status = String(
+      nfce.status ||
+      (nfce.autorizado ? 'autorizada' : '') ||
+      (nfce.pendente_reenvio ? 'pendente_transmissao' : '') ||
+      (nfce.cStat ? 'rejeitada' : '') ||
+      vendas[idx].nfce_status ||
+      'emitida_homologacao'
+    );
 
     vendas[idx].nfce_id = idNota;
     vendas[idx].nfce_status = status;
     vendas[idx].status_nfce = status;
-    vendas[idx].nfce_numero = nfce.numero || nfce.nNF || vendas[idx].nfce_numero || '';
+    vendas[idx].nfce_numero = nfce.numero || vendas[idx].nfce_numero || '';
     vendas[idx].nfce_chave = nfce.chave || nfce.chNFe || vendas[idx].nfce_chave || '';
     vendas[idx].nfce_xml_url = nfce.xml_url || vendas[idx].nfce_xml_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/xml');
     vendas[idx].nfce_pdf_url = nfce.pdf_url || vendas[idx].nfce_pdf_url || (base + '/nfce/' + encodeURIComponent(idNota) + '/pdf');
-    vendas[idx].nfce_cstat = cStat;
+    vendas[idx].nfce_cstat = nfce.cStat || '';
     vendas[idx].nfce_xmotivo = nfce.xMotivo || '';
-    vendas[idx].nfce_protocolo = protocolo;
-    vendas[idx].nfce_autorizada = autorizada;
-    vendas[idx].nfce_transmitida = autorizada || !!nfce.transmitido;
-    vendas[idx].nfce_pendente_reenvio = autorizada ? false : !!nfce.pendente_reenvio;
-    vendas[idx].nfce_erro_comunicacao = autorizada ? false : !!nfce.erro_comunicacao;
+    vendas[idx].nfce_protocolo = nfce.nProt || '';
+    vendas[idx].nfce_autorizada = !!nfce.autorizado;
+    vendas[idx].nfce_transmitida = !!nfce.transmitido;
+    vendas[idx].nfce_pendente_reenvio = !!nfce.pendente_reenvio;
+    vendas[idx].nfce_erro_comunicacao = !!nfce.erro_comunicacao;
     vendas[idx].nfce_tentativas = Number(nfce.tentativas_sefaz || vendas[idx].nfce_tentativas || 0);
     vendas[idx].nfce_data = new Date().toISOString();
     vendas[idx].updatedAt = new Date().toISOString();
 
     DB.set('vendas', vendas);
-    return vendas[idx];
   }
 
   window.emitirNfceCaixa = async function(vid){
@@ -2442,6 +2426,107 @@ document.addEventListener('DOMContentLoaded',function(){
   };
 
 
+  window.atualizarStatusNfceCaixa = async function(vid){
+    try{
+      var venda = acharVenda(vid);
+      if(!venda){
+        throw new Error('Venda não encontrada.');
+      }
+
+      var statusAtual = String(venda.nfce_status || venda.status_nfce || '').toLowerCase();
+      if(statusAtual.indexOf('autoriz') >= 0 || String(venda.nfce_cstat || '') === '100'){
+        if(typeof toast === 'function') toast('✅ Esta NFC-e já consta como autorizada.','ok');
+        return;
+      }
+
+      var base = apiBase();
+      var idsConsulta = [];
+      [venda.nfce_id, vid].forEach(function(id){
+        id = String(id || '').trim();
+        if(id && idsConsulta.indexOf(id) < 0) idsConsulta.push(id);
+      });
+
+      if(!idsConsulta.length){
+        throw new Error('A venda não possui identificador de NFC-e para consulta.');
+      }
+
+      if(typeof toast === 'function') toast('🔄 Consultando o status da NFC-e...');
+
+      var data = null;
+      var ultimaMensagem = '';
+      for(var i = 0; i < idsConsulta.length; i++){
+        var resp = await fetch(base + '/nfce/' + encodeURIComponent(idsConsulta[i]) + '/status', {
+          method: 'GET',
+          cache: 'no-store'
+        });
+
+        try{
+          data = await resp.json();
+        }catch(e){
+          data = null;
+        }
+
+        if(resp.ok && data && data.ok === true) break;
+        ultimaMensagem = (data && data.error) || ('Falha HTTP ' + resp.status);
+        data = null;
+      }
+
+      if(!data){
+        throw new Error(ultimaMensagem || 'Não foi possível consultar o status da NFC-e.');
+      }
+
+      var resumo = data.resumoFiscal || {};
+      var sefaz = data.sefaz || {};
+      var cancelamento = data.cancelamento || {};
+      var cStat = String(resumo.cStat || sefaz.cStat || '').trim();
+      var protocolo = String(resumo.protocolo || sefaz.nProt || '').trim();
+      var autorizada = resumo.autorizada === true || cStat === '100' || !!protocolo;
+      var cancelada = resumo.cancelada === true || cancelamento.cancelado === true || cStat === '135' || cStat === '155';
+
+      var vendas = DB.get('vendas') || [];
+      var idx = vendas.findIndex(function(v){ return String(v.id) === String(vid); });
+      if(idx < 0) throw new Error('Venda não encontrada no armazenamento local.');
+
+      if(cancelada){
+        vendas[idx].nfce_status = 'cancelada';
+        vendas[idx].status_nfce = 'cancelada';
+      }else if(autorizada){
+        vendas[idx].nfce_status = 'autorizada';
+        vendas[idx].status_nfce = 'autorizada';
+      }else{
+        vendas[idx].nfce_status = String(resumo.status || vendas[idx].nfce_status || 'pendente_transmissao');
+        vendas[idx].status_nfce = vendas[idx].nfce_status;
+      }
+
+      vendas[idx].nfce_numero = resumo.numero || vendas[idx].nfce_numero || '';
+      vendas[idx].nfce_chave = resumo.chave || vendas[idx].nfce_chave || '';
+      vendas[idx].nfce_cstat = cStat || vendas[idx].nfce_cstat || '';
+      vendas[idx].nfce_xmotivo = resumo.xMotivo || sefaz.xMotivo || vendas[idx].nfce_xmotivo || '';
+      vendas[idx].nfce_protocolo = protocolo || vendas[idx].nfce_protocolo || '';
+      vendas[idx].nfce_autorizada = autorizada;
+      vendas[idx].nfce_transmitida = autorizada || sefaz.transmitido === true;
+      vendas[idx].nfce_pendente_reenvio = !autorizada && !cancelada;
+      vendas[idx].nfce_status_consultado_em = new Date().toISOString();
+      vendas[idx].updatedAt = new Date().toISOString();
+      DB.set('vendas', vendas);
+
+      try{ renderCaixa(); }catch(e){}
+      try{ renderVendas(); }catch(e){}
+      try{ renderDash(); }catch(e){}
+
+      if(cancelada){
+        if(typeof toast === 'function') toast('⚫ NFC-e consta como cancelada.','ok');
+      }else if(autorizada){
+        if(typeof toast === 'function') toast('✅ Status atualizado: NFC-e autorizada.','ok');
+      }else{
+        if(typeof toast === 'function') toast('⚠️ A NFC-e ainda não possui autorização registrada.');
+      }
+    }catch(err){
+      if(typeof toast === 'function') toast('❌ ' + (err.message || 'Erro ao atualizar o status da NFC-e.'));
+    }
+  };
+
+
   window.reenviarNfceCaixa = async function(vid){
     try{
       var venda = acharVenda(vid);
@@ -2468,22 +2553,16 @@ document.addEventListener('DOMContentLoaded',function(){
         throw new Error('Resposta inválida da API.');
       }
 
-      // Preserva a resposta aninhada da recriação ({ nfce: {...} }) e
-      // também aceita a resposta plana de um reenvio direto.
-      var retornoNormalizado = (data && data.nfce)
-        ? data
-        : {
-            ok: data && data.ok,
-            nfce: Object.assign({
-              id: venda.nfce_id || vid,
-              numero: venda.nfce_numero || '',
-              chave: venda.nfce_chave || '',
-              xml_url: venda.nfce_xml_url || '',
-              pdf_url: venda.nfce_pdf_url || ''
-            }, data || {})
-          };
-
-      salvarRetornoNota(vid, retornoNormalizado);
+      salvarRetornoNota(vid, {
+        ok: data && data.ok,
+        nfce: Object.assign({
+          id: venda.nfce_id || vid,
+          numero: venda.nfce_numero || '',
+          chave: venda.nfce_chave || '',
+          xml_url: venda.nfce_xml_url || '',
+          pdf_url: venda.nfce_pdf_url || ''
+        }, data || {})
+      });
 
       try{ renderCaixa(); }catch(e){}
       try{ renderVendas(); }catch(e){}
