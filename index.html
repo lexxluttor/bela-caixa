@@ -2310,6 +2310,29 @@ document.addEventListener('DOMContentLoaded',function(){
 
   function payloadNota(venda, cliente){
     var itens = Array.isArray(venda.itens) ? venda.itens : [];
+    var formaPagamento = venda.forma || venda.forma_pagamento || 'dinheiro';
+    var pagamento = {
+      tipo: formaPagamento,
+      valor: Number(venda.total || 0)
+    };
+
+    // Pagamento dividido: envia ao servidor cada forma e valor já salvos na venda.
+    // As demais formas continuam exatamente com o payload anterior.
+    if(String(formaPagamento).toLowerCase() === 'dividido' && Array.isArray(venda.pagamentos)){
+      var detalhes = venda.pagamentos.map(function(p){
+        return {
+          tipo: p.tipo || p.forma || '',
+          valor: Number(p.valor != null ? p.valor : (p.val != null ? p.val : 0))
+        };
+      }).filter(function(p){
+        return String(p.tipo || '').trim() && isFinite(p.valor) && p.valor > 0;
+      });
+
+      if(detalhes.length){
+        pagamento.detalhes = detalhes;
+      }
+    }
+
     return {
       vendaId: venda.id,
       dataVenda: venda.data || venda.createdAt || new Date().toISOString(),
@@ -2326,10 +2349,7 @@ document.addEventListener('DOMContentLoaded',function(){
         cpf: ''
       },
       itens: itens.map(itemNota),
-      pagamento: {
-        tipo: venda.forma || venda.forma_pagamento || 'dinheiro',
-        valor: Number(venda.total || 0)
-      },
+      pagamento: pagamento,
       desconto: Number(venda.desconto || 0),
       total: Number(venda.total || 0)
     };
