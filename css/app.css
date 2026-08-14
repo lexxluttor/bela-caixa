@@ -562,3 +562,17 @@ td{padding:8px 9px !important;font-size:12px !important;}
   transform:translateY(-1px);
 }
 
+
+/* ============================================================
+   NOVA VENDA — CARRINHO MAIS VISÍVEL
+   Carrinho: 22% -> 25% (aprox. +15% de largura)
+   Total: 22px -> 30px para melhorar a leitura
+   ============================================================ */
+#pg-venda .vr{
+  width:25% !important;
+}
+
+#pg-venda .vr .tb{
+  font-size:30px !important;
+  line-height:1.1 !important;
+}
