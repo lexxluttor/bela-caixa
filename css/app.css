@@ -576,3 +576,52 @@ td{padding:8px 9px !important;font-size:12px !important;}
   font-size:30px !important;
   line-height:1.1 !important;
 }
+
+
+/* ============================================================
+   NOVA VENDA — REFINO DO CARRINHO
+   Carrinho um pouco mais largo + tipografia mais legível
+   ============================================================ */
+#pg-venda .vr{
+  width:27% !important;
+}
+
+/* Título Carrinho */
+#pg-venda .vr .ct2{
+  font-size:19px !important;
+}
+
+/* Linhas dos produtos */
+#pg-venda #cart .ci{
+  font-size:17px !important;
+}
+
+/* Nome/descrição do produto */
+#pg-venda #cart .cin{
+  font-size:17px !important;
+  line-height:1.22 !important;
+}
+
+/* Valor de cada item */
+#pg-venda #cart .civ{
+  font-size:17px !important;
+  width:88px !important;
+}
+
+/* Quantidade */
+#pg-venda #cart .ciq{
+  font-size:17px !important;
+}
+
+/* Resumo: Subtotal, Desconto e TOTAL */
+#pg-venda .vr .cf .tr2{
+  font-size:17px !important;
+}
+
+/* Valor TOTAL com fonte mais nítida */
+#pg-venda .vr .tb{
+  font-family:Arial, Helvetica, sans-serif !important;
+  font-size:30px !important;
+  font-weight:800 !important;
+  line-height:1.1 !important;
+}
