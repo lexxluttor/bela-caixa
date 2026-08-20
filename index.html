@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="card" style="margin-bottom:0">
         <div class="ct">👤 Cliente</div>
         <div class="fr" id="v-row-busca">
-          <input class="fi" id="v-sc" placeholder="🔍 Buscar cliente por nome ou CPF..." oninput="buscaVCli()" style="flex:1" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+          <input class="fi" id="v-sc" placeholder="🔍 Buscar cliente por nome ou CPF..." oninput="buscaVCli()" style="flex:1" autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" data-lpignore="true" data-form-type="other" role="presentation">
           <button class="btn br sm" onclick="abrirMdCli(null,'venda')">➕ Novo</button>
           <button class="btn bh sm" onclick="abrirListaCliVenda()" title="Ver todos os clientes">📋 Lista</button>
         </div>
