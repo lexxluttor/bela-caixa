@@ -4043,31 +4043,143 @@ function printCaixa(){
   window.print();
 }
 
+function garantirModalEdicaoRecebimentoBM(){
+  var existente=document.getElementById('mo-rec-edit');
+  if(existente) return existente;
+
+  var ov=document.createElement('div');
+  ov.className='ov';
+  ov.id='mo-rec-edit';
+  ov.innerHTML=
+    '<div class="md rec-edit-md">'+
+      '<div class="mh">'+
+        '<div class="mht">💵 Detalhes do Recebimento</div>'+
+        '<button class="mx" type="button" onclick="fMd(\'mo-rec-edit\')">×</button>'+
+      '</div>'+
+      '<div class="mb">'+
+        '<input type="hidden" id="rec-edit-id">'+
+        '<div class="rec-edit-grid">'+
+          '<div class="fg">'+
+            '<label class="fl">Cliente</label>'+
+            '<input class="fi" id="rec-edit-cli" type="text" readonly>'+
+          '</div>'+
+          '<div class="fg">'+
+            '<label class="fl">Data/Hora</label>'+
+            '<input class="fi" id="rec-edit-data" type="datetime-local">'+
+          '</div>'+
+          '<div class="fg">'+
+            '<label class="fl">Valor Recebido (R$)</label>'+
+            '<input class="fi rec-edit-valor" id="rec-edit-val" type="number" step="0.01" min="0.01">'+
+          '</div>'+
+          '<div class="fg">'+
+            '<label class="fl">Forma de Pagamento</label>'+
+            '<select class="fi" id="rec-edit-forma">'+
+              '<option value="dinheiro">💵 Dinheiro</option>'+
+              '<option value="pix">📱 PIX</option>'+
+              '<option value="credito">💳 Crédito</option>'+
+              '<option value="debito">💳 Débito</option>'+
+            '</select>'+
+          '</div>'+
+          '<div class="fg gc">'+
+            '<label class="fl">Observação</label>'+
+            '<input class="fi" id="rec-edit-obs" type="text" placeholder="Opcional...">'+
+          '</div>'+
+        '</div>'+
+        '<div class="rec-edit-resumo">'+
+          '<span>Valor do recebimento</span>'+
+          '<strong id="rec-edit-total">R$ 0,00</strong>'+
+        '</div>'+
+      '</div>'+
+      '<div class="mf">'+
+        '<button class="btn bh" type="button" onclick="fMd(\'mo-rec-edit\')">Fechar</button>'+
+        '<button class="btn br" type="button" onclick="salvarEdicaoRecebimentoBM()">💾 Salvar Alterações</button>'+
+      '</div>'+
+    '</div>';
+
+  document.body.appendChild(ov);
+
+  var valorEl=document.getElementById('rec-edit-val');
+  if(valorEl){
+    valorEl.addEventListener('input', function(){
+      var n=parseFloat(String(valorEl.value||'').replace(',','.'))||0;
+      var t=document.getElementById('rec-edit-total');
+      if(t) t.textContent=R(n);
+    });
+  }
+
+  ov.addEventListener('click', function(e){
+    if(e.target===ov) fMd('mo-rec-edit');
+  });
+
+  return ov;
+}
+
 function editarRecebCaixa(pid){
+  var pgs=DB.get('pagamentos')||[];
+  var pag=pgs.find(function(x){return String(x.id)===String(pid);});
+  if(!pag){toast('⚠️ Recebimento não encontrado!');return;}
+
+  garantirModalEdicaoRecebimentoBM();
+
+  var cli=(DB.get('clientes')||[]).find(function(x){return String(x.id)===String(pag.cid);})||{nome:'Cliente'};
+
+  document.getElementById('rec-edit-id').value=pag.id||'';
+  document.getElementById('rec-edit-cli').value=cli.nome||'Cliente';
+  document.getElementById('rec-edit-data').value=fmtInputDateTime(pag.data||pag.createdAt||nowLocalISO());
+  document.getElementById('rec-edit-val').value=Number(pag.val||pag.valor||0).toFixed(2);
+  document.getElementById('rec-edit-forma').value=pag.forma||pag.forma_pagamento||'dinheiro';
+  document.getElementById('rec-edit-obs').value=pag.obs||'';
+
+  var total=document.getElementById('rec-edit-total');
+  if(total) total.textContent=R(pag.val||pag.valor||0);
+
+  abrirMd('mo-rec-edit');
+}
+
+function salvarEdicaoRecebimentoBM(){
+  var id=(document.getElementById('rec-edit-id')||{value:''}).value;
+  var valorEl=document.getElementById('rec-edit-val');
+  var dataEl=document.getElementById('rec-edit-data');
+  var formaEl=document.getElementById('rec-edit-forma');
+  var obsEl=document.getElementById('rec-edit-obs');
+
+  var valor=parseFloat(String((valorEl||{value:''}).value||'').replace(',','.'));
+  if(!isFinite(valor)||valor<=0){toast('⚠️ Informe um valor válido!');return;}
+  if(!dataEl || !dataEl.value){toast('⚠️ Informe a data e hora do recebimento!');return;}
+
   pedirSenha(function(){
-    var pgs=DB.get('pagamentos');
-    var idx=pgs.findIndex(function(x){return x.id===pid;});
+    var pgs=DB.get('pagamentos')||[];
+    var idx=pgs.findIndex(function(x){return String(x.id)===String(id);});
     if(idx<0){toast('⚠️ Recebimento não encontrado!');return;}
+
     var pag=pgs[idx];
-    var cli=DB.get('clientes').find(function(x){return x.id===pag.cid;})||{nome:'Cliente'};
-    var novoValor=prompt('Corrigir valor recebido de '+cli.nome, Number(pag.val||0).toFixed(2).replace('.',','));
-    if(novoValor===null)return;
-    novoValor=String(novoValor).replace(',', '.').trim();
-    var valor=parseFloat(novoValor);
-    if(!valor || valor<=0){toast('⚠️ Valor inválido!');return;}
-    var formaAtual=pag.forma||'dinheiro';
-    var novaForma=prompt('Forma de pagamento (dinheiro, pix, cartão, transferência)', formaAtual);
-    if(novaForma===null)return;
-    novaForma=String(novaForma).trim().toLowerCase();
-    if(!novaForma)novaForma=formaAtual;
+    var novaData=parseInputDateTime(dataEl.value, pag.data||pag.createdAt||nowLocalISO());
+
     pag.val=valor;
-    pag.forma=novaForma;
+    pag.valor=valor;
+    pag.forma=(formaEl&&formaEl.value)||pag.forma||'dinheiro';
+    pag.forma_pagamento=pag.forma;
+    pag.obs=(obsEl&&obsEl.value)||'';
+    pag.data=novaData;
+    pag.updatedAt=nowLocalISO();
+
     pgs[idx]=pag;
-    DB.set('pagamentos', pgs);
-    renderCaixa();
-    renderReceb();
-    if(typeof renderDash==='function')renderDash();
-    toast('✅ Recebimento corrigido!','ok');
+    DB.set('pagamentos',pgs);
+
+    fMd('mo-rec-edit');
+
+    try{renderCaixa();}catch(e){}
+    try{renderReceb();}catch(e){}
+    try{
+      if(typeof renderRecebPainel==='function' && typeof rCli!=='undefined' && rCli && String(rCli.id)===String(pag.cid)){
+        renderRecebPainel();
+      }
+    }catch(e){}
+    try{if(typeof renderMovimentacoesCliModal==='function')renderMovimentacoesCliModal();}catch(e){}
+    try{if(typeof renderRel==='function')renderRel();}catch(e){}
+    try{if(typeof renderDash==='function')renderDash();}catch(e){}
+
+    toast('✅ Recebimento atualizado!','ok');
   });
 }
 
@@ -4654,27 +4766,12 @@ function salvarEditVenda(){
 }
 
 // Editar Pagamento
+// Mantido como compatibilidade: qualquer botão antigo passa a abrir a nova tela única.
 function abrirEditPag(id){
-  pedirSenha(function(){
-    var p=DB.get('pagamentos').find(function(x){return x.id===id;});if(!p)return;
-    document.getElementById('ep-id').value=p.id;
-    document.getElementById('ep-val').value=p.val.toFixed(2);
-    document.getElementById('ep-forma').value=p.forma;
-    document.getElementById('ep-obs').value=p.obs||'';
-    abrirMd('mo-edit-pag');
-  });
+  editarRecebCaixa(id);
 }
 function salvarEditPag(){
-  var id=document.getElementById('ep-id').value;
-  var pgs=DB.get('pagamentos');
-  var idx=pgs.findIndex(function(p){return p.id===id;});if(idx<0)return;
-  pgs[idx].val=parseFloat(document.getElementById('ep-val').value);
-  pgs[idx].forma=document.getElementById('ep-forma').value;
-  pgs[idx].obs=document.getElementById('ep-obs').value;
-  DB.set('pagamentos',pgs);fMd('mo-edit-pag');
-  if(typeof renderRecebPainel==='function')renderRecebPainel();
-  renderCaixa();renderDash();
-  toast('✅ Pagamento atualizado!','ok');
+  salvarEdicaoRecebimentoBM();
 }
 
 
