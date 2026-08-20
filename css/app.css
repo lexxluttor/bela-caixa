@@ -625,3 +625,56 @@ td{padding:8px 9px !important;font-size:12px !important;}
   font-weight:800 !important;
   line-height:1.1 !important;
 }
+
+
+/* ============================================================
+   RECEBIMENTOS — TELA ÚNICA DE EDIÇÃO
+   Permite corrigir data/hora, valor, forma e observação.
+   ============================================================ */
+#mo-rec-edit{z-index:49990 !important;}
+#mo-rec-edit .rec-edit-md{
+  width:92% !important;
+  max-width:680px !important;
+}
+#mo-rec-edit .rec-edit-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+#mo-rec-edit .rec-edit-grid .fg{
+  margin-bottom:0 !important;
+}
+#mo-rec-edit #rec-edit-cli[readonly]{
+  cursor:default;
+  opacity:.9;
+}
+#mo-rec-edit .rec-edit-valor{
+  font-size:17px !important;
+  font-weight:800 !important;
+}
+#mo-rec-edit .rec-edit-resumo{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  margin-top:16px;
+  padding:14px 16px;
+  border:1px solid var(--bdr);
+  border-radius:10px;
+  background:var(--s2);
+  font-weight:800;
+}
+#mo-rec-edit .rec-edit-resumo strong{
+  font-family:Arial,Helvetica,sans-serif;
+  font-size:28px;
+  color:var(--red2);
+  line-height:1;
+}
+#mo-rec-edit .mf{
+  align-items:center;
+}
+@media (max-width:700px){
+  #mo-rec-edit .rec-edit-grid{
+    grid-template-columns:1fr;
+  }
+}
