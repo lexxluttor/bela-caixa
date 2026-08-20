@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="card" id="r-busca-card">
       <div class="ct">🔍 Buscar Cliente</div>
       <div class="fr" style="align-items:center;">
-        <input class="fi" id="r-sc" placeholder="Digite nome ou CPF do cliente..." oninput="buscaRCli()" style="flex:1">
+        <input class="fi" id="r-sc" placeholder="Digite nome ou CPF do cliente..." oninput="buscaRCli()" style="flex:1" autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" data-lpignore="true" data-form-type="other" role="presentation">
         <button class="btn bb xs" type="button" style="margin-left:6px;" onclick="abrirListaDevedores()">📋 Devedores</button>
       </div>
       <div id="r-sg" style="margin-top:8px;"></div>
