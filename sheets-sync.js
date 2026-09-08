@@ -92,20 +92,46 @@ const originalSetItem = localStorage.setItem.bind(localStorage);
 function safeSetItem_(k, v) {
   try {
     originalSetItem(k, v);
+    return true;
   } catch (e) {
-    console.warn("localStorage ignorado por falta de espaço:", k, e);
+    // Se o armazenamento estiver cheio, remove apenas arquivos de backup
+    // descartáveis e tenta novamente. Nunca apaga os dados principais.
+    limparBackupsLocaisPesados_();
+    try {
+      originalSetItem(k, v);
+      return true;
+    } catch (e2) {
+      console.error("Não foi possível salvar no localStorage:", k, e2);
+      throw new Error("O armazenamento local do sistema está cheio. Faça um backup no servidor e tente novamente.");
+    }
   }
 }
 
 function limparBackupsLocaisPesados_() {
-  [
-    "bm_backup",
-    "backup_1",
-    "backup_2",
-    "backup_3",
-    "bm_last_sync_error",
-    "bm_last_restore_error"
-  ].forEach(function (k) {
+  const chaves = [];
+
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+
+      if (
+        k === "bm_backup" ||
+        k === "backup_1" ||
+        k === "backup_2" ||
+        k === "backup_3" ||
+        k === "bm_last_sync_error" ||
+        k === "bm_last_restore_error" ||
+        k === "bm_backup_produtos_antes_exclusao" ||
+        k === "bm_backup_unificacao_produtos" ||
+        k.indexOf("bm_backup_produtos_antes_balanco_") === 0
+      ) {
+        chaves.push(k);
+      }
+    }
+  } catch (e) {}
+
+  chaves.forEach(function (k) {
     try { localStorage.removeItem(k); } catch (e) {}
   });
 }
@@ -119,7 +145,7 @@ function lerLocal(nome) {
 }
 
 function salvarLocal(nome, dados) {
-  originalSetItem("bm_" + nome, JSON.stringify(dados || []));
+  safeSetItem_("bm_" + nome, JSON.stringify(dados || []));
 }
 
 function gerarHashSync() {
@@ -620,7 +646,7 @@ async function restoreNow() {
 /* ================= HOOK LOCALSTORAGE ================= */
 
 localStorage.setItem = function (k, v) {
-  originalSetItem(k, v);
+  safeSetItem_(k, v);
 
   if (ignorarHook) return;
 
@@ -790,6 +816,10 @@ window.BelaSheetsSync = {
   listarPlanilhasBackup: listarPlanilhasBackup,
 
   backupServerNow: backupServerNow,
+
+  scheduleSync: function (motivo) {
+    agendarSync(motivo || "mudanca");
+  },
 
   status: function () {
     return {
