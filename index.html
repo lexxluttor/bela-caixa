@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded',function(){
       <div class="card" style="margin-bottom:0">
         <div class="ct">👤 Cliente</div>
         <div class="fr" id="v-row-busca">
-          <input class="fi" id="v-sc" placeholder="🔍 Buscar cliente por nome ou CPF..." oninput="buscaVCli()" style="flex:1" autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" data-lpignore="true" data-form-type="other" role="presentation">
+          <input class="fi" id="v-sc" placeholder="🔍 Buscar cliente por nome ou CPF..." oninput="buscaVCli()" style="flex:1" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
           <button class="btn br sm" onclick="abrirMdCli(null,'venda')">➕ Novo</button>
           <button class="btn bh sm" onclick="abrirListaCliVenda()" title="Ver todos os clientes">📋 Lista</button>
         </div>
@@ -175,7 +175,7 @@ document.addEventListener('DOMContentLoaded',function(){
     <div class="card" id="r-busca-card">
       <div class="ct">🔍 Buscar Cliente</div>
       <div class="fr" style="align-items:center;">
-        <input class="fi" id="r-sc" placeholder="Digite nome ou CPF do cliente..." oninput="buscaRCli()" style="flex:1" autocomplete="new-password" autocorrect="off" autocapitalize="none" spellcheck="false" readonly onfocus="this.removeAttribute('readonly')" data-lpignore="true" data-form-type="other" role="presentation">
+        <input class="fi" id="r-sc" placeholder="Digite nome ou CPF do cliente..." oninput="buscaRCli()" style="flex:1">
         <button class="btn bb xs" type="button" style="margin-left:6px;" onclick="abrirListaDevedores()">📋 Devedores</button>
       </div>
       <div id="r-sg" style="margin-top:8px;"></div>
@@ -3237,7 +3237,18 @@ function balFinalizarReal(){
     });
 
     try{
-      localStorage.setItem('bm_backup_produtos_antes_balanco_'+Date.now(), JSON.stringify(DB.get('produtos')||[]));
+      (function(){
+  try{
+    var produtosBackup = JSON.stringify(DB.get('produtos') || []);
+    if(produtosBackup.length < 50000){
+      localStorage.setItem('bm_backup_produtos_antes_balanco', produtosBackup);
+    }else{
+      localStorage.removeItem('bm_backup_produtos_antes_balanco');
+    }
+  }catch(e){
+    try{ localStorage.removeItem('bm_backup_produtos_antes_balanco'); }catch(_){}
+  }
+})();
     }catch(e){}
 
     DB.set('produtos', produtos);
