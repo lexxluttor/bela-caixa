@@ -3303,22 +3303,52 @@ function bmNumeroWhatsApp(tel){
   if(num.length===10 || num.length===11) num='55'+num;
   return num;
 }
-function bmAbrirWhatsApp(tel,msg){
+async function bmAbrirWhatsApp(tel,msg){
   var num=bmNumeroWhatsApp(tel);
   if(!num){ toast('⚠️ Cliente sem telefone/WhatsApp!'); return false; }
-  var url='https://wa.me/'+num+'?text='+encodeURIComponent(msg||'');
+
+  /*
+   * Primeiro tenta enviar diretamente pelo Node.js + Baileys.
+   * O WhatsApp Web permanece como fallback caso o Node não esteja disponível.
+   */
   try{
-    var a=document.createElement('a');
-    a.href=url;
-    a.target='_blank';
-    a.rel='noopener';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(function(){ try{document.body.removeChild(a);}catch(e){} },300);
-  }catch(e){
-    window.open(url,'_blank');
+    var resposta=await fetch('http://127.0.0.1:3000/enviar-whatsapp',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        telefone:num,
+        mensagem:msg||''
+      })
+    });
+
+    var dados=await resposta.json();
+
+    if(dados.sucesso){
+      toast('✅ Mensagem enviada pelo WhatsApp!');
+      return true;
+    }
+
+    throw new Error(dados.erro||'Não foi possível enviar a mensagem.');
+
+  }catch(erro){
+    console.warn('Node.js/WhatsApp indisponível. Usando WhatsApp Web como alternativa.',erro);
+
+    var url='https://wa.me/'+num+'?text='+encodeURIComponent(msg||'');
+
+    try{
+      var a=document.createElement('a');
+      a.href=url;
+      a.target='_blank';
+      a.rel='noopener';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function(){ try{document.body.removeChild(a);}catch(e){} },300);
+    }catch(e){
+      window.open(url,'_blank');
+    }
+
+    return true;
   }
-  return true;
 }
 function bmClienteById(cid){
   return (DB.get('clientes')||[]).find(function(c){ return String(c.id)===String(cid); }) || null;
