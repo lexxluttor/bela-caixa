@@ -3377,21 +3377,59 @@ function renderCobranca(){
   }).join('');
 }
 function carregarModuloCobrancasAutomacaoBM(cb){
-  if(window.cobrancasAutomacao){cb();return;}
-  var src='cobrancas-automacao-v2.js';
-  var ja=document.querySelector('script[data-cobrancas-automacao]');
-  if(ja){
-    ja.addEventListener('load',cb,{once:true});
-    ja.addEventListener('error',function(){toast('❌ Não foi possível carregar o módulo de cobranças!','warn');},{once:true});
+  if(typeof window.cobrancasAutomacao==='object'){
+    cb();
     return;
   }
-  var sc=document.createElement('script');
-  sc.src=src;
-  sc.async=true;
-  sc.dataset.cobrancasAutomacao='1';
-  sc.onload=cb;
-  sc.onerror=function(){toast('❌ Não foi possível carregar o módulo de cobranças!','warn');};
-  document.head.appendChild(sc);
+
+  var fontes=[
+    './cobrancas-automacao-v2.js',
+    './js/cobrancas-automacao-v2.js'
+  ];
+  var indice=0;
+
+  function tentarCarregar(){
+    if(typeof window.cobrancasAutomacao==='object'){
+      cb();
+      return;
+    }
+
+    if(indice>=fontes.length){
+      toast('❌ Não foi possível carregar o módulo de cobranças!','warn');
+      return;
+    }
+
+    var src=fontes[indice++];
+    var existente=document.querySelector('script[data-cobrancas-automacao][src="'+src+'"]');
+
+    if(existente){
+      if(typeof window.cobrancasAutomacao==='object'){
+        cb();
+        return;
+      }
+      existente.remove();
+    }
+
+    var sc=document.createElement('script');
+    sc.src=src;
+    sc.async=true;
+    sc.dataset.cobrancasAutomacao='1';
+    sc.onload=function(){
+      if(typeof window.cobrancasAutomacao==='object'){
+        cb();
+      }else{
+        sc.remove();
+        tentarCarregar();
+      }
+    };
+    sc.onerror=function(){
+      sc.remove();
+      tentarCarregar();
+    };
+    document.head.appendChild(sc);
+  }
+
+  tentarCarregar();
 }
 
 function cobrarTodos(){
