@@ -3476,7 +3476,7 @@ function cobrarTodos(){
       for(var i=0;i<selecionados.length;i++){
         var ok=await wppCobrar(selecionados[i].id);
         if(ok) confirmados.push(selecionados[i]);
-        if(i<selecionados.length-1) await new Promise(function(resolve){setTimeout(resolve,800);});
+        if(i<selecionados.length-1) await new Promise(function(resolve){setTimeout(resolve,8000);});
       }
 
       if(confirmados.length){
