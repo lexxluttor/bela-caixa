@@ -82,12 +82,19 @@ function chamarAppsScriptCobrancas_(action, dados) {
 }
 
 function lerHistoricoLocal_() {
+  const todos = [];
+
   try {
     const dados = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    return Array.isArray(dados) ? dados : [];
-  } catch (e) {
-    return [];
-  }
+    if (Array.isArray(dados)) todos.push.apply(todos, dados);
+  } catch (e) {}
+
+  try {
+    const filaSync = JSON.parse(localStorage.getItem('bm_historico_cobrancas') || '[]');
+    if (Array.isArray(filaSync)) todos.push.apply(todos, filaSync);
+  } catch (e) {}
+
+  return todos;
 }
 
 function salvarHistoricoLocal_(historico) {
@@ -345,7 +352,31 @@ async function abrirAprovacao(estado, onEnviar) {
  * O cache local é apagado SOMENTE depois da confirmação de gravação no servidor.
  */
 function registrarCobrancas(clientes) {
-  const lista = (Array.isArray(clientes) ? clientes : []).map(function(cliente){
+  const listaOriginal = Array.isArray(clientes) ? clientes : [];
+
+  if (typeof window !== 'undefined' &&
+      window.BelaSheetsSync &&
+      typeof window.BelaSheetsSync.registrarHistoricoCobrancas === 'function') {
+    return window.BelaSheetsSync.registrarHistoricoCobrancas(listaOriginal)
+      .then(function(resposta){
+        if(typeof toast === 'function') {
+          if (resposta && resposta.ok) {
+            const qtd = Number(resposta.historicoCobrancasProcessadas || 0);
+            toast('✅ '+qtd+' cobrança(s) registrada(s) na planilha. Cache local limpo.','ok');
+          } else {
+            toast('⚠️ Cobranças enviadas, mas o histórico ainda não foi salvo na planilha.','warn');
+          }
+        }
+        return resposta;
+      })
+      .catch(function(erro){
+        console.error('Falha no sync do histórico de cobranças:', erro);
+        if(typeof toast === 'function') toast('⚠️ Histórico pendente. O sistema tentará salvar na próxima sincronização.','warn');
+        return {ok:false, erro: erro && erro.message || String(erro)};
+      });
+  }
+
+  const lista = listaOriginal.map(function(cliente){
     const clienteId = String(cliente && (cliente.clienteId ?? cliente.id ?? cliente.cid) || '');
     return {
       registroId: 'COB-' + clienteId + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7),
@@ -419,6 +450,7 @@ function listarHistorico() {
 
 function limparHistorico() {
   limparHistoricoLocal_();
+  try { localStorage.removeItem('bm_historico_cobrancas'); } catch (e) {}
 }
 
 if (typeof window !== 'undefined') {
