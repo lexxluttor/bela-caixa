@@ -354,86 +354,135 @@ async function abrirAprovacao(estado, onEnviar) {
 function registrarCobrancas(clientes) {
   const listaOriginal = Array.isArray(clientes) ? clientes : [];
 
-  if (typeof window !== 'undefined' &&
-      window.BelaSheetsSync &&
-      typeof window.BelaSheetsSync.registrarHistoricoCobrancas === 'function') {
-    return window.BelaSheetsSync.registrarHistoricoCobrancas(listaOriginal)
-      .then(function(resposta){
-        if(typeof toast === 'function') {
-          if (resposta && resposta.ok) {
-            const qtd = Number(resposta.historicoCobrancasProcessadas || 0);
-            toast('✅ '+qtd+' cobrança(s) registrada(s) na planilha. Cache local limpo.','ok');
-          } else {
-            toast('⚠️ Cobranças enviadas, mas o histórico ainda não foi salvo na planilha.','warn');
-          }
-        }
-        return resposta;
-      })
-      .catch(function(erro){
-        console.error('Falha no sync do histórico de cobranças:', erro);
-        if(typeof toast === 'function') toast('⚠️ Histórico pendente. O sistema tentará salvar na próxima sincronização.','warn');
-        return {ok:false, erro: erro && erro.message || String(erro)};
-      });
-  }
-
-  const lista = listaOriginal.map(function(cliente){
-    const clienteId = String(cliente && (cliente.clienteId ?? cliente.id ?? cliente.cid) || '');
+  const lista = listaOriginal.map(function(cliente, indice){
+    const clienteId = String(cliente && (cliente.clienteId ?? cliente.id ?? cliente.cid) || '').trim();
     return {
-      registroId: 'COB-' + clienteId + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7),
+      registroId: String(cliente && (cliente.registroId || cliente.cobrancaId || cliente.historicoId) || '').trim() ||
+        ('COB-' + clienteId + '-' + Date.now().toString(36) + '-' + indice + '-' + Math.random().toString(36).slice(2,7)),
       id: clienteId,
       cid: clienteId,
       nome: cliente && (cliente.nome || cliente.cliente) || '',
-      telefone: cliente && (cliente.telefone || cliente.fone) || '',
+      telefone: cliente && (cliente.telefone || cliente.tel || cliente.fone) || '',
       saldo: cliente && cliente.saldo != null ? cliente.saldo : 0,
       dias: cliente && cliente.dias != null ? cliente.dias : 0,
       dataCobranca: new Date().toISOString()
     };
   }).filter(function(c){ return !!c.id; });
 
-  if(!lista.length) return Promise.resolve({ok:true,totalSalvos:0});
+  if(!lista.length){
+    return Promise.resolve({ok:true,totalSalvos:0,totalPendentes:0});
+  }
 
+  /*
+   * A gravação da cobrança NÃO passa pelo sync geral.
+   * O histórico é persistente no Apps Script e é salvo diretamente aqui.
+   * O cache do navegador só é removido depois da confirmação do servidor.
+   */
   return chamarAppsScriptCobrancas_('registrarHistoricoCobrancas', {
     clientes: lista
   })
     .then(function(resposta){
-      /*
-       * LIMPEZA DE NAVEGADOR:
-       * o histórico temporário só é removido depois que o Apps Script confirma
-       * a gravação na planilha.
-       */
-      limparHistoricoLocal_();
+      const qtd = Number(resposta && resposta.totalSalvos || 0);
+      const bloqueados = Array.isArray(resposta && resposta.bloqueados) ? resposta.bloqueados : [];
 
-      if(typeof toast === 'function') {
-        const qtd = Number(resposta.totalSalvos || 0);
-        toast('✅ '+qtd+' cobrança(s) registrada(s) na planilha. Cache local limpo.','ok');
+      if (qtd >= lista.length) {
+        limparHistoricoLocal_();
+        try { localStorage.removeItem('bm_historico_cobrancas'); } catch (e) {}
+
+        if(typeof toast === 'function') {
+          toast('✅ '+qtd+' cobrança(s) registrada(s) na planilha.','ok');
+        }
+
+        return Object.assign({}, resposta, {
+          ok: true,
+          totalSalvos: qtd,
+          totalPendentes: 0
+        });
       }
 
-      return resposta;
-    })
-    .catch(function(erro){
       /*
-       * Se a nuvem não confirmou, não apagamos o cache. Mantemos somente um
-       * cache pequeno e limitado à janela de 7 dias para evitar crescimento.
+       * Se o servidor informou algum bloqueio, não apagamos uma fila inteira.
+       * Mantemos somente os registros que não foram confirmados, para não
+       * duplicar no próximo tratamento.
        */
-      const atual = lerHistoricoLocal_();
-      const agora = new Date().toISOString();
-      const acrescentar = lista.map(function(cliente){
+      const idsSalvos = new Set(
+        (Array.isArray(resposta && resposta.salvos) ? resposta.salvos : [])
+          .map(function(item){ return String(item && item.id || ''); })
+          .filter(Boolean)
+      );
+      const pendentes = lista.filter(function(cliente){
+        return !idsSalvos.has(String(cliente.registroId));
+      });
+
+      salvarHistoricoLocal_(pendentes.map(function(cliente){
         return {
           clienteId: cliente.id,
           nome: cliente.nome,
           telefone: cliente.telefone,
           saldo: cliente.saldo,
-          registradoEm: agora,
-          dataCobranca: agora
+          dias: cliente.dias,
+          registradoEm: cliente.dataCobranca,
+          dataCobranca: cliente.dataCobranca
         };
+      }));
+
+      if(typeof toast === 'function') {
+        if (bloqueados.length) {
+          toast('⚠️ '+qtd+' cobrança(s) registrada(s). '+bloqueados.length+' ficou(aram) bloqueada(s) pela regra de 7 dias.','warn');
+        } else {
+          toast('⚠️ O servidor confirmou apenas '+qtd+' de '+lista.length+' cobrança(s).','warn');
+        }
+      }
+
+      return Object.assign({}, resposta, {
+        ok: qtd > 0,
+        totalSalvos: qtd,
+        totalPendentes: pendentes.length
       });
-      salvarHistoricoLocal_(atual.concat(acrescentar));
+    })
+    .catch(function(erro){
+      /*
+       * A mensagem já foi enviada, então nunca perdemos o registro.
+       * Guardamos somente uma fila pequena no navegador para nova tentativa.
+       */
+      salvarHistoricoLocal_(lerHistoricoLocal_().concat(lista.map(function(cliente){
+        return {
+          clienteId: cliente.id,
+          nome: cliente.nome,
+          telefone: cliente.telefone,
+          saldo: cliente.saldo,
+          dias: cliente.dias,
+          registradoEm: cliente.dataCobranca,
+          dataCobranca: cliente.dataCobranca
+        };
+      })));
+
+      try {
+        const fila = lerHistoricoLocal_().map(function(item, indice){
+          return {
+            id: String(item.clienteId || 'COB-' + indice),
+            cid: String(item.clienteId || ''),
+            cliente: item.nome || '',
+            telefone: item.telefone || '',
+            saldo: item.saldo || 0,
+            dias: item.dias || 0,
+            data_cobranca: item.dataCobranca || item.registradoEm || new Date().toISOString(),
+            status: 'enviada',
+            createdAt: item.registradoEm || new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+        });
+        localStorage.setItem('bm_historico_cobrancas', JSON.stringify(fila.slice(-50)));
+      } catch (e) {}
 
       console.error('Falha ao salvar histórico de cobranças no Apps Script:', erro);
-      if(typeof toast === 'function') toast('⚠️ Cobranças enviadas, mas o histórico não foi salvo online. O cache temporário foi mantido.','warn');
+      if(typeof toast === 'function') {
+        toast('⚠️ Cobranças enviadas, mas o histórico não foi confirmado na planilha. Ele ficou pendente para nova tentativa.','warn');
+      }
+
       return {
         ok: false,
-        erro: erro.message,
+        erro: erro && erro.message || String(erro),
         totalSalvos: 0,
         totalPendentes: lista.length
       };

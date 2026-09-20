@@ -3479,11 +3479,16 @@ function cobrarTodos(){
         if(i<selecionados.length-1) await new Promise(function(resolve){setTimeout(resolve,8000);});
       }
 
+      var resultadoRegistro=null;
       if(confirmados.length){
-        window.cobrancasAutomacao.registrarCobrancas(confirmados);
+        resultadoRegistro=await window.cobrancasAutomacao.registrarCobrancas(confirmados);
       }
 
-      toast('Cobrança iniciada para '+confirmados.length+' de '+selecionados.length+' cliente(s).','warn');
+      if(resultadoRegistro&&resultadoRegistro.ok===false){
+        toast('⚠️ '+confirmados.length+' cobrança(s) enviada(s), mas o histórico ficou pendente de gravação.','warn');
+      }else{
+        toast('✅ '+confirmados.length+' de '+selecionados.length+' cobrança(s) enviada(s) e registradas.','ok');
+      }
     });
   });
 }
