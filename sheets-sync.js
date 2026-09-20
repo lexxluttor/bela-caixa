@@ -803,55 +803,6 @@ init();
 /* ================= API GLOBAL ================= */
 
 window.BelaSheetsSync = {
-  /**
-   * Registra o histórico oficial das cobranças diretamente no Apps Script.
-   * Este caminho é separado do sync geral para não depender de syncEmAndamento.
-   */
-  registrarHistoricoCobrancas: async function (clientes) {
-    const lista = Array.isArray(clientes) ? clientes : [];
-
-    if (!lista.length) {
-      return {
-        ok: true,
-        totalSalvos: 0,
-        totalBloqueados: 0
-      };
-    }
-
-    const dados = lista.map(function (cliente) {
-      return {
-        id: cliente && (cliente.id || cliente.cid || cliente.clienteId) || "",
-        nome: cliente && (cliente.nome || cliente.cliente) || "",
-        telefone: cliente && (cliente.telefone || cliente.tel || cliente.fone) || "",
-        saldo: cliente && cliente.saldo != null ? cliente.saldo : 0,
-        dias: cliente && cliente.dias != null ? cliente.dias : 0,
-        registroId: cliente && (cliente.registroId || cliente.cobrancaId || cliente.historicoId) || "",
-        dataCobranca: cliente && (cliente.dataCobranca || cliente.data_cobranca) || new Date().toISOString()
-      };
-    });
-
-    let ultimaErro = null;
-
-    for (let tentativa = 1; tentativa <= 3; tentativa++) {
-      try {
-        return await post({
-          action: "registrarHistoricoCobrancas",
-          clientes: dados
-        });
-      } catch (e) {
-        ultimaErro = e;
-
-        if (tentativa < 3) {
-          await new Promise(function (resolve) {
-            setTimeout(resolve, 1000 * tentativa);
-          });
-        }
-      }
-    }
-
-    throw ultimaErro || new Error("Não foi possível registrar o histórico das cobranças.");
-  },
-
   syncNow: function () {
     return syncNow("manual");
   },
