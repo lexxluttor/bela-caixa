@@ -158,8 +158,7 @@ function gerarHashSync() {
       creditos: lerLocal("creditos"),
       vendedores: lerLocal("vendedores"),
       comissoes: lerLocal("comissoes"),
-      fechamentos_comissoes: lerLocal("fechamentos_comissoes"),
-      historico_cobrancas: lerLocal("historico_cobrancas")
+      fechamentos_comissoes: lerLocal("fechamentos_comissoes")
     });
   } catch (e) {
     return String(Date.now());
@@ -383,21 +382,6 @@ function normalizarComissao(c) {
   };
 }
 
-function normalizarHistoricoCobranca(h) {
-  return {
-    id: h.id || h.registroId || "",
-    cid: h.cid || h.clienteId || h.idCliente || "",
-    cliente: h.cliente || h.nome || "",
-    telefone: h.telefone || h.tel || "",
-    saldo: numeroSeguro(h.saldo),
-    dias: numeroSeguro(h.dias),
-    data_cobranca: h.data_cobranca || h.dataCobranca || h.registradoEm || agoraISO(),
-    status: h.status || "enviada",
-    createdAt: h.createdAt || h.data_cobranca || h.dataCobranca || h.registradoEm || agoraISO(),
-    updatedAt: h.updatedAt || agoraISO()
-  };
-}
-
 function normalizarFechamentoComissao(f) {
   return {
     id: f.id || "",
@@ -550,25 +534,10 @@ async function syncNow(origem) {
       cobrancas: lerLocal("creditos").map(normalizarCobranca),
       vendedores: lerLocal("vendedores").map(normalizarVendedor),
       comissoes: lerLocal("comissoes").filter(function(c){ return !c.deletedAt; }).map(normalizarComissao),
-      fechamentos_comissoes: lerLocal("fechamentos_comissoes").filter(function(f){ return !f.deletedAt; }).map(normalizarFechamentoComissao),
-      historico_cobrancas: lerLocal("historico_cobrancas").map(normalizarHistoricoCobranca)
+      fechamentos_comissoes: lerLocal("fechamentos_comissoes").filter(function(f){ return !f.deletedAt; }).map(normalizarFechamentoComissao)
     };
 
     const res = await post(payload);
-
-    const historicoPendente = Array.isArray(payload.historico_cobrancas)
-      ? payload.historico_cobrancas.length
-      : 0;
-
-    if (historicoPendente > 0 &&
-        Number(res && res.historicoCobrancasProcessadas || 0) >= historicoPendente) {
-      ignorarHook = true;
-      try {
-        localStorage.removeItem("bm_historico_cobrancas");
-      } finally {
-        ignorarHook = false;
-      }
-    }
 
     safeSetItem_("bm_last_sync", agoraISO());
     safeSetItem_("bm_last_sync_origin", origem || "manual");
@@ -683,7 +652,7 @@ localStorage.setItem = function (k, v) {
 
   const nome = String(k).replace("bm_", "");
 
-  if (["clientes", "produtos", "vendas", "pagamentos", "creditos", "vendedores", "comissoes", "fechamentos_comissoes", "historico_cobrancas"].includes(nome)) {
+  if (["clientes", "produtos", "vendas", "pagamentos", "creditos", "vendedores", "comissoes", "fechamentos_comissoes"].includes(nome)) {
     agendarSync(nome);
   }
 };
@@ -834,53 +803,57 @@ init();
 /* ================= API GLOBAL ================= */
 
 window.BelaSheetsSync = {
-  syncNow: function () {
-    return syncNow("manual");
-  },
-
-  registrarHistoricoCobrancas: function (clientes) {
+  /**
+   * Registra o histórico oficial das cobranças diretamente no Apps Script.
+   * Este caminho é separado do sync geral para não depender de syncEmAndamento.
+   */
+  registrarHistoricoCobrancas: async function (clientes) {
     const lista = Array.isArray(clientes) ? clientes : [];
+
     if (!lista.length) {
-      return Promise.resolve({ ok: true, historicoCobrancasProcessadas: 0 });
+      return {
+        ok: true,
+        totalSalvos: 0,
+        totalBloqueados: 0
+      };
     }
 
-    const agora = new Date().toISOString();
-    const atuais = lerLocal("historico_cobrancas");
-    const novos = lista.map(function (cliente, indice) {
-      const cid = String(cliente && (cliente.clienteId ?? cliente.id ?? cliente.cid) || "").trim();
-      const nome = String(cliente && (cliente.nome || cliente.cliente) || "").trim();
-      const telefone = String(cliente && (cliente.telefone || cliente.tel || cliente.fone) || "").trim();
-      const baseId = String(cliente && (cliente.registroId || cliente.cobrancaId || cliente.historicoId) || "").trim();
-      const id = baseId || ("COB-" + cid + "-" + Date.now().toString(36) + "-" + indice + "-" + Math.random().toString(36).slice(2,7));
-
+    const dados = lista.map(function (cliente) {
       return {
-        id: id,
-        cid: cid,
-        cliente: nome,
-        telefone: telefone,
+        id: cliente && (cliente.id || cliente.cid || cliente.clienteId) || "",
+        nome: cliente && (cliente.nome || cliente.cliente) || "",
+        telefone: cliente && (cliente.telefone || cliente.tel || cliente.fone) || "",
         saldo: cliente && cliente.saldo != null ? cliente.saldo : 0,
         dias: cliente && cliente.dias != null ? cliente.dias : 0,
-        data_cobranca: cliente && (cliente.dataCobranca || cliente.data_cobranca) || agora,
-        status: "enviada",
-        createdAt: agora,
-        updatedAt: agora
+        registroId: cliente && (cliente.registroId || cliente.cobrancaId || cliente.historicoId) || "",
+        dataCobranca: cliente && (cliente.dataCobranca || cliente.data_cobranca) || new Date().toISOString()
       };
-    }).filter(function(item){ return !!item.cid; });
-
-    if (!novos.length) {
-      return Promise.resolve({ ok: true, historicoCobrancasProcessadas: 0 });
-    }
-
-    const ids = new Set(atuais.map(function(item){ return String(item && item.id || ""); }));
-    const fila = atuais.slice();
-    novos.forEach(function(item){
-      if (ids.has(item.id)) return;
-      ids.add(item.id);
-      fila.push(item);
     });
 
-    salvarLocal("historico_cobrancas", fila);
-    return syncNow("cobrancas_historico");
+    let ultimaErro = null;
+
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      try {
+        return await post({
+          action: "registrarHistoricoCobrancas",
+          clientes: dados
+        });
+      } catch (e) {
+        ultimaErro = e;
+
+        if (tentativa < 3) {
+          await new Promise(function (resolve) {
+            setTimeout(resolve, 1000 * tentativa);
+          });
+        }
+      }
+    }
+
+    throw ultimaErro || new Error("Não foi possível registrar o histórico das cobranças.");
+  },
+
+  syncNow: function () {
+    return syncNow("manual");
   },
 
   restoreNow: restoreNow,
@@ -906,7 +879,6 @@ window.BelaSheetsSync = {
       origemUltimoSync: localStorage.getItem("bm_last_sync_origin"),
       ultimoRestore: localStorage.getItem("bm_last_restore"),
       origemUltimoRestore: localStorage.getItem("bm_last_restore_source"),
-      historicoCobrancasPendentes: lerLocal("historico_cobrancas").length,
       ultimoErroSync,
       ultimoMotivoSync
     };
