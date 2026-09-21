@@ -3383,7 +3383,7 @@ function carregarModuloCobrancasBM(cb){
     return;
   }
 
-  var fontes=['./cobrancas-automacao-v2.js','./js/cobrancas-automacao-v2.js'];
+  var fontes=['./js/cobrancas-automacao-v2.js'];
   var indice=0;
 
   function tentar(){
