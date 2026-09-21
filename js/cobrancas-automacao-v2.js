@@ -38,10 +38,10 @@ function chamarAppsScriptCobrancas_(action, dados) {
   const url = obterAppsScriptCobrancasUrl_();
   if (!url) return Promise.reject(new Error('URL do Apps Script não encontrada.'));
 
-  const payload = JSON.stringify(dados || {});
+  const corpo = Object.assign({}, dados || {}, { action: action });
+  const payload = JSON.stringify(corpo);
   const body =
-    'action=' + encodeURIComponent(action) +
-    '&payload=' + encodeURIComponent(payload);
+    'payload=' + encodeURIComponent(payload);
 
   let controller = null;
   let timer = null;
@@ -348,8 +348,84 @@ async function abrirAprovacao(estado, onEnviar) {
 }
 
 /**
- * Registra no Apps Script apenas os clientes efetivamente enviados pelo app-core.
- * O cache local é apagado SOMENTE depois da confirmação de gravação no servidor.
+ * Registra UMA cobrança imediatamente após o envio da mensagem.
+ * Este é o caminho principal usado pelo botão de envio.
+ */
+function registrarCobrancaIndividual(cliente) {
+  const c = cliente || {};
+  const clienteId = String(c.clienteId ?? c.id ?? c.cid ?? '').trim();
+
+  if (!clienteId) {
+    return Promise.resolve({ ok: false, error: 'Cliente sem ID para registrar cobrança.' });
+  }
+
+  const registro = {
+    registroId: String(c.registroId || c.cobrancaId || c.historicoId || '').trim() ||
+      ('COB-' + clienteId + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,7)),
+    id: clienteId,
+    cid: clienteId,
+    nome: String(c.nome || c.cliente || ''),
+    telefone: String(c.telefone || c.tel || c.fone || ''),
+    saldo: c.saldo != null ? c.saldo : 0,
+    dias: c.dias != null ? c.dias : 0,
+    dataCobranca: new Date().toISOString()
+  };
+
+  return chamarAppsScriptCobrancas_('registrarHistoricoCobrancas', {
+    clientes: [registro]
+  })
+    .then(function(resposta){
+      const salvou = Number(resposta && resposta.totalSalvos || 0) >= 1;
+
+      if (salvou) {
+        limparHistoricoLocal_();
+        try { localStorage.removeItem('bm_historico_cobrancas'); } catch (e) {}
+      } else {
+        salvarHistoricoLocal_([{
+          clienteId: registro.id,
+          nome: registro.nome,
+          telefone: registro.telefone,
+          saldo: registro.saldo,
+          dias: registro.dias,
+          registradoEm: registro.dataCobranca,
+          dataCobranca: registro.dataCobranca
+        }]);
+      }
+
+      return Object.assign({}, resposta, {
+        ok: salvou,
+        registrado: salvou,
+        clienteId: registro.id
+      });
+    })
+    .catch(function(erro){
+      salvarHistoricoLocal_([{
+        clienteId: registro.id,
+        nome: registro.nome,
+        telefone: registro.telefone,
+        saldo: registro.saldo,
+        dias: registro.dias,
+        registradoEm: registro.dataCobranca,
+        dataCobranca: registro.dataCobranca
+      }]);
+
+      if(typeof toast === 'function') {
+        toast('⚠️ Mensagem enviada, mas o registro da cobrança ficou pendente.','warn');
+      }
+
+      return {
+        ok: false,
+        registrado: false,
+        pendente: true,
+        clienteId: registro.id,
+        error: erro && erro.message ? erro.message : String(erro)
+      };
+    });
+}
+
+/**
+ * Registra no Apps Script os clientes efetivamente enviados pelo app-core.
+ * Mantida para compatibilidade com chamadas em lote existentes.
  */
 function registrarCobrancas(clientes) {
   const listaOriginal = Array.isArray(clientes) ? clientes : [];
@@ -489,6 +565,127 @@ function registrarCobrancas(clientes) {
     });
 }
 
+
+function montarDadosCobranca_(cid) {
+  if (typeof DB !== 'object' || typeof DB.get !== 'function') return null;
+  const clientes = DB.get('clientes');
+  const c = clientes.find(function(x){ return String(x && x.id) === String(cid); });
+  if (!c || !c.tel) return null;
+
+  const s = typeof saldo === 'function' ? saldo(c.id) : { sd: 0 };
+  const dias = typeof diasSemPag === 'function' ? diasSemPag(c.id) : 0;
+  const num = String(c.tel).replace(/\D/g,'').replace(/^0+/,'');
+  const telefone = num.startsWith('55') ? num : '55' + num;
+
+  const defMsg = 'Olá, {nome}! 😊\\n\\nAqui é a *Bela Modas*! 👗\\n\\nVocê tem um crediário em aberto de *{saldo}* há {dias} dias.\\n\\nQuando puder entre em contato! 💕\\n📞 31 99733-7304\\n📍 @bela_modaspetro';
+  const tmpl = typeof getCfg === 'function' ? (getCfg('msgCob') || defMsg) : defMsg;
+  const formatar = typeof R === 'function' ? R : function(v){ return 'R$ ' + Number(v || 0).toFixed(2).replace('.',','); };
+  const msg = tmpl.replace(/\{nome\}/g,c.nome || '')
+    .replace(/\{saldo\}/g,formatar(s.sd))
+    .replace(/\{dias\}/g,String(dias));
+
+  return { c:c, saldo:s.sd, dias:dias, telefone:telefone, mensagem:msg };
+}
+
+async function wppCobrar(cid){
+  const dados = montarDadosCobranca_(cid);
+  if(!dados){
+    if(typeof toast === 'function') toast('⚠️ Cliente sem telefone!');
+    return false;
+  }
+
+  let envioOk = false;
+
+  try {
+    if(typeof bmAbrirWhatsApp === 'function'){
+      envioOk = !!(await bmAbrirWhatsApp(dados.telefone, dados.mensagem));
+    }else{
+      window.open('https://wa.me/' + dados.telefone + '?text=' + encodeURIComponent(dados.mensagem), '_blank');
+      envioOk = true;
+    }
+  } catch(e) {
+    console.warn('Falha na integração WhatsApp:', e);
+    envioOk = false;
+  }
+
+  if(!envioOk) return false;
+
+  try {
+    const registro = await registrarCobrancaIndividual({
+      id: dados.c.id,
+      nome: dados.c.nome || '',
+      telefone: dados.c.tel || dados.telefone,
+      saldo: dados.saldo,
+      dias: dados.dias
+    });
+
+    if(!registro || registro.registrado !== true || registro.ok !== true){
+      console.warn('Mensagem enviada, mas o registro da cobrança não foi confirmado:', registro);
+      return false;
+    }
+
+    return true;
+  } catch(e) {
+    console.warn('Erro ao registrar cobrança:', e);
+    return false;
+  }
+}
+
+function cobrarTodos(){
+  const campo = document.getElementById('inad-dias');
+  const diasMinimo = parseInt(campo && campo.value) || 30;
+  const clientes = (typeof DB === 'object' && typeof DB.get === 'function') ? DB.get('clientes') : [];
+
+  const candidatos = clientes.map(function(c){
+    const saldoAtual = typeof saldo === 'function' ? saldo(c.id) : { sd:0 };
+    const dias = typeof diasSemPag === 'function' ? diasSemPag(c.id) : 0;
+    return { c:c, sd:Number(saldoAtual && saldoAtual.sd || 0), dias:dias };
+  }).filter(function(x){
+    return x.sd > 0.01 && x.dias >= diasMinimo && x.c && x.c.tel;
+  });
+
+  if(!candidatos.length){
+    if(typeof toast === 'function') toast('Nenhum cliente com telefone para cobrar!','warn');
+    return;
+  }
+
+  const lista = candidatos.map(function(x){
+    return {
+      id:x.c.id,
+      nome:x.c.nome || '',
+      telefone:x.c.tel || '',
+      saldo:x.sd,
+      dias:x.dias
+    };
+  });
+
+  const estado = consultarLista(lista);
+  abrirAprovacao(estado, async function(selecionados){
+    if(!selecionados || !selecionados.length){
+      if(typeof toast === 'function') toast('Nenhum cliente selecionado para cobrança.','warn');
+      return;
+    }
+
+    let confirmados = 0;
+
+    for(let i=0;i<selecionados.length;i++){
+      const ok = await wppCobrar(selecionados[i].id);
+      if(ok) confirmados++;
+      if(i < selecionados.length - 1){
+        await new Promise(function(resolve){ setTimeout(resolve,8000); });
+      }
+    }
+
+    if(typeof toast === 'function'){
+      toast('✅ ' + confirmados + ' de ' + selecionados.length + ' cobrança(s) processada(s).','ok');
+    }
+  });
+}
+
+if (typeof window !== 'undefined') {
+  window.wppCobrar = wppCobrar;
+}
+
 function jaFoiCobrado(clienteId) {
   return !!localUltimaCobranca_(lerHistoricoLocal_(), clienteId);
 }
@@ -508,6 +705,9 @@ if (typeof window !== 'undefined') {
     abrirAprovacao,
     fecharAprovacao,
     registrarCobrancas,
+    registrarCobrancaIndividual,
+    cobrarTodos,
+    wppCobrar,
     jaFoiCobrado,
     listarHistorico,
     limparHistorico,

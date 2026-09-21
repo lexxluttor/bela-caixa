@@ -3376,26 +3376,24 @@ function renderCobranca(){
     '</div>';
   }).join('');
 }
-function carregarModuloCobrancasAutomacaoBM(cb){
-  if(typeof window.cobrancasAutomacao==='object'){
+/* ================= PONTE PARA MÓDULO DE COBRANÇAS ================= */
+function carregarModuloCobrancasBM(cb){
+  if(window.cobrancasAutomacao && typeof window.cobrancasAutomacao.cobrarTodos==='function'){
     cb();
     return;
   }
 
-  var fontes=[
-    './cobrancas-automacao-v2.js',
-    './js/cobrancas-automacao-v2.js'
-  ];
+  var fontes=['./cobrancas-automacao-v2.js','./js/cobrancas-automacao-v2.js'];
   var indice=0;
 
-  function tentarCarregar(){
-    if(typeof window.cobrancasAutomacao==='object'){
+  function tentar(){
+    if(window.cobrancasAutomacao && typeof window.cobrancasAutomacao.cobrarTodos==='function'){
       cb();
       return;
     }
 
     if(indice>=fontes.length){
-      toast('❌ Não foi possível carregar o módulo de cobranças!','warn');
+      toast('❌ Módulo de cobranças não está disponível!','warn');
       return;
     }
 
@@ -3403,10 +3401,6 @@ function carregarModuloCobrancasAutomacaoBM(cb){
     var existente=document.querySelector('script[data-cobrancas-automacao][src="'+src+'"]');
 
     if(existente){
-      if(typeof window.cobrancasAutomacao==='object'){
-        cb();
-        return;
-      }
       existente.remove();
     }
 
@@ -3415,98 +3409,37 @@ function carregarModuloCobrancasAutomacaoBM(cb){
     sc.async=true;
     sc.dataset.cobrancasAutomacao='1';
     sc.onload=function(){
-      if(typeof window.cobrancasAutomacao==='object'){
+      if(window.cobrancasAutomacao && typeof window.cobrancasAutomacao.cobrarTodos==='function'){
         cb();
       }else{
         sc.remove();
-        tentarCarregar();
+        tentar();
       }
     };
     sc.onerror=function(){
       sc.remove();
-      tentarCarregar();
+      tentar();
     };
     document.head.appendChild(sc);
   }
 
-  tentarCarregar();
+  tentar();
 }
 
 function cobrarTodos(){
-  var dias=parseInt(document.getElementById('inad-dias').value)||30;
-  var clis=DB.get('clientes');
-  var inad=clis.map(function(c){
-    var s=saldo(c.id);
-    var d=diasSemPag(c.id);
-    return {c:c,sd:s.sd,dias:d};
-  }).filter(function(x){
-    return x.sd>0.01&&x.dias>=dias&&x.c.tel;
-  });
-
-  if(!inad.length){
-    toast('Nenhum cliente com telefone para cobrar!','warn');
-    return;
-  }
-
-  var lista=inad.map(function(x){
-    var c=x.c;
-    return {
-      id:c.id,
-      nome:c.nome||'',
-      telefone:c.tel||'',
-      saldo:x.sd,
-      dias:x.dias
-    };
-  });
-
-  carregarModuloCobrancasAutomacaoBM(function(){
-    if(!window.cobrancasAutomacao||typeof window.cobrancasAutomacao.abrirAprovacao!=='function'){
-      toast('❌ Módulo de cobranças não está disponível!','warn');
-      return;
+  carregarModuloCobrancasBM(function(){
+    if(window.cobrancasAutomacao && typeof window.cobrancasAutomacao.cobrarTodos==='function'){
+      window.cobrancasAutomacao.cobrarTodos();
     }
-
-    var estado=window.cobrancasAutomacao.consultarLista(lista);
-    window.cobrancasAutomacao.abrirAprovacao(estado,async function(selecionados){
-      if(!selecionados||!selecionados.length){
-        toast('Nenhum cliente selecionado para cobrança.','warn');
-        return;
-      }
-
-      var confirmados=[];
-      for(var i=0;i<selecionados.length;i++){
-        var ok=await wppCobrar(selecionados[i].id);
-        if(ok) confirmados.push(selecionados[i]);
-        if(i<selecionados.length-1) await new Promise(function(resolve){setTimeout(resolve,8000);});
-      }
-
-      var resultadoRegistro=null;
-      if(confirmados.length){
-        resultadoRegistro=await window.cobrancasAutomacao.registrarCobrancas(confirmados);
-      }
-
-      if(resultadoRegistro&&resultadoRegistro.ok===false){
-        toast('⚠️ '+confirmados.length+' cobrança(s) enviada(s), mas o histórico ficou pendente de gravação.','warn');
-      }else{
-        toast('✅ '+confirmados.length+' de '+selecionados.length+' cobrança(s) enviada(s) e registradas.','ok');
-      }
-    });
   });
 }
-async function wppCobrar(cid){
-  var c=DB.get('clientes').find(function(x){return x.id===cid;});
-  if(!c||!c.tel){toast('⚠️ Cliente sem telefone!');return false;}
-  var s=saldo(c.id),dias=diasSemPag(c.id);
-  var num=c.tel.replace(/\D/g,'');if(!num.startsWith('55'))num='55'+num;
-  var defMsg='Olá, {nome}! 😊\n\nAqui é a *Bela Modas*! 👗\n\nVocê tem um crediário em aberto de *{saldo}* há {dias} dias.\n\nQuando puder entre em contato! 💕\n📞 31 99733-7304\n📍 @bela_modaspetro';
-  var tmpl=getCfg('msgCob')||defMsg;
-  var msg=tmpl.replace(/\{nome\}/g,c.nome).replace(/\{saldo\}/g,R(s.sd)).replace(/\{dias\}/g,String(dias));
 
-  if(typeof bmAbrirWhatsApp==='function'){
-    try{return !!(await bmAbrirWhatsApp(num,msg));}catch(e){console.warn('Falha na integração WhatsApp:',e);return false;}
-  }
-
-  window.open('https://wa.me/'+num+'?text='+encodeURIComponent(msg),'_blank');
-  return true;
+function wppCobrar(cid){
+  carregarModuloCobrancasBM(function(){
+    if(window.cobrancasAutomacao && typeof window.cobrancasAutomacao.wppCobrar==='function'){
+      window.cobrancasAutomacao.wppCobrar(cid);
+    }
+  });
 }
 
 function irReceb(cid){
