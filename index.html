@@ -1135,6 +1135,31 @@ document.addEventListener('DOMContentLoaded',function(){
 </div>
 
 
+<!-- MODAL TELEFONE PARA ENVIO DE COMPROVANTE -->
+<div class="ov" id="mo-comp-tel" style="z-index:9999;">
+  <div class="md" style="max-width:460px;">
+    <div class="mh">
+      <div class="mht">📱 Enviar comprovante</div>
+      <button class="mx" onclick="fMd('mo-comp-tel')">✕</button>
+    </div>
+    <div class="mb">
+      <div style="padding:4px 0 12px;line-height:1.6;">
+        <div class="tm" style="margin-bottom:5px;">Cliente</div>
+        <div id="comp-tel-cliente" style="font-size:16px;font-weight:800;">Cliente</div>
+      </div>
+      <div class="fg">
+        <label class="fl">Telefone / WhatsApp</label>
+        <input class="fi" id="comp-tel-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="(31) 99999-9999">
+        <div class="tm" style="margin-top:6px;">Digite o número que deve receber este comprovante.</div>
+      </div>
+    </div>
+    <div class="mf">
+      <button class="btn bh" onclick="fMd('mo-comp-tel')">Cancelar</button>
+      <button class="btn bb" onclick="enviarComprovanteTelefone()">📱 Enviar comprovante</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL DETALHE VENDA -->
 
 
@@ -3395,16 +3420,49 @@ wppCobrar=function(cid){
   bmAbrirWhatsApp(c.tel,msg);
 };
 
-/* Sobrescreve WhatsApp do modal de comprovante */
-wppComp=function(){
-  var d=_comp||{}, c=d.cli;
-  if(!c||!c.tel){toast('⚠️ Cliente sem telefone!');return;}
+/* Comprovante: permite escolher/informar o número antes do envio. */
+function wppComp(){
+  var d=_comp||{}, c=d.cli||{};
+  var nome=(c.nome||d.venda&&d.venda.cliNome||d.pag&&d.pag.cliNome||'Cliente');
+  var input=document.getElementById('comp-tel-input');
+  var cliente=document.getElementById('comp-tel-cliente');
+  if(cliente) cliente.textContent=nome;
+  if(input){
+    input.value=c.tel||'';
+    input.focus();
+    input.select();
+  }
+  abrirMd('mo-comp-tel');
+}
+
+async function enviarComprovanteTelefone(){
+  var d=_comp||{}, c=d.cli||{};
+  var input=document.getElementById('comp-tel-input');
+  var tel=(input&&input.value||'').trim();
+  var num=bmNumeroWhatsApp(tel);
+  if(!num || num.length<12){
+    toast('⚠️ Informe um número de WhatsApp válido.');
+    if(input) input.focus();
+    return;
+  }
+
   var msg='';
-  if(d.venda) msg=bmMsgVenda(d.venda,c);
-  else if(d.pag) msg=bmMsgPagamento(d.pag,c);
-  if(!msg){toast('⚠️ Comprovante não encontrado!');return;}
-  bmAbrirWhatsApp(c.tel,msg);
-};
+  if(d.venda){
+    var cliMsg=Object.assign({},c,{tel:tel});
+    msg=bmMsgVenda(d.venda,cliMsg);
+  }else if(d.pag){
+    var cliPag=Object.assign({},c,{tel:tel});
+    msg=bmMsgPagamento(d.pag,cliPag);
+  }
+
+  if(!msg){
+    toast('⚠️ Comprovante não encontrado!');
+    return;
+  }
+
+  fMd('mo-comp-tel');
+  await bmAbrirWhatsApp(tel,msg);
+}
 
 function reimprimirMovCaixa(id,tipo){
   if(tipo==='venda'){
