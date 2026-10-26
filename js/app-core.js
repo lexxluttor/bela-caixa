@@ -2961,18 +2961,30 @@ function finalizarVenda(){
     renderCart();
     toast('✅ Venda finalizada! '+totalFmt+' — '+cliNome,'ok');
 
-    // Mostra o comprovante assim que a venda estiver salva localmente.
-    // A sincronização continua em segundo plano via DB.set()/scheduleSync().
-    try{mostrarComp(vendaComp,cliComp,null);}catch(e){}
-
-    // Atualiza as telas depois, sem forçar syncNow() durante a finalização.
+    // Atualiza apenas a tela que está aberta. Recriar listas grandes de vendas,
+    // produtos e dashboard em toda finalização pode bloquear a interface.
     setTimeout(function(){
-      try{renderProds();}catch(e){}
-      try{renderPGrid();}catch(e){}
-      try{if(typeof renderDash==='function') renderDash();}catch(e){}
-      try{if(typeof renderVendas==='function') renderVendas();}catch(e){}
-      try{if(typeof renderCx==='function') renderCx();}catch(e){}
+      try{
+        var paginaAtiva=document.querySelector('.pg.on');
+        var paginaId=paginaAtiva ? paginaAtiva.id : '';
+        if(paginaId==='pg-venda'){
+          if(typeof renderPGrid==='function') renderPGrid();
+        }else if(paginaId==='pg-produtos'){
+          if(typeof renderProds==='function') renderProds();
+        }else if(paginaId==='pg-dash'){
+          if(typeof renderDash==='function') renderDash();
+        }else if(paginaId==='pg-vendas'){
+          if(typeof renderVendas==='function') renderVendas();
+        }else if(paginaId==='pg-caixa'){
+          if(typeof renderCx==='function') renderCx();
+        }
+      }catch(e){}
+      // Não chamar syncNow() aqui: DB.set já agenda a sincronização automática.
     },60);
+
+    setTimeout(function(){
+      try{mostrarComp(vendaComp,cliComp,null);}catch(e){}
+    },220);
   } finally {
     setTimeout(function(){ _finalizandoVenda=false; }, 250);
   }
