@@ -2961,18 +2961,18 @@ function finalizarVenda(){
     renderCart();
     toast('✅ Venda finalizada! '+totalFmt+' — '+cliNome,'ok');
 
+    // Mostra o comprovante assim que a venda estiver salva localmente.
+    // A sincronização continua em segundo plano via DB.set()/scheduleSync().
+    try{mostrarComp(vendaComp,cliComp,null);}catch(e){}
+
+    // Atualiza as telas depois, sem forçar syncNow() durante a finalização.
     setTimeout(function(){
       try{renderProds();}catch(e){}
       try{renderPGrid();}catch(e){}
       try{if(typeof renderDash==='function') renderDash();}catch(e){}
       try{if(typeof renderVendas==='function') renderVendas();}catch(e){}
       try{if(typeof renderCx==='function') renderCx();}catch(e){}
-      try{if(typeof syncNow==='function') syncNow();}catch(e){}
     },60);
-
-    setTimeout(function(){
-      try{mostrarComp(vendaComp,cliComp,null);}catch(e){}
-    },220);
   } finally {
     setTimeout(function(){ _finalizandoVenda=false; }, 250);
   }
