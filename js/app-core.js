@@ -2938,7 +2938,7 @@ function confirmarPagamento(){
   finalizarVenda();
 }
 var _finalizandoVenda=false;
-function finalizarVenda(){
+async function finalizarVenda(){
   if(_finalizandoVenda) return;
   if(!cart.length){toast('⚠️ Carrinho vazio!');return;}
   if(vForma==='fiado'&&!vCli){toast('⚠️ Selecione um cliente para crediário!');return;}
@@ -2952,17 +2952,43 @@ function finalizarVenda(){
     var venda={id:DB.uid(),data:stamp,createdAt:stamp,updatedAt:stamp,deletedAt:'',cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:itensVenda,subtotal:subtotal,desconto:desconto,total:total};
     if(vForma==='dividido') venda.pagamentos=JSON.parse(JSON.stringify(vPagamentosDivididos||[]));
 
-    ajustarEstoqueVenda(venda.itens, 'subtrair');
-
-    var vendas=DB.get('vendas')||[];
-    vendas.push(venda);
-    DB.set('vendas',vendas);
-
-    if(vForma==='fiado'&&vCli){
-      var crds=DB.get('creditos')||[];
-      crds.push({id:DB.uid(),cid:vCli.id,data:venda.data,desc:'Venda Crediário: '+itensVenda.map(function(i){return i.desc;}).join(', '),val:total,vid:venda.id});
-      DB.set('creditos',crds);
+    // IndexedDB é a gravação transacional; localStorage continua como espelho
+    // para as telas existentes e para o Google Sheets.
+    if(!window.BelaIndexedDB){
+      await new Promise(function(resolve,reject){
+        var script=document.createElement('script');
+        script.src='./js/indexeddb-engine.js';
+        script.onload=resolve;
+        script.onerror=function(){reject(new Error('Não foi possível carregar o motor IndexedDB'));};
+        document.head.appendChild(script);
+      });
     }
+    if(!window.BelaIndexedDB)throw new Error('Motor IndexedDB indisponível');
+    var produtosAntes=DB.get('produtos')||[];
+    var vendasAntes=DB.get('vendas')||[];
+    var creditosAntes=DB.get('creditos')||[];
+    var credito=(vForma==='fiado'&&vCli)?{id:DB.uid(),cid:vCli.id,data:venda.data,desc:'Venda Crediário: '+itensVenda.map(function(i){return i.desc;}).join(', '),val:total,vid:venda.id}:null;
+    // Não sobrescrever vendas já confirmadas no IndexedDB que ainda não
+    // conseguiram ser espelhadas no localStorage após uma falha anterior.
+    var vendasIndexedDB=await BelaIndexedDB.read('vendas');
+    if(Array.isArray(vendasIndexedDB)){
+      var idsLocais=new Set(vendasAntes.map(function(v){return String(v.id);}));
+      var pendentes=vendasIndexedDB.filter(function(v){return !idsLocais.has(String(v.id));});
+      if(pendentes.length){
+        throw new Error('Existem '+pendentes.length+' venda(s) gravada(s) no IndexedDB ainda não recuperada(s). Não finalize outra venda antes de recuperar os dados.');
+      }
+    }
+    // Atualiza a cópia somente quando não houver transação de venda pendente.
+    await BelaIndexedDB.writeBatch({produtos:produtosAntes,vendas:vendasAntes,creditos:creditosAntes});
+    await BelaIndexedDB.commitSale(venda,credito,{produtos:produtosAntes,vendas:vendasAntes,creditos:creditosAntes});
+    // Em caso de falha no espelho, mantém o carrinho e avisa o operador.
+    // A venda já estará salva no IndexedDB para recuperação.
+    var novosProdutos=await BelaIndexedDB.read('produtos');
+    var novasVendas=await BelaIndexedDB.read('vendas');
+    var novosCreditos=credito?await BelaIndexedDB.read('creditos'):null;
+    DB.set('produtos',novosProdutos);
+    DB.set('vendas',novasVendas);
+    if(credito)DB.set('creditos',novosCreditos);
 
     var cliComp=vCli, vendaComp=venda;
     var cliNome=vCli?vCli.nome:'Balcão';
@@ -3000,8 +3026,11 @@ function finalizarVenda(){
     setTimeout(function(){
       try{mostrarComp(vendaComp,cliComp,null);}catch(e){}
     },220);
+  } catch(e){
+    console.error('Falha ao finalizar venda',e);
+    toast('⚠️ Não foi possível concluir a venda: '+(e.message||e));
   } finally {
-    setTimeout(function(){ _finalizandoVenda=false; }, 250);
+    _finalizandoVenda=false;
   }
 }
 
@@ -5081,11 +5110,34 @@ function pedirSenhaCancelar(){
   pedirSenha(function(){ cancelarVenda(vid); });
 }
 
-function cancelarVenda(vid){
+async function cancelarVenda(vid){
   var vendas=DB.get('vendas');
   var v=vendas.find(function(x){return x.id===vid;});
   if(!v){toast('⚠️ Venda não encontrada!');return;}
   if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?\nEsta ação não pode ser desfeita!')){return;}
+
+  // Commit atômico antes de qualquer alteração no espelho local.
+  try {
+    if(!window.BelaIndexedDB){
+      await new Promise(function(resolve,reject){
+        var script=document.createElement('script');
+        script.src='./js/indexeddb-engine.js';
+        script.onload=resolve;
+        script.onerror=function(){reject(new Error('Motor IndexedDB indisponível'));};
+        document.head.appendChild(script);
+      });
+    }
+    var conjuntos=['produtos','vendas','creditos','fiados','pagamentos'];
+    var espelho={};
+    for(var k of conjuntos)espelho[k]=DB.get(k)||[];
+    var vendasIDB=await BelaIndexedDB.read('vendas');
+    if(Array.isArray(vendasIDB)){
+      var idsLocais=new Set(espelho.vendas.map(function(x){return String(x.id);}));
+      if(vendasIDB.some(function(x){return !idsLocais.has(String(x.id));}))throw new Error('Existem vendas pendentes de recuperação no IndexedDB');
+    }
+    await BelaIndexedDB.writeBatch(espelho);
+    var cancelados=await BelaIndexedDB.cancelSale(vid,espelho);
+  }catch(e){toast('⚠️ Cancelamento bloqueado: '+e.message);return;}
 
   ajustarEstoqueVenda(v.itens || [], 'somar');
 
@@ -5110,6 +5162,7 @@ function cancelarVenda(vid){
     var pvid=String(p.vid || p.venda_id || '');
     return pvid!==String(vid);
   }));
+
 
   limparDebitosOrfaos();
 
