@@ -37,13 +37,12 @@ function set(nome,value){
  if(!Array.isArray(value))throw new Error("Dados invalidos para "+nome);
  const snapshot=clone(value);
  // Escritas sequenciais evitam inversao de ordem entre operacoes.
- writeQueue=writeQueue.then(async function(){
-  await global.BelaIndexedDB.set("bm_"+nome,snapshot);
-  cache[nome]=snapshot;
- }).catch(function(e){lastError=e;ready=false;throw e;});
- return writeQueue;
+ cache[nome]=snapshot;
+ const operation=writeQueue.then(function(){return global.BelaIndexedDB.set("bm_"+nome,snapshot);});
+ writeQueue=operation.catch(function(e){lastError=e;ready=false;});
+ return operation;
 }
-function flush(){return writeQueue;}
+function flush(){return writeQueue.then(function(){if(lastError)throw lastError;});}
 function status(){return {ready:ready,colecoes:ready?COLECOES.map(function(nome){return {nome:nome,registros:cache[nome].length};}):[],erro:lastError?String(lastError.message||lastError):null};}
 global.BelaIDBBridge=Object.freeze({hydrate:hydrate,get:get,set:set,flush:flush,status:status,collections:COLECOES.slice()});
 })(window);
