@@ -863,6 +863,14 @@ window.BelaSheetsSync = {
   backupServerNow: backupServerNow,
 
   scheduleSync: function (motivo) {
+    if (window.BELA_CAIXA_STORAGE_MODE === "indexeddb") {
+      if (!usarIndexedDBSync_() || window.BELA_CAIXA_STORAGE_ERROR) {
+        console.error("Sincronizacao nao agendada: IndexedDB indisponivel.");
+        return;
+      }
+      versaoDadosLocal++;
+      dadosPendentesSync = true;
+    }
     agendarSync(motivo || "mudanca");
   },
 
