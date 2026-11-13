@@ -16,7 +16,7 @@ const API_URL =
 "https://script.google.com/macros/s/AKfycbxvE2DpOpZDW1bZOvatqdN0HjSOXI3gvFdGPSj7qeUb6NF2V-K18-5tpil1KGW4O1lB/exec";
 
 // Proteção temporária: base local apareceu vazia; impedir sobrescrever a planilha.
-const BM_SYNC_BLOQUEADO_RECUPERACAO = true;
+const BM_SYNC_BLOQUEADO_RECUPERACAO = false;
 const AUTO_SYNC_DELAY_MS = 4000;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 
@@ -535,6 +535,20 @@ async function syncNow(origem) {
       comissoes: lerLocal("comissoes").filter(function(c){ return !c.deletedAt; }).map(normalizarComissao),
       fechamentos_comissoes: lerLocal("fechamentos_comissoes").filter(function(f){ return !f.deletedAt; }).map(normalizarFechamentoComissao)
     };
+
+    // Proteção da recuperação de 13/11/2026: nunca enviar base parcial.
+    // Limites conservadores, inferiores aos totais verificados na restauração.
+    const minimosRecuperacao = {
+      clientes: 200, produtos: 2100, vendas: 2300,
+      recebimentos: 900, cobrancas: 900, vendedores: 4,
+      comissoes: 2400, fechamentos_comissoes: 4
+    };
+    const inconsistentes = Object.keys(minimosRecuperacao).filter(function(chave){
+      return !Array.isArray(payload[chave]) || payload[chave].length < minimosRecuperacao[chave];
+    });
+    if (inconsistentes.length) {
+      throw new Error("Sincronização interrompida para proteger o histórico recuperado. Conferir: " + inconsistentes.join(", "));
+    }
 
     const res = await post(payload);
 
