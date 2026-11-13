@@ -949,8 +949,23 @@ function renderDash(){
   var vh=vendas.filter(function(v){return v.data.startsWith(hoje);});
   var tvh=vh.filter(function(v){return v.forma!=='fiado';}).reduce(function(s,v){return s+v.total;},0);
   var tmes=vendas.filter(function(v){var d=new Date(v.data);return d.getMonth()===mes&&d.getFullYear()===ano&&v.forma!=='fiado';}).reduce(function(s,v){return s+v.total;},0);
-  var totalFiad=clis.reduce(function(s,c){return s+saldo(c.id).sd;},0);
-  var inad=clis.filter(function(c){return saldo(c.id).sd>0.01&&diasSemPag(c.id)>=30;});
+  // Agrega cobranças e pagamentos uma única vez, evitando reler milhares de
+  // registros para cada cliente na abertura do painel.
+  var creditoPorCliente=Object.create(null),pagamentoPorCliente=Object.create(null);
+  creditosValidos().forEach(function(c){
+    var id=String(c.cid||'');
+    creditoPorCliente[id]=(creditoPorCliente[id]||0)+Number(c.val||0);
+  });
+  pagamentosValidos().forEach(function(p){
+    var id=String(p.cid||'');
+    pagamentoPorCliente[id]=(pagamentoPorCliente[id]||0)+Number(p.val||0);
+  });
+  var saldoPainel=function(id){
+    id=String(id||'');
+    return Math.max(0,(creditoPorCliente[id]||0)-(pagamentoPorCliente[id]||0));
+  };
+  var totalFiad=clis.reduce(function(s,c){return s+saldoPainel(c.id);},0);
+  var inad=clis.filter(function(c){return saldoPainel(c.id)>0.01&&diasSemPag(c.id)>=30;});
   document.getElementById('d-stats').innerHTML=
     '<div class="st stg"><div class="sl">Vendas Hoje</div><div class="sv">'+R(tvh)+'</div><span class="tm">'+vh.length+' venda(s)</span></div>'+
     '<div class="st str"><div class="sl">Crediário em Aberto</div><div class="sv">'+R(totalFiad)+'</div></div>'+
@@ -963,7 +978,7 @@ function renderDash(){
   }).join('');
   document.getElementById('d-uv').innerHTML=uv||'<div class="empty">Nenhuma venda ainda</div>';
   var inadHtml=inad.slice(0,5).map(function(c){
-    var sd=saldo(c.id).sd,dias=diasSemPag(c.id);
+    var sd=saldoPainel(c.id),dias=diasSemPag(c.id);
     return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--bdr);font-size:12px;">'+
       '<span><b>'+c.nome+'</b><br><span style="color:var(--orange);font-size:11px;">'+dias+' dias sem pagar</span></span>'+
       '<span style="display:flex;gap:6px;align-items:center;"><b class="txt-r">'+R(sd)+'</b>'+
