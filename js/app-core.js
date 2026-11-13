@@ -515,11 +515,15 @@ function bmUsarIndexedDB_(){
 }
 var DB={
   get:function(k){
-    if(bmUsarIndexedDB_()) return window.BelaIDBBridge.get(k);
+    if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+      if(!bmUsarIndexedDB_()) throw new Error('IndexedDB nao pronto: leitura bloqueada para proteger dados.');
+      return window.BelaIDBBridge.get(k);
+    }
     try{var v=localStorage.getItem('bm_'+k);return v?JSON.parse(v):[];}catch(e){return[];}
   },
   set:function(k,v){
-    if(bmUsarIndexedDB_()){
+    if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+      if(!bmUsarIndexedDB_()) throw new Error('IndexedDB nao pronto: gravacao bloqueada para proteger dados.');
       var gravacao=window.BelaIDBBridge.set(k,v);
       gravacao.then(function(){
         if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
