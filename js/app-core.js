@@ -2968,6 +2968,16 @@ async function finalizarVenda(){
     var vendasAntes=DB.get('vendas')||[];
     var creditosAntes=DB.get('creditos')||[];
     var credito=(vForma==='fiado'&&vCli)?{id:DB.uid(),cid:vCli.id,data:venda.data,desc:'Venda Crediário: '+itensVenda.map(function(i){return i.desc;}).join(', '),val:total,vid:venda.id}:null;
+    // Não sobrescrever vendas já confirmadas no IndexedDB que ainda não
+    // conseguiram ser espelhadas no localStorage após uma falha anterior.
+    var vendasIndexedDB=await BelaIndexedDB.read('vendas');
+    if(Array.isArray(vendasIndexedDB)){
+      var idsLocais=new Set(vendasAntes.map(function(v){return String(v.id);}));
+      var pendentes=vendasIndexedDB.filter(function(v){return !idsLocais.has(String(v.id));});
+      if(pendentes.length){
+        throw new Error('Existem '+pendentes.length+' venda(s) gravada(s) no IndexedDB ainda não recuperada(s). Não finalize outra venda antes de recuperar os dados.');
+      }
+    }
     // Atualiza a cópia somente quando não houver transação de venda pendente.
     await BelaIndexedDB.writeBatch({produtos:produtosAntes,vendas:vendasAntes,creditos:creditosAntes});
     await BelaIndexedDB.commitSale(venda,credito,{produtos:produtosAntes,vendas:vendasAntes,creditos:creditosAntes});
