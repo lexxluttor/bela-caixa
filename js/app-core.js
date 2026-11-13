@@ -2954,7 +2954,16 @@ async function finalizarVenda(){
 
     // IndexedDB é a gravação transacional; localStorage continua como espelho
     // para as telas existentes e para o Google Sheets.
-    if(!window.BelaIndexedDB){throw new Error('Motor IndexedDB não carregado. Venda não realizada.');}
+    if(!window.BelaIndexedDB){
+      await new Promise(function(resolve,reject){
+        var script=document.createElement('script');
+        script.src='./js/indexeddb-engine.js';
+        script.onload=resolve;
+        script.onerror=function(){reject(new Error('Não foi possível carregar o motor IndexedDB'));};
+        document.head.appendChild(script);
+      });
+    }
+    if(!window.BelaIndexedDB)throw new Error('Motor IndexedDB indisponível');
     var produtosAntes=DB.get('produtos')||[];
     var vendasAntes=DB.get('vendas')||[];
     var creditosAntes=DB.get('creditos')||[];
