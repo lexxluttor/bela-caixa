@@ -544,6 +544,11 @@ var DB={
 };
 
 function initDB(){
+  // IndexedDB ja foi hidratado: nunca inicializar dados de exemplo nem depender de bm_ok2.
+  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+    if(!bmUsarIndexedDB_()) throw new Error('Inicializacao bloqueada: IndexedDB nao pronto.');
+    return;
+  }
   if(localStorage.getItem('bm_ok2'))return;
   DB.set('clientes',[
     {id:'c1',nome:'Maria Silva',cpf:'123.456.789-00',tel:'31991112222',end:'Rua das Flores, 10',obs:'VIP'},
