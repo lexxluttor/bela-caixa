@@ -4563,7 +4563,19 @@ function renderRelEstoque(){
 }
 
 // INIT
-window.addEventListener('load', function(){
+window.addEventListener('load', async function(){
+  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+    try{
+      if(!window.BelaIDBBridge) throw new Error('Ponte IndexedDB nao carregada.');
+      await window.BelaIDBBridge.hydrate();
+      await window.BelaIDBBridge.flush();
+    }catch(erro){
+      window.BELA_CAIXA_STORAGE_ERROR=erro;
+      console.error('Bela Caixa: inicializacao bloqueada para proteger os dados.',erro);
+      alert('O IndexedDB nao pode ser carregado. O caixa foi bloqueado para evitar perda de dados. Nao restaure nem apague os dados. Detalhes: '+(erro.message||erro));
+      return;
+    }
+  }
   carregarTema();
 
   initDB(); limparDebitosOrfaos();
