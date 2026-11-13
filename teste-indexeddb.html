@@ -1,0 +1,15 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bela Caixa — Teste IndexedDB</title><style>body{font:16px system-ui;max-width:760px;margin:30px auto;padding:18px;background:#fff8ef;color:#401520}button{background:#650817;color:white;border:0;border-radius:8px;padding:14px;font-size:16px}pre{white-space:pre-wrap;background:white;padding:16px;border:1px solid #ddd;border-radius:8px}</style></head><body><h1>Teste isolado do IndexedDB</h1><p>Executa vendas fictícias em um banco separado. Não altera o caixa, estoque real, localStorage ou Google Sheets.</p><button id="run">Executar teste</button><pre id="out">Aguardando.</pre><script>window.BELA_INDEXEDDB_TEST_NAME='bela-caixa-teste-isolado-v1';</script><script src="./js/indexeddb-engine.js"></script><script>
+document.getElementById('run').onclick=async function(){this.disabled=true;const out=document.getElementById('out');out.textContent='Testando...';const log=x=>out.textContent+='\n'+x;try{
+ const id='teste-'+Date.now();
+ await BelaIndexedDB.writeBatch({produtos:[{id:'p1',nome:'Produto fictício',estq:10}],vendas:[],creditos:[]});
+ const venda={id,forma:'fiado',itens:[{pid:'p1',qtd:2}],total:20};
+ const credito={id:'c-'+id,vid:id,val:20};
+ await BelaIndexedDB.commitSale(venda,credito);
+ const p=await BelaIndexedDB.read('produtos'),v=await BelaIndexedDB.read('vendas'),c=await BelaIndexedDB.read('creditos');
+ if(p[0].estq!==8||v.length!==1||c.length!==1)throw Error('Resultado incorreto');
+ log('✓ Venda fictícia registrada');log('✓ Estoque: 10 → 8');log('✓ Crediário registrado');
+ let duplicou=false;try{await BelaIndexedDB.commitSale(venda,credito)}catch(e){duplicou=true}
+ if(!duplicou)throw Error('Proteção contra duplicidade falhou');
+ log('✓ Venda duplicada bloqueada');log('RESULTADO: TESTE APROVADO');
+}catch(e){log('FALHA: '+(e.message||e));}finally{this.disabled=false}};
+</script></body></html>
