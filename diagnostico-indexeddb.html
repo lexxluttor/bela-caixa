@@ -3,7 +3,7 @@
 <style>body{font:16px system-ui,sans-serif;max-width:760px;margin:30px auto;padding:0 18px;color:#25212a}button{padding:12px 18px;background:#650817;color:white;border:0;border-radius:8px;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f2f3;padding:18px;border-radius:8px}small{color:#555}</style></head>
 <body><h1>Diagnóstico de armazenamento — Bela Caixa</h1>
 <p>Esta página <strong>não migra, apaga nem altera</strong> dados do caixa ou da planilha. Ela testa o IndexedDB e mostra apenas contagens e tamanhos aproximados dos dados locais.</p>
-<button id="testar">Testar armazenamento</button><pre id="resultado">Clique em testar.</pre>
+<button id="testar">Testar armazenamento</button><button id="copiar" style="margin-left:8px;background:#35465a">Copiar dados para IndexedDB</button><pre id="copiaresultado">Cópia ainda não iniciada.</pre><pre id="resultado">Clique em testar.</pre>
 <small>Não compartilhe dados de clientes. Este relatório contém somente nomes de coleções e números.</small>
 <script src="./js/indexeddb-storage.js"></script>
 <script>
@@ -36,5 +36,37 @@ document.getElementById('testar').addEventListener('click', async function () {
     linhas.push('Nenhum dado comercial foi copiado ou alterado.');
   }catch(e){linhas.push('ERRO: '+(e&&e.message||e));}
   out.textContent=linhas.join('\n');
+});
+</script>
+<script>
+document.getElementById('copiar').addEventListener('click', async function () {
+ const out=document.getElementById('copiaresultado');
+ const btn=this;
+ if(!confirm('Copiar os dados comerciais atuais do localStorage para o IndexedDB? Os originais permanecerão intactos.'))return;
+ btn.disabled=true;
+ out.textContent='Iniciando cópia e conferência...';
+ const nomes=['clientes','produtos','vendas','pagamentos','creditos','fiados','vendedores','comissoes','fechamentos_comissoes'];
+ const rel=[];
+ try{
+  await BelaIndexedDB.open();
+  for(const nome of nomes){
+   const raw=localStorage.getItem('bm_'+nome);
+   if(raw===null){rel.push(nome+': ausente no localStorage; ignorado');continue;}
+   let dados;
+   try{dados=JSON.parse(raw);}catch(e){throw new Error(nome+': JSON inválido na origem; cópia interrompida');}
+   if(!Array.isArray(dados))throw new Error(nome+': formato inesperado; cópia interrompida');
+   const key='bm_'+nome;
+   await BelaIndexedDB.set(key,dados);
+   const verificado=await BelaIndexedDB.get(key);
+   if(!Array.isArray(verificado)||verificado.length!==dados.length||JSON.stringify(verificado)!==JSON.stringify(dados)){
+    throw new Error(nome+': divergência ao verificar dados copiados');
+   }
+   rel.push(nome+': '+dados.length+' registros copiados e conferidos');
+   out.textContent=rel.join('\n');
+  }
+  rel.push('','CÓPIA CONCLUÍDA. Os dados originais continuam no localStorage.','O caixa e a sincronização com Sheets ainda não usam o IndexedDB.');
+ }catch(e){rel.push('','ERRO: '+(e&&e.message||e),'Dados originais não foram alterados.');}
+ out.textContent=rel.join('\n');
+ btn.disabled=false;
 });
 </script></body></html>
