@@ -507,16 +507,21 @@ function syncDown(){
     }
   }catch(e){}
 }
+/* Compactação local reversível para evitar QuotaExceededError. */
+var BMStorageCodec=(function(){var P='BM_LZW_1:';function zip(input){var data=unescape(encodeURIComponent(input)),dict=Object.create(null),phrase='',code=256,out=[];for(var i=0;i<data.length;i++){var ch=data.charAt(i),next=phrase+ch;if(Object.prototype.hasOwnProperty.call(dict,next)){phrase=next;continue;}if(phrase)out.push(phrase.length===1?phrase.charCodeAt(0):dict[phrase]);if(phrase&&code<65530)dict[next]=code++;phrase=ch;}if(phrase)out.push(phrase.length===1?phrase.charCodeAt(0):dict[phrase]);var result='';for(var j=0;j<out.length;j+=8192)result+=String.fromCharCode.apply(null,out.slice(j,j+8192));return P+result;}function unzip(input){if(typeof input!=='string'||input.slice(0,P.length)!==P)return input;var data=input.slice(P.length),dict=Object.create(null),code=256;if(!data.length)return '';var old=String.fromCharCode(data.charCodeAt(0)),parts=[old];for(var i=1;i<data.length;i++){var k=data.charCodeAt(i),entry=k<256?String.fromCharCode(k):dict[k];if(entry===undefined){if(k!==code)throw Error('Dados compactados inválidos');entry=old+old.charAt(0);}parts.push(entry);if(code<65530)dict[code++]=old+entry.charAt(0);old=entry;}return decodeURIComponent(escape(parts.join('')));}return {prefix:P,encode:function(v){if(typeof v!=='string'||v.length<1024)return v;var z=zip(v);return z.length<v.length*.9?z:v;},decode:unzip};})();window.BMStorageCodec=BMStorageCodec;
+function bmMigrarBasesLocais(){['vendas','produtos','comissoes','entradas','creditos','pagamentos','clientes','vendedores','fechamentos_comissoes'].forEach(function(nome){var key='bm_'+nome;try{var original=localStorage.getItem(key);if(!original||original.indexOf(BMStorageCodec.prefix)===0)return;var z=BMStorageCodec.encode(original);if(z!==original){localStorage.setItem(key,z);if(BMStorageCodec.decode(localStorage.getItem(key))!==original)throw Error('Falha ao validar compactação');}}catch(e){console.warn('Compactação não aplicada: '+key,e);}});}
+
 var DB={
-  get:function(k){try{var v=localStorage.getItem('bm_'+k);return v?JSON.parse(v):[];}catch(e){return[];}},
+  get:function(k){try{var v=localStorage.getItem('bm_'+k);return v?JSON.parse(BMStorageCodec.decode(v)):[];}catch(e){console.error('Falha ao ler base '+k,e);return[];}},
   set:function(k,v){
-    localStorage.setItem('bm_'+k,JSON.stringify(v));
+    localStorage.setItem('bm_'+k,BMStorageCodec.encode(JSON.stringify(v)));
     if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
       window.BelaSheetsSync.scheduleSync();
     }
   },
   uid:function(){return Date.now().toString(36)+Math.random().toString(36).substr(2,4);}
 };
+bmMigrarBasesLocais();
 
 function initDB(){
   if(localStorage.getItem('bm_ok2'))return;
