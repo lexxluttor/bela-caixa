@@ -51,7 +51,7 @@ function stockAfter(items,products,mode){
 }
 // One transaction writes sales, products and credit together.
 // The caller must wait for this promise before showing sale success.
-async function commitSale(venda,credito){
+async function commitSale(venda,credito,expected){
  if(!venda||!venda.id||!Array.isArray(venda.itens))throw new Error("Venda inválida");
  const db=await open();
  try{
@@ -73,6 +73,11 @@ async function commitSale(venda,credito){
       records[name]=arr;
       if(Object.keys(records).length!==names.length)return;
       if(records.vendas.some(v=>String(v.id)===String(venda.id)))throw new Error("Venda duplicada");
+      if(expected){
+        for(const n of names){
+          if(JSON.stringify(records[n])!==JSON.stringify(expected[n]))throw new Error("Cópia IndexedDB desatualizada: "+n);
+        }
+      }
       records.vendas.push(venda);
       records.produtos=stockAfter(venda.itens,records.produtos,"subtrair");
       if(credito){
