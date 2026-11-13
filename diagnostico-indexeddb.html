@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Bela Caixa — Diagnóstico IndexedDB</title>
+<style>body{font:16px system-ui,sans-serif;max-width:760px;margin:30px auto;padding:0 18px;color:#25212a}button{padding:12px 18px;background:#650817;color:white;border:0;border-radius:8px;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f2f3;padding:18px;border-radius:8px}small{color:#555}</style></head>
+<body><h1>Diagnóstico de armazenamento — Bela Caixa</h1>
+<p>Esta página <strong>não migra, apaga nem altera</strong> dados do caixa ou da planilha. Ela testa o IndexedDB e mostra apenas contagens e tamanhos aproximados dos dados locais.</p>
+<button id="testar">Testar armazenamento</button><pre id="resultado">Clique em testar.</pre>
+<small>Não compartilhe dados de clientes. Este relatório contém somente nomes de coleções e números.</small>
+<script src="./js/indexeddb-storage.js"></script>
+<script>
+document.getElementById('testar').addEventListener('click', async function () {
+  const out=document.getElementById('resultado');
+  out.textContent='Executando...';
+  const linhas=[];
+  try {
+    const db=await BelaIndexedDB.open();
+    linhas.push('IndexedDB: disponível ('+db.name+')');
+    const chave='__teste_diagnostico__';
+    const valor={teste:true,quando:Date.now()};
+    await BelaIndexedDB.set(chave,valor);
+    const lido=await BelaIndexedDB.get(chave);
+    if(!lido || lido.quando!==valor.quando) throw new Error('A leitura não corresponde à gravação.');
+    await BelaIndexedDB.remove(chave);
+    if(await BelaIndexedDB.get(chave)!==undefined) throw new Error('A exclusão do registro de teste falhou.');
+    linhas.push('Teste de gravar/ler/excluir: OK');
+    linhas.push('');
+    linhas.push('Dados atuais no localStorage (somente leitura):');
+    const nomes=['clientes','produtos','vendas','pagamentos','creditos','fiados','vendedores','comissoes','fechamentos_comissoes'];
+    for(const nome of nomes){
+      const raw=localStorage.getItem('bm_'+nome);
+      if(raw===null){linhas.push(nome+': ausente');continue;}
+      let count='formato desconhecido';
+      try{const d=JSON.parse(raw);count=Array.isArray(d)?d.length+' registros':typeof d;}catch(e){count='JSON inválido';}
+      linhas.push(nome+': '+count+'; '+Math.round(raw.length*2/1024)+' KiB estimados');
+    }
+    linhas.push('');
+    linhas.push('Nenhum dado comercial foi copiado ou alterado.');
+  }catch(e){linhas.push('ERRO: '+(e&&e.message||e));}
+  out.textContent=linhas.join('\n');
+});
+</script></body></html>
