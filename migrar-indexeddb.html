@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bela Caixa — Migração segura IndexedDB</title>
+<style>body{font:16px system-ui;background:#fff8ef;color:#3b1720;max-width:740px;margin:30px auto;padding:20px}h1{color:#650817}button{background:#650817;color:white;border:0;border-radius:8px;padding:15px 20px;font-size:16px;cursor:pointer}button:disabled{opacity:.5}pre{white-space:pre-wrap;background:#fff;border:1px solid #ddd;padding:18px;border-radius:8px;line-height:1.6}small{color:#666}</style></head><body>
+<h1>Bela Caixa — Cópia segura para IndexedDB</h1>
+<p>Esta etapa <b>copia e verifica</b> os dados do navegador no IndexedDB. Não apaga nem modifica os dados do localStorage e não envia informações ao Google Sheets.</p>
+<p><b>Importante:</b> abra esta página no mesmo navegador e aparelho em que os dados do Bela Caixa foram recuperados. Guarde o arquivo de backup baixado anteriormente.</p>
+<button id="go">Copiar e verificar os dados</button><pre id="log">Aguardando sua confirmação.</pre>
+<small>Esta ferramenta prepara a migração. O caixa continuará usando o armazenamento antigo até a próxima atualização do aplicativo.</small>
+<script>
+(function(){
+'use strict';
+var names=['produtos','vendas','clientes','pagamentos','creditos','comissoes','entradas','vendedores','fechamentos_comissoes','fiados'];
+var btn=document.getElementById('go'),log=document.getElementById('log');
+function write(s){log.textContent+='\n'+s;}
+function openDB(){return new Promise(function(resolve,reject){var req=indexedDB.open('bela-caixa-v2',1);req.onupgradeneeded=function(){var db=req.result;if(!db.objectStoreNames.contains('datasets'))db.createObjectStore('datasets',{keyPath:'name'});};req.onsuccess=function(){resolve(req.result);};req.onerror=function(){reject(req.error);};});}
+function save(db,name,raw,count){return new Promise(function(resolve,reject){var tx=db.transaction('datasets','readwrite');tx.objectStore('datasets').put({name:name,raw:raw,count:count,updatedAt:new Date().toISOString()});tx.oncomplete=resolve;tx.onerror=function(){reject(tx.error);};tx.onabort=function(){reject(tx.error);};});}
+function read(db,name){return new Promise(function(resolve,reject){var tx=db.transaction('datasets','readonly');var req=tx.objectStore('datasets').get(name);req.onsuccess=function(){resolve(req.result);};req.onerror=function(){reject(req.error);};});}
+btn.onclick=async function(){btn.disabled=true;log.textContent='Iniciando cópia sem excluir os dados originais...';var db;try{db=await openDB();var total=0;for(var i=0;i<names.length;i++){var name=names[i],raw=localStorage.getItem('bm_'+name);if(raw===null){write('— '+name+': não existe no localStorage; ignorado');continue;}var data=JSON.parse(raw);if(!Array.isArray(data))throw Error('Formato inesperado em '+name);await save(db,name,raw,data.length);var copied=await read(db,name);if(!copied||copied.raw!==raw||copied.count!==data.length)throw Error('Verificação falhou em '+name);total++;write('✓ '+name+': '+data.length+' registros conferidos');}write('\nCÓPIA CONCLUÍDA: '+total+' conjuntos verificados.');write('Nenhum dado original foi excluído. Não registre vendas ainda.');}catch(e){write('\nERRO: '+(e&&e.message||e));write('Os dados originais permanecem no localStorage.');}finally{if(db)db.close();btn.disabled=false;}};
+})();
+</script></body></html>
