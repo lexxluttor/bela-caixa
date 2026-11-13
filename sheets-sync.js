@@ -561,8 +561,11 @@ async function syncNow(origem) {
       recebimentos: 900, cobrancas: 900, vendedores: 4,
       comissoes: 2400, fechamentos_comissoes: 4
     };
+    // Comissoes excluidas permanecem no IndexedDB, mas nao entram no payload.
+    // Validar a integridade do historico completo, nao apenas as comissoes ativas.
     const inconsistentes = Object.keys(minimosRecuperacao).filter(function(chave){
-      return !Array.isArray(payload[chave]) || payload[chave].length < minimosRecuperacao[chave];
+      const registros = chave === "comissoes" ? lerLocal("comissoes") : payload[chave];
+      return !Array.isArray(registros) || registros.length < minimosRecuperacao[chave];
     });
     if (inconsistentes.length) {
       throw new Error("Sincronização interrompida para proteger o histórico recuperado. Conferir: " + inconsistentes.join(", "));
