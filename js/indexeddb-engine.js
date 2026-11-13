@@ -43,7 +43,7 @@ function stockAfter(items,products,mode){
   const qty=Number(item.qtd ?? item.qty ?? item.quantidade ?? 0);
   if(!pid||!Number.isFinite(qty)||qty<=0)continue;
   const p=next.find(x=>String(x.id)===String(pid));
-  if(!p)throw new Error("Produto da venda não encontrado: "+pid);
+  if(!p)continue; // Itens avulsos não cadastrados não movimentam estoque, como no caixa atual.
   const previous=Number(p.estq!=null?p.estq:(p.estoque!=null?p.estoque:0))||0;
   p.estq=mode==="somar"?previous+qty:Math.max(0,previous-qty);
  }
