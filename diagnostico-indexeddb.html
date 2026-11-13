@@ -3,7 +3,7 @@
 <style>body{font:16px system-ui,sans-serif;max-width:760px;margin:30px auto;padding:0 18px;color:#25212a}button{padding:12px 18px;background:#650817;color:white;border:0;border-radius:8px;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f5f2f3;padding:18px;border-radius:8px}small{color:#555}</style></head>
 <body><h1>Diagnóstico de armazenamento — Bela Caixa</h1>
 <p>Esta página <strong>não migra, apaga nem altera</strong> dados do caixa ou da planilha. Ela testa o IndexedDB e mostra apenas contagens e tamanhos aproximados dos dados locais.</p>
-<button id="testar">Testar armazenamento</button><button id="copiar" style="margin-left:8px;background:#35465a">Copiar dados para IndexedDB</button><pre id="copiaresultado">Cópia ainda não iniciada.</pre><pre id="resultado">Clique em testar.</pre>
+<button id="testar">Testar armazenamento</button><button id="copiar" style="margin-left:8px;background:#35465a">Copiar dados para IndexedDB</button><pre id="copiaresultado">Cópia ainda não iniciada.</pre><button id="conferir" style="margin-left:8px;background:#276749">Conferir cópia atual</button><pre id="conferirresultado">Conferência ainda não executada.</pre><pre id="resultado">Clique em testar.</pre>
 <small>Não compartilhe dados de clientes. Este relatório contém somente nomes de coleções e números.</small>
 <script src="./js/indexeddb-storage.js"></script>
 <script>
@@ -68,5 +68,25 @@ document.getElementById('copiar').addEventListener('click', async function () {
  }catch(e){rel.push('','ERRO: '+(e&&e.message||e),'Dados originais não foram alterados.');}
  out.textContent=rel.join('\n');
  btn.disabled=false;
+});
+</script><script>
+document.getElementById('conferir').addEventListener('click',async function(){
+ const out=document.getElementById('conferirresultado');out.textContent='Conferindo...';
+ const nomes=['clientes','produtos','vendas','pagamentos','creditos','fiados','vendedores','comissoes','fechamentos_comissoes'];
+ const lines=[];let iguais=0,diferentes=0;
+ try{
+  for(const nome of nomes){
+   const raw=localStorage.getItem('bm_'+nome);
+   const salvo=await BelaIndexedDB.get('bm_'+nome);
+   if(raw===null){lines.push(nome+': sem origem');continue;}
+   const atual=JSON.parse(raw);
+   const ok=JSON.stringify(atual)===JSON.stringify(salvo);
+   if(ok)iguais++;else diferentes++;
+   lines.push(nome+': '+(ok?'IGUAL':'DIFERENTE (dados locais podem ter mudado após a cópia)'));
+  }
+  lines.push('',diferentes?'ATENÇÃO: '+diferentes+' conjunto(s) divergentes. Refaça a cópia antes de qualquer ativação.':'CONFERÊNCIA OK: '+iguais+' conjunto(s) idênticos.');
+  lines.push('Nenhuma informação foi alterada nesta conferência.');
+ }catch(e){lines.push('ERRO: '+(e&&e.message||e));}
+ out.textContent=lines.join('\n');
 });
 </script></body></html>
