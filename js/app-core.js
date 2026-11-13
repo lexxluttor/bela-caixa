@@ -2942,16 +2942,33 @@ function finalizarVenda(){
     var venda={id:DB.uid(),data:stamp,createdAt:stamp,updatedAt:stamp,deletedAt:'',cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:itensVenda,subtotal:subtotal,desconto:desconto,total:total};
     if(vForma==='dividido') venda.pagamentos=JSON.parse(JSON.stringify(vPagamentosDivididos||[]));
 
-    ajustarEstoqueVenda(venda.itens, 'subtrair');
-
+    // Grava a venda primeiro. Se alguma etapa falhar, restaura os dados anteriores.
+    // Não esvazia o carrinho nem exibe sucesso em caso de erro.
     var vendas=DB.get('vendas')||[];
-    vendas.push(venda);
-    DB.set('vendas',vendas);
-
-    if(vForma==='fiado'&&vCli){
-      var crds=DB.get('creditos')||[];
-      crds.push({id:DB.uid(),cid:vCli.id,data:venda.data,desc:'Venda Crediário: '+itensVenda.map(function(i){return i.desc;}).join(', '),val:total,vid:venda.id});
-      DB.set('creditos',crds);
+    var creditosAntes=null;
+    var produtosAntes=null;
+    var vendaGravada=false, estoqueGravado=false, creditoGravado=false;
+    try{
+      if(vForma==='fiado'&&vCli) creditosAntes=DB.get('creditos')||[];
+      produtosAntes=DB.get('produtos')||[];
+      DB.set('vendas',vendas.concat([venda]));
+      vendaGravada=true;
+      ajustarEstoqueVenda(venda.itens, 'subtrair');
+      estoqueGravado=true;
+      if(vForma==='fiado'&&vCli){
+        var crds=creditosAntes.concat([{id:DB.uid(),cid:vCli.id,data:venda.data,desc:'Venda Crediário: '+itensVenda.map(function(i){return i.desc;}).join(', '),val:total,vid:venda.id}]);
+        DB.set('creditos',crds);
+        creditoGravado=true;
+      }
+    }catch(erroGravacao){
+      // Reversão em ordem inversa; preserva a venda para recuperação se falhar a reversão.
+      var falhasReversao=[];
+      if(creditoGravado && creditosAntes) try{DB.set('creditos',creditosAntes);}catch(e){falhasReversao.push('crediário');}
+      if(estoqueGravado && produtosAntes) try{DB.set('produtos',produtosAntes);}catch(e){falhasReversao.push('estoque');}
+      if(vendaGravada) try{DB.set('vendas',vendas);}catch(e){falhasReversao.push('vendas');}
+      console.error('Falha ao finalizar venda:',erroGravacao, 'Falhas na reversão:',falhasReversao);
+      toast('❌ Não foi possível finalizar a venda. '+(falhasReversao.length?'Confira o histórico antes de tentar novamente.':'Nenhuma venda foi concluída.' ));
+      return;
     }
 
     var cliComp=vCli, vendaComp=venda;
