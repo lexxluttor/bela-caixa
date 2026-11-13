@@ -140,7 +140,16 @@ function limparBackupsLocaisPesados_() {
   });
 }
 
+// Fonte de dados unica quando a migracao for ativada.
+function usarIndexedDBSync_() {
+  return window.BELA_CAIXA_STORAGE_MODE === "indexeddb" &&
+    window.BelaIDBBridge && window.BelaIDBBridge.status().ready === true;
+}
 function lerLocal(nome) {
+  if (window.BELA_CAIXA_STORAGE_MODE === "indexeddb") {
+    if (!usarIndexedDBSync_()) throw new Error("IndexedDB nao pronto: sincronizacao bloqueada.");
+    return window.BelaIDBBridge.get(nome);
+  }
   try {
     return JSON.parse(localStorage.getItem("bm_" + nome) || "[]");
   } catch (e) {
@@ -149,6 +158,10 @@ function lerLocal(nome) {
 }
 
 function salvarLocal(nome, dados) {
+  if (window.BELA_CAIXA_STORAGE_MODE === "indexeddb") {
+    if (!usarIndexedDBSync_()) throw new Error("IndexedDB nao pronto: restauracao bloqueada.");
+    return window.BelaIDBBridge.set(nome, dados || []);
+  }
   safeSetItem_("bm_" + nome, JSON.stringify(dados || []));
 }
 
@@ -523,6 +536,11 @@ async function syncNow(origem) {
   const versaoNoInicio = versaoDadosLocal;
 
   try {
+    if (window.BELA_CAIXA_STORAGE_MODE === "indexeddb") {
+      if (!usarIndexedDBSync_()) throw new Error("IndexedDB nao inicializado; envio bloqueado.");
+      await window.BelaIDBBridge.flush();
+      if (window.BELA_CAIXA_STORAGE_ERROR) throw new Error("Falha de gravacao no IndexedDB; envio bloqueado.");
+    }
     const payload = {
       action: "syncAll",
       origem: origem || "manual",
