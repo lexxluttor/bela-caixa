@@ -1178,6 +1178,9 @@ document.addEventListener('DOMContentLoaded',function(){
 
 
 
+<script src="./js/indexeddb-storage.js"></script>
+<script src="./js/indexeddb-bridge.js"></script>
+<script>window.BELA_CAIXA_STORAGE_MODE = "indexeddb";</script>
 <script src="./js/app-core.js"></script>
 <script src="./js/produtos-unificacao.js"></script>
 <script src="./js/vendedores-comissoes.js"></script>
@@ -1890,7 +1893,8 @@ document.addEventListener('DOMContentLoaded',function(){
 });
 
 </script>
-<script src="./sheets-sync.js">
+<script src="./sheets-sync.js"></script>
+<script>
 document.addEventListener('DOMContentLoaded',function(){
   var f=document.getElementById('v-desc');
   if(f){
