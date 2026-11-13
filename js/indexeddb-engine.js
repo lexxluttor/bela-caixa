@@ -91,6 +91,42 @@ async function commitSale(venda,credito,expected){
   });
  }finally{db.close();}
 }
+// Cancela uma venda e restaura estoque/crediário em uma única transação.
+async function cancelSale(vid,expected){
+ const names=["vendas","produtos","creditos","fiados","pagamentos"];
+ const db=await open();
+ try{
+  return await new Promise((resolve,reject)=>{
+   const tx=db.transaction(STORE,"readwrite"),store=tx.objectStore(STORE);
+   const records={};let done=false;
+   tx.oncomplete=()=>resolve(records);
+   tx.onerror=()=>reject(tx.error||new Error("Falha ao cancelar venda"));
+   tx.onabort=()=>reject(tx.error||new Error("Cancelamento não gravado"));
+   names.forEach(n=>{
+    const req=store.get(n);
+    req.onsuccess=()=>{
+     if(done)return;
+     try{
+      records[n]=req.result?JSON.parse(req.result.raw):[];
+      validateRows(n,records[n]);
+      if(Object.keys(records).length!==names.length)return;
+      if(expected)for(const k of names){
+       if(JSON.stringify(records[k])!==JSON.stringify(expected[k]))throw new Error("Dados divergentes: "+k);
+      }
+      const venda=records.vendas.find(v=>String(v.id)===String(vid));
+      if(!venda)throw new Error("Venda não encontrada no IndexedDB");
+      records.produtos=stockAfter(venda.itens,records.produtos,"somar");
+      records.vendas=records.vendas.filter(v=>String(v.id)!==String(vid));
+      records.creditos=records.creditos.filter(v=>String(v.vid||"")!==String(vid));
+      records.fiados=records.fiados.filter(v=>String(v.vid||"")!==String(vid));
+      records.pagamentos=records.pagamentos.filter(v=>String(v.vid||v.venda_id||"")!==String(vid));
+      names.forEach(k=>store.put({name:k,raw:JSON.stringify(records[k]),count:records[k].length,updatedAt:new Date().toISOString()}));
+     }catch(e){done=true;try{tx.abort();}catch(_){}reject(e);}
+    };
+   });
+  });
+ }finally{db.close();}
+}
 // Verifica se a cópia do IndexedDB ainda corresponde ao localStorage.
 // Não ativar commitSale enquanto outras rotinas continuarem gravando só no localStorage.
 async function verificarConsistencia(names){
@@ -105,5 +141,5 @@ async function verificarConsistencia(names){
  }
  return {seguro:result.every(r=>r.igual),conjuntos:result};
 }
-global.BelaIndexedDB={open,read,writeBatch,commitSale,verificarConsistencia};
+global.BelaIndexedDB={open,read,writeBatch,commitSale,cancelSale,verificarConsistencia};
 })(window);
