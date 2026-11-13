@@ -87,43 +87,20 @@ function normalizarDescricaoCobranca_(v) {
   return s;
 }
 
-/* Compactação reversível dos dados principais; preserva IDs e histórico. */
-var BMStorageCodec=(function(){
- var PREFIX='BM_LZW_1:';
- function compress(input){
-  var data=unescape(encodeURIComponent(input)),dict=Object.create(null),phrase='',code=256,out=[];
-  for(var i=0;i<data.length;i++){var ch=data.charAt(i),next=phrase+ch;if(Object.prototype.hasOwnProperty.call(dict,next)){phrase=next;continue;}if(phrase)out.push(phrase.length===1?phrase.charCodeAt(0):dict[phrase]);if(phrase&&code<65530)dict[next]=code++;phrase=ch;}
-  if(phrase)out.push(phrase.length===1?phrase.charCodeAt(0):dict[phrase]);
-  var result='';for(var j=0;j<out.length;j+=8192)result+=String.fromCharCode.apply(null,out.slice(j,j+8192));return PREFIX+result;
- }
- function decode(input){
-  if(typeof input!=='string'||input.slice(0,PREFIX.length)!==PREFIX)return input;
-  var data=input.slice(PREFIX.length),dict=Object.create(null),code=256;if(!data.length)return '';
-  var old=String.fromCharCode(data.charCodeAt(0)),parts=[old];
-  for(var i=1;i<data.length;i++){var k=data.charCodeAt(i),entry=k<256?String.fromCharCode(k):dict[k];if(entry===undefined){if(k!==code)throw Error('Dados compactados inválidos');entry=old+old.charAt(0);}parts.push(entry);if(code<65530)dict[code++]=old+entry.charAt(0);old=entry;}
-  return decodeURIComponent(escape(parts.join('')));
- }
- return {encode:function(value){if(typeof value!=='string'||value.length<1024)return value;var compressed=compress(value);return compressed.length<value.length*0.90?compressed:value;},decode:decode,prefix:PREFIX};
-})();
-window.BMStorageCodec=BMStorageCodec;
-const BM_BASES_COMPACTADAS=/^bm_(vendas|produtos|comissoes|entradas|creditos|pagamentos|clientes|vendedores|fechamentos_comissoes)$/;
-
 /* ================= STORAGE ================= */
 
 const originalSetItem = localStorage.setItem.bind(localStorage);
-const originalGetItem = localStorage.getItem.bind(localStorage);
-localStorage.getItem = function(k){return BMStorageCodec.decode(originalGetItem(k));};
 
 function safeSetItem_(k, v) {
   try {
-    originalSetItem(k, BM_BASES_COMPACTADAS.test(k) ? BMStorageCodec.encode(v) : v);
+    originalSetItem(k, v);
     return true;
   } catch (e) {
     // Se o armazenamento estiver cheio, remove apenas arquivos de backup
     // descartáveis e tenta novamente. Nunca apaga os dados principais.
     limparBackupsLocaisPesados_();
     try {
-      originalSetItem(k, BM_BASES_COMPACTADAS.test(k) ? BMStorageCodec.encode(v) : v);
+      originalSetItem(k, v);
       return true;
     } catch (e2) {
       console.error("Não foi possível salvar no localStorage:", k, e2);
@@ -162,18 +139,11 @@ function limparBackupsLocaisPesados_() {
 }
 
 function lerLocal(nome) {
-  // Nunca converter falha de leitura em base vazia: syncAll substitui abas inteiras.
-  const chave = "bm_" + nome;
-  const bruto = originalGetItem(chave);
-  if (bruto == null) throw new Error("Base local ausente: " + chave + ". Sincronização bloqueada para proteger o servidor.");
-  let dados;
   try {
-    dados = JSON.parse(BMStorageCodec.decode(bruto));
+    return JSON.parse(localStorage.getItem("bm_" + nome) || "[]");
   } catch (e) {
-    throw new Error("Falha ao ler " + chave + ". Sincronização bloqueada: " + e.message);
+    return [];
   }
-  if (!Array.isArray(dados)) throw new Error("Formato inválido em " + chave + ". Sincronização bloqueada.");
-  return dados;
 }
 
 function salvarLocal(nome, dados) {
@@ -559,11 +529,6 @@ async function syncNow(origem) {
       fechamentos_comissoes: lerLocal("fechamentos_comissoes").filter(function(f){ return !f.deletedAt; }).map(normalizarFechamentoComissao)
     };
 
-    // Verificação mínima antes de substituir as abas do Sheets.
-    // Não sincronizar uma base principal vazia por erro de carregamento.
-    if (!payload.vendas.length || !payload.produtos.length || !payload.clientes.length) {
-      throw new Error("Sincronização bloqueada: vendas, produtos ou clientes estão vazios.");
-    }
     const res = await post(payload);
 
     safeSetItem_("bm_last_sync", agoraISO());
@@ -830,24 +795,9 @@ async function backupServerNow() {
 
 function init() {
   limparBackupsLocaisPesados_();
-  // Migração individual: nunca remove registros; confirma leitura antes de seguir.
-  ['vendas','produtos','comissoes','entradas','creditos','pagamentos','clientes','vendedores','fechamentos_comissoes'].forEach(function(nome){
-    var chave='bm_'+nome;
-    try{
-      var bruto=originalGetItem(chave);
-      if(!bruto || bruto.slice(0,BMStorageCodec.prefix.length)===BMStorageCodec.prefix)return;
-      var reduzido=BMStorageCodec.encode(bruto);
-      if(reduzido===bruto)return;
-      originalSetItem(chave,reduzido);
-      if(BMStorageCodec.decode(originalGetItem(chave))!==bruto)throw new Error('Verificação de integridade falhou');
-    }catch(e){console.error('Migração não concluída: '+chave,e);}
-  });
 
-  // Sem registro anterior, não enviar automaticamente uma base potencialmente incompleta.
-  // O operador pode sincronizar manualmente após conferir os dados.
-  if (!localStorage.getItem("bm_last_sync")) {
-    console.warn("Sem histórico de sincronização: envio automático inicial desativado por segurança.");
-  }
+  // Sem registro de sincronização anterior, mantém a primeira sincronização pendente.
+  if (!localStorage.getItem("bm_last_sync")) dadosPendentesSync = true;
 
   iniciarSyncIntervalo();
 
