@@ -5110,11 +5110,35 @@ function pedirSenhaCancelar(){
   pedirSenha(function(){ cancelarVenda(vid); });
 }
 
-function cancelarVenda(vid){
+async function cancelarVenda(vid){
   var vendas=DB.get('vendas');
   var v=vendas.find(function(x){return x.id===vid;});
   if(!v){toast('⚠️ Venda não encontrada!');return;}
   if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?\nEsta ação não pode ser desfeita!')){return;}
+
+  // Impede exclusão enquanto o espelho transacional não estiver preparado.
+  // Mantém a venda intacta em caso de falha de gravação.
+  try {
+    if(!window.BelaIndexedDB){
+      await new Promise(function(resolve,reject){
+        var script=document.createElement('script');
+        script.src='./js/indexeddb-engine.js';
+        script.onload=resolve;
+        script.onerror=function(){reject(new Error('Motor IndexedDB indisponível'));};
+        document.head.appendChild(script);
+      });
+    }
+    var conjuntos=['produtos','vendas','creditos','fiados','pagamentos'];
+    var espelho={};
+    for(var k of conjuntos){
+      var idb=await BelaIndexedDB.read(k);
+      var local=DB.get(k)||[];
+      if(Array.isArray(idb) && JSON.stringify(idb)!==JSON.stringify(local)){
+        throw new Error('Dados divergentes em '+k+'. Cancelamento bloqueado para evitar perda de dados.');
+      }
+      espelho[k]=local;
+    }
+  }catch(e){toast('⚠️ '+e.message);return;}
 
   ajustarEstoqueVenda(v.itens || [], 'somar');
 
@@ -5139,6 +5163,15 @@ function cancelarVenda(vid){
     var pvid=String(p.vid || p.venda_id || '');
     return pvid!==String(vid);
   }));
+
+  try {
+    var atualizados={};
+    for(var k of conjuntos) atualizados[k]=DB.get(k)||[];
+    await BelaIndexedDB.writeBatch(atualizados);
+  }catch(e){
+    toast('⚠️ Cancelamento feito no caixa, mas falhou a atualização IndexedDB: '+e.message);
+    return;
+  }
 
   limparDebitosOrfaos();
 
