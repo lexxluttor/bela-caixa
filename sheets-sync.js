@@ -21,9 +21,7 @@ const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 let syncEmAndamento = false;
 let restoreEmAndamento = false;
 let autoSyncTimer = null;
-let ultimoHashEnviado = ""; // Mantido por compatibilidade com versões anteriores.
-let dadosPendentesSync = false;
-let versaoDadosLocal = 0;
+let ultimoHashEnviado = "";
 let ultimoErroSync = "";
 let ultimoMotivoSync = "";
 let intervaloAtivo = false;
@@ -151,9 +149,20 @@ function salvarLocal(nome, dados) {
 }
 
 function gerarHashSync() {
-  // Não serializa os bancos inteiros. A detecção de alterações é feita pelo hook
-  // do localStorage, evitando travamentos ao comparar milhares de registros.
-  return String(versaoDadosLocal) + (dadosPendentesSync ? ":pendente" : ":limpo");
+  try {
+    return JSON.stringify({
+      clientes: lerLocal("clientes"),
+      produtos: lerLocal("produtos"),
+      vendas: lerLocal("vendas"),
+      pagamentos: lerLocal("pagamentos"),
+      creditos: lerLocal("creditos"),
+      vendedores: lerLocal("vendedores"),
+      comissoes: lerLocal("comissoes"),
+      fechamentos_comissoes: lerLocal("fechamentos_comissoes")
+    });
+  } catch (e) {
+    return String(Date.now());
+  }
 }
 
 /* ================= HTTP ================= */
@@ -513,7 +522,6 @@ async function syncNow(origem) {
   if (syncEmAndamento || restoreEmAndamento) return false;
 
   syncEmAndamento = true;
-  const versaoNoInicio = versaoDadosLocal;
 
   try {
     const payload = {
@@ -534,12 +542,6 @@ async function syncNow(origem) {
     safeSetItem_("bm_last_sync", agoraISO());
     safeSetItem_("bm_last_sync_origin", origem || "manual");
 
-    // Só marca como sincronizado se nenhum dado mudou enquanto o envio ocorria.
-    if (versaoDadosLocal === versaoNoInicio) {
-      dadosPendentesSync = false;
-    } else {
-      dadosPendentesSync = true;
-    }
     ultimoHashEnviado = gerarHashSync();
     ultimoErroSync = "";
     ultimoMotivoSync = origem || "manual";
@@ -550,16 +552,10 @@ async function syncNow(origem) {
     console.error("Erro no sync:", e);
     ultimoErroSync = String(e && e.message || e);
     safeSetItem_("bm_last_sync_error", ultimoErroSync);
-    // Mantém os dados marcados como pendentes para nova tentativa posterior.
-    dadosPendentesSync = true;
     throw e;
 
   } finally {
     syncEmAndamento = false;
-    // Se houve alterações durante o envio, agenda outra sincronização sem perdê-las.
-    if (dadosPendentesSync && versaoDadosLocal !== versaoNoInicio) {
-      agendarSync("mudanca_durante_sync");
-    }
   }
 }
 
@@ -571,12 +567,10 @@ function agendarSync(motivo) {
   autoSyncTimer = setTimeout(async function () {
     autoSyncTimer = null;
 
-    if (restoreEmAndamento) return;
-    if (syncEmAndamento) {
-      agendarSync(motivo || "mudanca");
-      return;
-    }
-    if (!dadosPendentesSync) return;
+    if (restoreEmAndamento || syncEmAndamento) return;
+
+    const hashAtual = gerarHashSync();
+    if (hashAtual === ultimoHashEnviado) return;
 
     try {
       await syncNow("auto:" + (motivo || "mudanca"));
@@ -591,7 +585,10 @@ function iniciarSyncIntervalo() {
   intervaloAtivo = true;
 
   setInterval(async function () {
-    if (restoreEmAndamento || syncEmAndamento || !dadosPendentesSync) return;
+    if (restoreEmAndamento || syncEmAndamento) return;
+
+    const hashAtual = gerarHashSync();
+    if (hashAtual === ultimoHashEnviado) return;
 
     try {
       await syncNow("intervalo_2min");
@@ -628,7 +625,6 @@ async function restoreNow() {
     ignorarHook = false;
 
     safeSetItem_("bm_last_restore", agoraISO());
-    dadosPendentesSync = false;
     ultimoHashEnviado = gerarHashSync();
     ultimoErroSync = "";
 
@@ -657,8 +653,6 @@ localStorage.setItem = function (k, v) {
   const nome = String(k).replace("bm_", "");
 
   if (["clientes", "produtos", "vendas", "pagamentos", "creditos", "vendedores", "comissoes", "fechamentos_comissoes"].includes(nome)) {
-    versaoDadosLocal++;
-    dadosPendentesSync = true;
     agendarSync(nome);
   }
 };
@@ -714,7 +708,6 @@ async function restaurarPlanilhaPorId(id) {
     safeSetItem_("bm_last_restore", agoraISO());
     safeSetItem_("bm_last_restore_source", dados.spreadsheetName || id);
 
-    dadosPendentesSync = false;
     ultimoHashEnviado = gerarHashSync();
     ultimoErroSync = "";
 
@@ -796,8 +789,9 @@ async function backupServerNow() {
 function init() {
   limparBackupsLocaisPesados_();
 
-  // Sem registro de sincronização anterior, mantém a primeira sincronização pendente.
-  if (!localStorage.getItem("bm_last_sync")) dadosPendentesSync = true;
+  if (localStorage.getItem("bm_last_sync")) {
+    ultimoHashEnviado = gerarHashSync();
+  }
 
   iniciarSyncIntervalo();
 
@@ -832,8 +826,6 @@ window.BelaSheetsSync = {
       syncEmAndamento,
       restoreEmAndamento,
       autoSyncPendente: !!autoSyncTimer,
-      dadosPendentesSync,
-      versaoDadosLocal,
       ultimoSync: localStorage.getItem("bm_last_sync"),
       origemUltimoSync: localStorage.getItem("bm_last_sync_origin"),
       ultimoRestore: localStorage.getItem("bm_last_restore"),
