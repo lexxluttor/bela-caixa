@@ -4,7 +4,7 @@
  */
 (function(global){
 "use strict";
-const DB_NAME="bela-caixa-v2", STORE="datasets";
+const DB_NAME=global.BELA_INDEXEDDB_TEST_NAME || "bela-caixa-v2", STORE="datasets";
 function open(){
  return new Promise((resolve,reject)=>{
   const req=indexedDB.open(DB_NAME,1);
