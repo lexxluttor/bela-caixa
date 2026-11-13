@@ -507,10 +507,27 @@ function syncDown(){
     }
   }catch(e){}
 }
+// IndexedDB: adaptador preparado, sem ativacao automatica.
+// A ativacao depende do carregamento validado da ponte antes do boot.
+function bmUsarIndexedDB_(){
+  return window.BelaIDBBridge && window.BelaIDBBridge.status().ready === true &&
+    window.BELA_CAIXA_STORAGE_MODE === 'indexeddb';
+}
 var DB={
-  get:function(k){try{var v=localStorage.getItem('bm_'+k);return v?JSON.parse(v):[];}catch(e){return[];}},
+  get:function(k){
+    if(bmUsarIndexedDB_()) return window.BelaIDBBridge.get(k);
+    try{var v=localStorage.getItem('bm_'+k);return v?JSON.parse(v):[];}catch(e){return[];}
+  },
   set:function(k,v){
-    localStorage.setItem('bm_'+k,JSON.stringify(v));
+    if(bmUsarIndexedDB_()){
+      var gravacao=window.BelaIDBBridge.set(k,v);
+      gravacao.catch(function(e){
+        console.error('Falha grave de persistencia IndexedDB em '+k,e);
+        window.BELA_CAIXA_STORAGE_ERROR=e;
+      });
+    }else{
+      localStorage.setItem('bm_'+k,JSON.stringify(v));
+    }
     if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
       window.BelaSheetsSync.scheduleSync();
     }
