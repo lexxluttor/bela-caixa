@@ -1,4 +1,4 @@
-/* Bela Caixa — motor IndexedDB v2 (preparação, não ativado no caixa).
+/* Bela Caixa — motor IndexedDB v2 (preparação segura, não ativado no caixa).
  * Preserva localStorage. Nenhum código deste arquivo é executado até ser
  * explicitamente importado pelo aplicativo.
  */
@@ -40,10 +40,10 @@ function stockAfter(items,products,mode){
  for(const item of items||[]){
   if(!item)continue;
   const pid=item.pid||item.produto_id||item.idProduto||item.id;
-  const qty=Number(item.qtd||item.qty||item.quantidade||0);
+  const qty=Number(item.qtd ?? item.qty ?? item.quantidade ?? 0);
   if(!pid||!Number.isFinite(qty)||qty<=0)continue;
   const p=next.find(x=>String(x.id)===String(pid));
-  if(!p)continue;
+  if(!p)continue; // Itens avulsos não cadastrados não movimentam estoque, como no caixa atual.
   const previous=Number(p.estq!=null?p.estq:(p.estoque!=null?p.estoque:0))||0;
   p.estq=mode==="somar"?previous+qty:Math.max(0,previous-qty);
  }
@@ -51,7 +51,7 @@ function stockAfter(items,products,mode){
 }
 // One transaction writes sales, products and credit together.
 // The caller must wait for this promise before showing sale success.
-async function commitSale(venda,credito){
+async function commitSale(venda,credito,expected){
  if(!venda||!venda.id||!Array.isArray(venda.itens))throw new Error("Venda inválida");
  const db=await open();
  try{
@@ -73,9 +73,17 @@ async function commitSale(venda,credito){
       records[name]=arr;
       if(Object.keys(records).length!==names.length)return;
       if(records.vendas.some(v=>String(v.id)===String(venda.id)))throw new Error("Venda duplicada");
+      if(expected){
+        for(const n of names){
+          if(JSON.stringify(records[n])!==JSON.stringify(expected[n]))throw new Error("Cópia IndexedDB desatualizada: "+n);
+        }
+      }
       records.vendas.push(venda);
       records.produtos=stockAfter(venda.itens,records.produtos,"subtrair");
-      if(credito)records.creditos.push(credito);
+      if(credito){
+        if(records.creditos.some(c=>String(c.id)===String(credito.id)))throw new Error("Crédito duplicado");
+        records.creditos.push(credito);
+      }
       names.forEach(n=>store.put({name:n,raw:JSON.stringify(records[n]),count:records[n].length,updatedAt:new Date().toISOString()}));
      }catch(e){failed=true;try{tx.abort();}catch(_){} reject(e);}
     };
@@ -83,5 +91,55 @@ async function commitSale(venda,credito){
   });
  }finally{db.close();}
 }
-global.BelaIndexedDB={open,read,writeBatch,commitSale};
+// Cancela uma venda e restaura estoque/crediário em uma única transação.
+async function cancelSale(vid,expected){
+ const names=["vendas","produtos","creditos","fiados","pagamentos"];
+ const db=await open();
+ try{
+  return await new Promise((resolve,reject)=>{
+   const tx=db.transaction(STORE,"readwrite"),store=tx.objectStore(STORE);
+   const records={};let done=false;
+   tx.oncomplete=()=>resolve(records);
+   tx.onerror=()=>reject(tx.error||new Error("Falha ao cancelar venda"));
+   tx.onabort=()=>reject(tx.error||new Error("Cancelamento não gravado"));
+   names.forEach(n=>{
+    const req=store.get(n);
+    req.onsuccess=()=>{
+     if(done)return;
+     try{
+      records[n]=req.result?JSON.parse(req.result.raw):[];
+      validateRows(n,records[n]);
+      if(Object.keys(records).length!==names.length)return;
+      if(expected)for(const k of names){
+       if(JSON.stringify(records[k])!==JSON.stringify(expected[k]))throw new Error("Dados divergentes: "+k);
+      }
+      const venda=records.vendas.find(v=>String(v.id)===String(vid));
+      if(!venda)throw new Error("Venda não encontrada no IndexedDB");
+      records.produtos=stockAfter(venda.itens,records.produtos,"somar");
+      records.vendas=records.vendas.filter(v=>String(v.id)!==String(vid));
+      records.creditos=records.creditos.filter(v=>String(v.vid||"")!==String(vid));
+      records.fiados=records.fiados.filter(v=>String(v.vid||"")!==String(vid));
+      records.pagamentos=records.pagamentos.filter(v=>String(v.vid||v.venda_id||"")!==String(vid));
+      names.forEach(k=>store.put({name:k,raw:JSON.stringify(records[k]),count:records[k].length,updatedAt:new Date().toISOString()}));
+     }catch(e){done=true;try{tx.abort();}catch(_){}reject(e);}
+    };
+   });
+  });
+ }finally{db.close();}
+}
+// Verifica se a cópia do IndexedDB ainda corresponde ao localStorage.
+// Não ativar commitSale enquanto outras rotinas continuarem gravando só no localStorage.
+async function verificarConsistencia(names){
+ const keys=names||["produtos","vendas","clientes","pagamentos","creditos","comissoes","entradas","vendedores","fechamentos_comissoes","fiados"];
+ const result=[];
+ for(const name of keys){
+  const raw=localStorage.getItem("bm_"+name);
+  const idb=await read(name);
+  const local=raw===null?null:JSON.parse(raw);
+  const igual=JSON.stringify(local)===JSON.stringify(idb);
+  result.push({name,igual,local:local&&local.length,idb:idb&&idb.length});
+ }
+ return {seguro:result.every(r=>r.igual),conjuntos:result};
+}
+global.BelaIndexedDB={open,read,writeBatch,commitSale,cancelSale,verificarConsistencia};
 })(window);
