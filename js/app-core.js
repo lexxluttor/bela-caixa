@@ -2942,11 +2942,25 @@ function finalizarVenda(){
     var venda={id:DB.uid(),data:stamp,createdAt:stamp,updatedAt:stamp,deletedAt:'',cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:itensVenda,subtotal:subtotal,desconto:desconto,total:total};
     if(vForma==='dividido') venda.pagamentos=JSON.parse(JSON.stringify(vPagamentosDivididos||[]));
 
-    ajustarEstoqueVenda(venda.itens, 'subtrair');
-
+    // Primeiro confirma que a venda cabe no armazenamento. Se não couber,
+    // não altera o estoque, não limpa o carrinho e não mostra sucesso.
     var vendas=DB.get('vendas')||[];
-    vendas.push(venda);
-    DB.set('vendas',vendas);
+    try {
+      DB.set('vendas',vendas.concat([venda]));
+    } catch (erroArmazenamento) {
+      console.error('Venda não gravada:',erroArmazenamento);
+      toast('❌ Armazenamento cheio. Venda não registrada; carrinho e estoque preservados.');
+      return;
+    }
+
+    // A venda já está registrada. Se o estoque falhar, não criar outra venda.
+    try {
+      ajustarEstoqueVenda(venda.itens, 'subtrair');
+    } catch (erroEstoque) {
+      console.error('Venda gravada, mas estoque não atualizado:',erroEstoque);
+      toast('⚠️ Venda registrada, mas estoque não atualizado. Confira o histórico antes de tentar novamente.');
+      return;
+    }
 
     if(vForma==='fiado'&&vCli){
       var crds=DB.get('creditos')||[];
