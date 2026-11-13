@@ -1,6 +1,7 @@
 
 /* Bela Caixa - sincronização revisada e estável */
 var SYNC_URL='/.netlify/functions/sync';
+function legacySyncDisabled_(){ return window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'; }
 var SYNC_KEYS=['clientes','produtos','vendas','creditos','fiados','pagamentos'];
 var _syncDirty=localStorage.getItem('bm_sync_dirty')==='1';
 var _syncBusy=false;
@@ -111,6 +112,7 @@ function collectDB(){
 
 function markLocalDirty(){
   var now=nowIso();
+  if(legacySyncDisabled_()) return;
   localStorage.setItem('bm_sync_local_at', now);
   localStorage.setItem('bm_sync_dirty', '1');
   _syncDirty=true;
@@ -118,6 +120,7 @@ function markLocalDirty(){
 }
 
 function scheduleSyncSoon(){
+  if(legacySyncDisabled_()) return;
   if(_syncDebounce) clearTimeout(_syncDebounce);
   _syncDebounce=setTimeout(function(){
     if(navigator.onLine){ syncPushNow(); }
@@ -151,6 +154,7 @@ function installSyncHooks(){
 }
 
 async function syncUp(){
+  if(legacySyncDisabled_()) return false;
   if(_syncBusy || !_syncDirty) return;
   installSyncHooks();
   _syncBusy=true;
@@ -180,6 +184,7 @@ async function syncUp(){
 }
 
 function applyRemoteDB(payload){
+  if(legacySyncDisabled_()) return;
   if(!payload || !payload.db) return false;
   var db = normalizeDbShape(payload.db);
   localStorage.setItem('bm_clientes', JSON.stringify(db.clientes || []));
@@ -194,6 +199,7 @@ function applyRemoteDB(payload){
 }
 
 async function syncDown(force){
+  if(legacySyncDisabled_()) return false;
   if(_syncBusy) return false;
   installSyncHooks();
   _syncBusy=true;
@@ -237,6 +243,7 @@ async function syncNow(){
 }
 
 async function backupNowServidor(){
+  if(legacySyncDisabled_()) { alert('Backup Netlify desativado no modo IndexedDB.'); return false; }
   setSS('sync','Gerando backup...');
   try{
     var res=await fetch(SYNC_URL,{
@@ -268,6 +275,7 @@ function closeSyncPanel(){
 }
 
 function startSyncLoop(){
+  if(legacySyncDisabled_()) return false;
   installSyncHooks();
   setSS('sync','Iniciando sincronização...');
   syncDown(true);
@@ -319,6 +327,7 @@ function exportarBackup(){
   }
 }
 function aplicarBackupObjeto(obj){
+  if(legacySyncDisabled_()) throw new Error('Restauracao legada via localStorage desativada no modo IndexedDB.');
   if(!obj || !obj.data) throw new Error('Arquivo de backup inválido');
   var db = normalizeDbShape(obj.data);
   localStorage.setItem('bm_clientes', JSON.stringify(db.clientes || []));
@@ -480,7 +489,7 @@ window.addEventListener('load', function(){
       }
       const result = origSet.call(DB, key, finalValue);
       if(BLIND_KEYS.indexOf(key) >= 0){
-        try{ localStorage.setItem("bm_" + key, JSON.stringify(finalValue)); }catch(e){}
+        if(!legacySyncDisabled_()) { try{ localStorage.setItem("bm_" + key, JSON.stringify(finalValue)); }catch(e){} }
       }
       return result;
     };
@@ -488,6 +497,7 @@ window.addEventListener('load', function(){
   }
 
   function blindAllData(){
+    if(legacySyncDisabled_()) return;
     BLIND_KEYS.forEach(function(key){
       let current = [];
       try{
