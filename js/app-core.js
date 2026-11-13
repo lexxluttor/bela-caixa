@@ -521,15 +521,19 @@ var DB={
   set:function(k,v){
     if(bmUsarIndexedDB_()){
       var gravacao=window.BelaIDBBridge.set(k,v);
-      gravacao.catch(function(e){
+      gravacao.then(function(){
+        if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
+          window.BelaSheetsSync.scheduleSync('indexeddb_gravado');
+        }
+      }).catch(function(e){
         console.error('Falha grave de persistencia IndexedDB em '+k,e);
         window.BELA_CAIXA_STORAGE_ERROR=e;
       });
     }else{
       localStorage.setItem('bm_'+k,JSON.stringify(v));
-    }
-    if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
-      window.BelaSheetsSync.scheduleSync();
+      if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync==='function'){
+        window.BelaSheetsSync.scheduleSync();
+      }
     }
   },
   uid:function(){return Date.now().toString(36)+Math.random().toString(36).substr(2,4);}
