@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Bela Caixa — Diagnóstico IndexedDB</title>
+<style>
+body{font:16px system-ui,sans-serif;max-width:780px;margin:28px auto;padding:18px;background:#fff8ef;color:#38131c}
+h1{color:#650817}button{padding:12px 18px;border:0;border-radius:8px;background:#650817;color:#fff;font-size:16px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#fff;padding:16px;border:1px solid #ddd;border-radius:8px}
+</style></head>
+<body>
+<h1>Diagnóstico da migração — somente leitura</h1>
+<p>Compara os 10 conjuntos de dados entre localStorage e IndexedDB neste navegador. Não altera, apaga, restaura ou sincroniza nenhum registro.</p>
+<p><strong>Atenção:</strong> uma diferença significa que a cópia está desatualizada. Não ative o IndexedDB como base principal até resolver todas as diferenças.</p>
+<button id="verificar">Verificar consistência</button>
+<pre id="saida" aria-live="polite">Aguardando verificação.</pre>
+<script src="./js/indexeddb-engine.js"></script>
+<script>
+document.getElementById('verificar').addEventListener('click',async function(){
+ const botao=this,saida=document.getElementById('saida');
+ botao.disabled=true;saida.textContent='Verificando...';
+ try{
+  const resultado=await BelaIndexedDB.verificarConsistencia();
+  saida.textContent=resultado.conjuntos.map(function(x){
+   return (x.igual?'OK':'DIFERENTE')+' — '+x.name+
+     ' | localStorage: '+(x.local===null?'ausente':x.local)+
+     ' | IndexedDB: '+(x.idb===null?'ausente':x.idb);
+  }).join('\n')+'\n\n'+(resultado.seguro?
+   'Cópia consistente neste momento. Isto não habilita vendas pelo IndexedDB.':
+   'Cópia divergente. Não habilitar a migração.');
+ }catch(e){saida.textContent='Falha na verificação: '+(e.message||String(e));}
+ finally{botao.disabled=false;}
+});
+</script></body></html>
