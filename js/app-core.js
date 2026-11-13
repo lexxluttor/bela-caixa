@@ -5116,8 +5116,7 @@ async function cancelarVenda(vid){
   if(!v){toast('⚠️ Venda não encontrada!');return;}
   if(!confirm('Cancelar venda de '+R(v.total)+' de '+v.cliNome+'?\nEsta ação não pode ser desfeita!')){return;}
 
-  // Impede exclusão enquanto o espelho transacional não estiver preparado.
-  // Mantém a venda intacta em caso de falha de gravação.
+  // Commit atômico antes de qualquer alteração no espelho local.
   try {
     if(!window.BelaIndexedDB){
       await new Promise(function(resolve,reject){
@@ -5130,15 +5129,9 @@ async function cancelarVenda(vid){
     }
     var conjuntos=['produtos','vendas','creditos','fiados','pagamentos'];
     var espelho={};
-    for(var k of conjuntos){
-      var idb=await BelaIndexedDB.read(k);
-      var local=DB.get(k)||[];
-      if(Array.isArray(idb) && JSON.stringify(idb)!==JSON.stringify(local)){
-        throw new Error('Dados divergentes em '+k+'. Cancelamento bloqueado para evitar perda de dados.');
-      }
-      espelho[k]=local;
-    }
-  }catch(e){toast('⚠️ '+e.message);return;}
+    for(var k of conjuntos)espelho[k]=DB.get(k)||[];
+    var cancelados=await BelaIndexedDB.cancelSale(vid,espelho);
+  }catch(e){toast('⚠️ Cancelamento bloqueado: '+e.message);return;}
 
   ajustarEstoqueVenda(v.itens || [], 'somar');
 
@@ -5164,14 +5157,6 @@ async function cancelarVenda(vid){
     return pvid!==String(vid);
   }));
 
-  try {
-    var atualizados={};
-    for(var k of conjuntos) atualizados[k]=DB.get(k)||[];
-    await BelaIndexedDB.writeBatch(atualizados);
-  }catch(e){
-    toast('⚠️ Cancelamento feito no caixa, mas falhou a atualização IndexedDB: '+e.message);
-    return;
-  }
 
   limparDebitosOrfaos();
 
