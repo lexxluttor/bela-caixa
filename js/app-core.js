@@ -2938,7 +2938,7 @@ function confirmarPagamento(){
   finalizarVenda();
 }
 var _finalizandoVenda=false;
-function finalizarVenda(){
+async function finalizarVenda(){
   if(_finalizandoVenda) return;
   if(!cart.length){toast('⚠️ Carrinho vazio!');return;}
   if(vForma==='fiado'&&!vCli){toast('⚠️ Selecione um cliente para crediário!');return;}
@@ -2952,17 +2952,24 @@ function finalizarVenda(){
     var venda={id:DB.uid(),data:stamp,createdAt:stamp,updatedAt:stamp,deletedAt:'',cid:vCli?vCli.id:null,cliNome:vCli?vCli.nome:'Balcão',forma:vForma,itens:itensVenda,subtotal:subtotal,desconto:desconto,total:total};
     if(vForma==='dividido') venda.pagamentos=JSON.parse(JSON.stringify(vPagamentosDivididos||[]));
 
-    ajustarEstoqueVenda(venda.itens, 'subtrair');
-
-    var vendas=DB.get('vendas')||[];
-    vendas.push(venda);
-    DB.set('vendas',vendas);
-
-    if(vForma==='fiado'&&vCli){
-      var crds=DB.get('creditos')||[];
-      crds.push({id:DB.uid(),cid:vCli.id,data:venda.data,desc:'Venda Crediário: '+itensVenda.map(function(i){return i.desc;}).join(', '),val:total,vid:venda.id});
-      DB.set('creditos',crds);
-    }
+    // IndexedDB é a gravação transacional; localStorage continua como espelho
+    // para as telas existentes e para o Google Sheets.
+    if(!window.BelaIndexedDB){throw new Error('Motor IndexedDB não carregado. Venda não realizada.');}
+    var produtosAntes=DB.get('produtos')||[];
+    var vendasAntes=DB.get('vendas')||[];
+    var creditosAntes=DB.get('creditos')||[];
+    var credito=(vForma==='fiado'&&vCli)?{id:DB.uid(),cid:vCli.id,data:venda.data,desc:'Venda Crediário: '+itensVenda.map(function(i){return i.desc;}).join(', '),val:total,vid:venda.id}:null;
+    // Atualiza a cópia somente quando não houver transação de venda pendente.
+    await BelaIndexedDB.writeBatch({produtos:produtosAntes,vendas:vendasAntes,creditos:creditosAntes});
+    await BelaIndexedDB.commitSale(venda,credito,{produtos:produtosAntes,vendas:vendasAntes,creditos:creditosAntes});
+    // Em caso de falha no espelho, mantém o carrinho e avisa o operador.
+    // A venda já estará salva no IndexedDB para recuperação.
+    var novosProdutos=await BelaIndexedDB.read('produtos');
+    var novasVendas=await BelaIndexedDB.read('vendas');
+    var novosCreditos=credito?await BelaIndexedDB.read('creditos'):null;
+    DB.set('produtos',novosProdutos);
+    DB.set('vendas',novasVendas);
+    if(credito)DB.set('creditos',novosCreditos);
 
     var cliComp=vCli, vendaComp=venda;
     var cliNome=vCli?vCli.nome:'Balcão';
@@ -3000,8 +3007,11 @@ function finalizarVenda(){
     setTimeout(function(){
       try{mostrarComp(vendaComp,cliComp,null);}catch(e){}
     },220);
+  } catch(e){
+    console.error('Falha ao finalizar venda',e);
+    toast('⚠️ Não foi possível concluir a venda: '+(e.message||e));
   } finally {
-    setTimeout(function(){ _finalizandoVenda=false; }, 250);
+    _finalizandoVenda=false;
   }
 }
 
