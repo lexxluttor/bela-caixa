@@ -1,0 +1,28 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bela Caixa — Recuperação controlada</title><style>body{font:16px system-ui;background:#faf7f5;color:#292326;max-width:760px;margin:35px auto;padding:18px}section{background:white;padding:22px;border:1px solid #ddd;border-radius:14px;margin:15px 0}button,input{padding:12px;margin:8px 0}button{background:#650817;color:white;border:0;border-radius:7px;cursor:pointer}button:disabled{background:#aaa}pre{white-space:pre-wrap;overflow-wrap:anywhere}strong{color:#650817}.warn{background:#fff3d8;padding:12px;border-radius:8px}</style></head><body><h1>Bela Caixa — Recuperação controlada</h1><p class="warn"><strong>Importante:</strong> use no mesmo Chrome do Bela Caixa. Esta página não acessa o Google Sheets e não sincroniza nada. Mantenha o backup original guardado.</p><section><h2>1. Salve o estado atual</h2><button id="export">Baixar estado atual do navegador</button><p id="exportstatus"></p></section><section><h2>2. Selecione o backup original</h2><input type="file" id="file" accept=".json,application/json"><pre id="report">Aguardando arquivo.</pre></section><section><h2>3. Restaurar com proteção</h2><p>A recuperação tentará gravar os registros completos. Se o Chrome não tiver espaço, a operação será cancelada e os dados anteriores serão repostos automaticamente.</p><label><input type="checkbox" id="confirmed"> Já baixei a cópia do estado atual e guardei o backup original.</label><p><button id="restore" disabled>Restaurar dados do backup</button></p><pre id="result"></pre></section><script>
+const keys=['bm_produtos','bm_vendas','bm_clientes','bm_pagamentos','bm_creditos','bm_comissoes','bm_entradas','bm_vendedores','bm_fechamentos_comissoes'];let backup=null,downloaded=false,busy=false;
+function snapshot(){const x={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);x[k]=localStorage.getItem(k)}return x}
+function saveFile(data,name){const b=new Blob([JSON.stringify(data)],{type:'application/json'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000)}
+function summary(v){if(typeof v!=='string')return 'ausente';if(v.startsWith('BM_LZW_1:'))return 'compactado';try{const x=JSON.parse(v);return Array.isArray(x)?x.length+' registros':'JSON'}catch(e){return 'inválido'}}
+function enable(){document.getElementById('restore').disabled=!backup||!downloaded||!document.getElementById('confirmed').checked||busy}
+document.getElementById('export').onclick=()=>{saveFile(snapshot(),'bela-caixa-estado-atual-antes-restauracao.json');downloaded=true;document.getElementById('exportstatus').textContent='Cópia gerada. Confirme que ela foi salva na pasta Downloads.';enable()};
+document.getElementById('confirmed').onchange=enable;
+document.getElementById('file').onchange=async e=>{backup=null;const f=e.target.files[0];if(!f)return;try{const obj=JSON.parse(await f.text());for(const k of keys){if(typeof obj[k]!=='string'||!Array.isArray(JSON.parse(obj[k]))||!JSON.parse(obj[k]).length)throw Error('Arquivo incompleto: '+k)}backup=obj;document.getElementById('report').textContent='Backup validado: '+f.name+'\n'+keys.map(k=>k+': '+summary(obj[k])).join('\n')+'\n\nChaves adicionais do backup: '+Object.keys(obj).length;}catch(err){document.getElementById('report').textContent='Não é possível restaurar: '+err.message}enable()};
+document.getElementById('restore').onclick=()=>{if(!backup||!downloaded||!document.getElementById('confirmed').checked||busy)return;busy=true;enable();const out=document.getElementById('result');out.textContent='Restaurando...';const before=snapshot();let success=false;try{
+  // Não alterar dados de origem nem importar metadados de sincronização antigos.
+  const excluded=new Set(['bm_last_sync','bm_last_sync_origin','bm_sync_dirty','bm_sync_local_at','bm_last_restore','bm_last_server_backup','bm_ok2']);
+  const entries=Object.entries(backup).filter(([k])=>!excluded.has(k));
+  // Remover somente chaves que serão restauradas, além de versões compactadas legadas; manter outras configurações.
+  for(const [k] of entries)localStorage.removeItem(k);
+  for(const [k,v] of entries)localStorage.setItem(k,v);
+  for(const k of keys){const raw=localStorage.getItem(k);if(raw!==backup[k])throw Error('Falha ao verificar '+k);const parsed=JSON.parse(raw);if(!Array.isArray(parsed)||!parsed.length)throw Error('Falha ao validar '+k)}
+  localStorage.setItem('bm_ok2','1');
+  localStorage.setItem('bm_sync_dirty','1');
+  success=true;
+  out.textContent='RECUPERAÇÃO LOCAL CONCLUÍDA.\n'+keys.map(k=>k+': '+summary(localStorage.getItem(k))).join('\n')+'\n\nAbra o Bela Caixa em outra aba e confira os registros. NÃO sincronize. Se ocorrer qualquer problema, use a cópia baixada do estado anterior.';
+}catch(err){
+  let rollbackError=null;
+  try{localStorage.clear();for(const [k,v] of Object.entries(before))localStorage.setItem(k,v)}catch(e){rollbackError=e}
+  out.textContent='RESTAURAÇÃO NÃO CONCLUÍDA: '+err.message+'\n'+(rollbackError?'ATENÇÃO: falha ao repor o estado anterior: '+rollbackError.message+'; mantenha a cópia baixada.':'O estado anterior do navegador foi reposto.')+'\nNão sincronize. Informe esta mensagem para preparar uma solução alternativa.';
+}finally{busy=false;enable()}
+};
+</script></body></html>
