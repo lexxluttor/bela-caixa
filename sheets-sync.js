@@ -162,11 +162,18 @@ function limparBackupsLocaisPesados_() {
 }
 
 function lerLocal(nome) {
+  // Nunca converter falha de leitura em base vazia: syncAll substitui abas inteiras.
+  const chave = "bm_" + nome;
+  const bruto = originalGetItem(chave);
+  if (bruto == null) throw new Error("Base local ausente: " + chave + ". Sincronização bloqueada para proteger o servidor.");
+  let dados;
   try {
-    return JSON.parse(localStorage.getItem("bm_" + nome) || "[]");
+    dados = JSON.parse(BMStorageCodec.decode(bruto));
   } catch (e) {
-    return [];
+    throw new Error("Falha ao ler " + chave + ". Sincronização bloqueada: " + e.message);
   }
+  if (!Array.isArray(dados)) throw new Error("Formato inválido em " + chave + ". Sincronização bloqueada.");
+  return dados;
 }
 
 function salvarLocal(nome, dados) {
@@ -552,6 +559,11 @@ async function syncNow(origem) {
       fechamentos_comissoes: lerLocal("fechamentos_comissoes").filter(function(f){ return !f.deletedAt; }).map(normalizarFechamentoComissao)
     };
 
+    // Verificação mínima antes de substituir as abas do Sheets.
+    // Não sincronizar uma base principal vazia por erro de carregamento.
+    if (!payload.vendas.length || !payload.produtos.length || !payload.clientes.length) {
+      throw new Error("Sincronização bloqueada: vendas, produtos ou clientes estão vazios.");
+    }
     const res = await post(payload);
 
     safeSetItem_("bm_last_sync", agoraISO());
@@ -831,8 +843,11 @@ function init() {
     }catch(e){console.error('Migração não concluída: '+chave,e);}
   });
 
-  // Sem registro de sincronização anterior, mantém a primeira sincronização pendente.
-  if (!localStorage.getItem("bm_last_sync")) dadosPendentesSync = true;
+  // Sem registro anterior, não enviar automaticamente uma base potencialmente incompleta.
+  // O operador pode sincronizar manualmente após conferir os dados.
+  if (!localStorage.getItem("bm_last_sync")) {
+    console.warn("Sem histórico de sincronização: envio automático inicial desativado por segurança.");
+  }
 
   iniciarSyncIntervalo();
 
