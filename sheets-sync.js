@@ -652,17 +652,14 @@ async function restoreNow() {
 
     ignorarHook = true;
 
-    salvarLocal("clientes", (dados.clientes || []).map(normalizarClienteRestauracao));
-    salvarLocal("produtos", (dados.produtos || []).map(normalizarProdutoRestauracao));
-    salvarLocal("vendas", (dados.vendas || []).map(normalizarVendaRestauracao));
-    salvarLocal("pagamentos", (dados.recebimentos || []).map(normalizarRecebimentoRestauracao));
-    salvarLocal("creditos", (dados.cobrancas || []).map(normalizarCobrancaRestauracao));
-    if (dados.vendedores) salvarLocal("vendedores", dados.vendedores || []);
-    if (dados.comissoes) salvarLocal("comissoes", dados.comissoes || []);
-    if (dados.fechamentos_comissoes) salvarLocal("fechamentos_comissoes", dados.fechamentos_comissoes || []);
-    if (dados.vendedores) salvarLocal("vendedores", dados.vendedores || []);
-    if (dados.comissoes) salvarLocal("comissoes", dados.comissoes || []);
-    if (dados.fechamentos_comissoes) salvarLocal("fechamentos_comissoes", dados.fechamentos_comissoes || []);
+    await salvarLocal("clientes", (dados.clientes || []).map(normalizarClienteRestauracao));
+    await salvarLocal("produtos", (dados.produtos || []).map(normalizarProdutoRestauracao));
+    await salvarLocal("vendas", (dados.vendas || []).map(normalizarVendaRestauracao));
+    await salvarLocal("pagamentos", (dados.recebimentos || []).map(normalizarRecebimentoRestauracao));
+    await salvarLocal("creditos", (dados.cobrancas || []).map(normalizarCobrancaRestauracao));
+    if (dados.vendedores) await salvarLocal("vendedores", dados.vendedores || []);
+    if (dados.comissoes) await salvarLocal("comissoes", dados.comissoes || []);
+    if (dados.fechamentos_comissoes) await salvarLocal("fechamentos_comissoes", dados.fechamentos_comissoes || []);
 
     ignorarHook = false;
 
@@ -742,11 +739,11 @@ async function restaurarPlanilhaPorId(id) {
 
     ignorarHook = true;
 
-    salvarLocal("clientes", (dados.clientes || []).map(normalizarClienteRestauracao));
-    salvarLocal("produtos", (dados.produtos || []).map(normalizarProdutoRestauracao));
-    salvarLocal("vendas", (dados.vendas || []).map(normalizarVendaRestauracao));
-    salvarLocal("pagamentos", (dados.recebimentos || []).map(normalizarRecebimentoRestauracao));
-    salvarLocal("creditos", (dados.cobrancas || []).map(normalizarCobrancaRestauracao));
+    await salvarLocal("clientes", (dados.clientes || []).map(normalizarClienteRestauracao));
+    await salvarLocal("produtos", (dados.produtos || []).map(normalizarProdutoRestauracao));
+    await salvarLocal("vendas", (dados.vendas || []).map(normalizarVendaRestauracao));
+    await salvarLocal("pagamentos", (dados.recebimentos || []).map(normalizarRecebimentoRestauracao));
+    await salvarLocal("creditos", (dados.cobrancas || []).map(normalizarCobrancaRestauracao));
 
     ignorarHook = false;
 
