@@ -898,6 +898,10 @@ function salvarDeletedStore(nome, lista){
   localStorage.setItem('bm_deleted_'+nome, JSON.stringify(lista||[]));
 }
 function registrarDeletedStore(nome, item){
+  // No modo IndexedDB, o syncAll envia as colecoes atuais completas.
+  // Nao gravar tombstones legados no localStorage: pode estar sem espaco
+  // e impedir o cancelamento de vendas depois da devolucao do estoque.
+  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb') return;
   if(!item || !item.id) return;
   var agora = new Date().toISOString();
   var tomb = Object.assign({}, item, {
