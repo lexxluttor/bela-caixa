@@ -5157,18 +5157,26 @@ function cancelarVenda(vid){
     return pvid!==String(vid);
   }));
 
-  limparDebitosOrfaos();
-
+  // As listas relacionadas ja foram filtradas acima. Evita uma segunda
+  // gravacao integral de creditos/fiados/pagamentos no mesmo cancelamento.
+  // IndexedDB recebe as gravacoes em fila; Sheets Sync ocorre em segundo plano.
   fMd('mo-vdet');
-  try{renderProds();}catch(e){}
-  try{renderPGrid();}catch(e){}
-  try{renderCaixa();}catch(e){}
-  try{renderCrediario();}catch(e){}
-  try{renderRecebPainel();}catch(e){}
-  try{renderCobranca();}catch(e){}
-  try{renderVendas();}catch(e){}
-  try{renderDash();}catch(e){}
-  toast('🚫 Venda cancelada!','ok');
+  toast('🚫 Venda cancelada! Atualizando telas...','ok');
+
+  // Atualiza primeiro o historico visivel e libera a interface.
+  setTimeout(function(){
+    try{renderVendas();}catch(e){console.warn('renderVendas',e);}
+    try{renderCaixa();}catch(e){console.warn('renderCaixa',e);}
+    // Telas pesadas ficam para o proximo ciclo, sem atrasar o cancelamento.
+    setTimeout(function(){
+      try{renderProds();}catch(e){}
+      try{renderPGrid();}catch(e){}
+      try{renderCrediario();}catch(e){}
+      try{renderRecebPainel();}catch(e){}
+      try{renderCobranca();}catch(e){}
+      try{renderDash();}catch(e){}
+    }, 80);
+  }, 0);
 }
 
 function printVdet(){
