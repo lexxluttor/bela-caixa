@@ -1556,7 +1556,90 @@ function renderProdsDebounced(){
   clearTimeout(_timerRenderProds);
   _timerRenderProds=setTimeout(renderProds, 180);
 }
+
+/* Bela Modas: prévia de agrupamento, somente leitura.
+   Não gera IDs nem altera produtos, vendas ou estoque. */
+function bmPreviaAgrupamentoCatalogo(){
+  var produtos=DB.get('produtos')||[];
+  var grupos=new Map();
+  function normalizar(s){
+    return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+  }
+  function identificar(p){
+    var nome=String(p.nome||'').trim();
+    var descricao=String(p.desc2||'').trim();
+    var padrao=/(?:^|[\s/—,-])(?:TAM(?:ANHO)?\s*[:.-]?\s*)?(\d{2,3}|PP|P|M|G|GG|XG|XGG|G[1-4])\s*$/i;
+    var achado=nome.match(padrao);
+    if(!achado) achado=descricao.match(/(?:^|[\s/—,-])TAM(?:ANHO)?\s*[:.-]?\s*(\d{2,3}|PP|P|M|G|GG|XG|XGG|G[1-4])(?:\s|$)/i);
+    if(!achado) return null;
+    var tamanho=normalizar(achado[1]);
+    var modelo=normalizar(nome.replace(padrao,'').replace(/[\s/—,-]+$/,''));
+    if(!modelo || !tamanho) return null;
+    return {modelo:modelo,tamanho:tamanho};
+  }
+  produtos.forEach(function(p){
+    if(!p || !p.id || String(p.id_catalogo||'').trim()) return;
+    var dado=identificar(p);
+    if(!dado) return;
+    var chave=dado.modelo;
+    if(!grupos.has(chave)) grupos.set(chave,[]);
+    grupos.get(chave).push({id:String(p.id),nome:String(p.nome||''),tamanho:dado.tamanho,estoque:estoqueProdBM(p)});
+  });
+  var candidatos=Array.from(grupos.entries()).filter(function(entry){
+    var itens=entry[1];
+    return itens.length>1 && new Set(itens.map(function(i){return i.tamanho;})).size===itens.length;
+  });
+  candidatos.sort(function(a,b){return b[1].length-a[1].length;});
+  var anterior=document.getElementById('bm-previa-catalogo');
+  if(anterior) anterior.remove();
+  var fundo=document.createElement('div');
+  fundo.id='bm-previa-catalogo';
+  fundo.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:12px';
+  var painel=document.createElement('div');
+  painel.style.cssText='background:var(--s1,#fff);color:var(--txt,#222);border-radius:12px;padding:18px;max-width:750px;width:100%;max-height:85vh;overflow:auto';
+  var titulo=document.createElement('h3');
+  titulo.textContent='Prévia de agrupamentos para o catálogo (somente leitura)';
+  painel.appendChild(titulo);
+  var info=document.createElement('p');
+  info.textContent=candidatos.length+' possíveis grupos encontrados. Nenhum identificador será criado ou salvo nesta tela.';
+  painel.appendChild(info);
+  candidatos.slice(0,60).forEach(function(entry){
+    var bloco=document.createElement('div');
+    bloco.style.cssText='border-top:1px solid #8885;padding:10px 0';
+    var cab=document.createElement('strong');
+    cab.textContent=entry[0]+' ('+entry[1].length+' tamanhos)';
+    bloco.appendChild(cab);
+    entry[1].forEach(function(i){
+      var linha=document.createElement('div');
+      linha.style.cssText='font-size:13px;margin-top:4px';
+      linha.textContent=i.nome+' | tamanho '+i.tamanho+' | estoque '+i.estoque;
+      bloco.appendChild(linha);
+    });
+    painel.appendChild(bloco);
+  });
+  var aviso=document.createElement('p');
+  aviso.textContent='Revise modelo e cor: nomes semelhantes podem representar produtos diferentes. A atribuição dos IDs será uma etapa separada, com confirmação.';
+  painel.appendChild(aviso);
+  var fechar=document.createElement('button');
+  fechar.type='button';fechar.textContent='Fechar prévia';
+  fechar.onclick=function(){fundo.remove();};
+  painel.appendChild(fechar);fundo.appendChild(painel);
+  fundo.addEventListener('click',function(e){if(e.target===fundo)fundo.remove();});
+  document.body.appendChild(fundo);
+}
+function bmInstalarBotaoCatalogo(){
+  var busca=document.getElementById('p-sc');
+  if(!busca || document.getElementById('bm-botao-previa-catalogo'))return;
+  var botao=document.createElement('button');
+  botao.id='bm-botao-previa-catalogo';botao.type='button';
+  botao.textContent='Prévia grupos catálogo';
+  botao.style.cssText='margin:6px;padding:8px 12px;border-radius:8px;cursor:pointer';
+  botao.onclick=bmPreviaAgrupamentoCatalogo;
+  busca.insertAdjacentElement('afterend',botao);
+}
+
 function renderProds(){
+  bmInstalarBotaoCatalogo();
   if(!_estoquesNormalizadosUmaVez){
     normalizarEstoquesProdutosBM();
     _estoquesNormalizadosUmaVez=true;
