@@ -1628,14 +1628,32 @@ function bmPreviaAgrupamentoCatalogo(){
   document.body.appendChild(fundo);
 }
 function bmInstalarBotaoCatalogo(){
+  if(document.getElementById('bm-botao-previa-catalogo'))return;
   var busca=document.getElementById('p-sc');
-  if(!busca || document.getElementById('bm-botao-previa-catalogo'))return;
+  if(!busca)return;
+  var candidatos=Array.from(document.querySelectorAll('button'));
+  var unificar=candidatos.find(function(el){
+    return /unificar selecionados/i.test(el.textContent||'');
+  });
+  var faixa=document.createElement('div');
+  faixa.id='bm-faixa-previa-catalogo';
+  faixa.style.cssText='display:flex;justify-content:flex-end;padding:10px 12px;clear:both;width:100%;box-sizing:border-box';
   var botao=document.createElement('button');
   botao.id='bm-botao-previa-catalogo';botao.type='button';
-  botao.textContent='Prévia grupos catálogo';
-  botao.style.cssText='margin:6px;padding:8px 12px;border-radius:8px;cursor:pointer';
+  botao.textContent='🔎 Prévia grupos catálogo';
+  botao.style.cssText='display:inline-block!important;visibility:visible!important;opacity:1!important;background:#287eb8;color:white;border:0;padding:12px 18px;border-radius:9px;font-weight:700;cursor:pointer;min-height:42px';
   botao.onclick=bmPreviaAgrupamentoCatalogo;
-  busca.insertAdjacentElement('afterend',botao);
+  faixa.appendChild(botao);
+  if(unificar){
+    var barra=unificar.closest('div');
+    var nivel=barra && barra.parentElement;
+    if(nivel && nivel !== document.body){
+      nivel.insertAdjacentElement('afterend',faixa);
+      return;
+    }
+  }
+  var linhaBusca=busca.parentElement;
+  if(linhaBusca)linhaBusca.insertAdjacentElement('afterend',faixa);
 }
 
 function renderProds(){
