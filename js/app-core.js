@@ -5692,3 +5692,77 @@ document.addEventListener('change', function(e){
     atualizarNCMAutomatico();
   }
 });
+
+/* BM CONSULTA ID CATALOGO POR CODIGO DE BARRAS */
+(function(){
+  function iniciar(){
+    if(document.getElementById('pg-consulta-catalogo'))return;
+    var navProdutos=Array.from(document.querySelectorAll('.nv')).find(function(n){return /Produtos/.test(n.textContent||'') && /ir\('produtos'\)/.test(n.getAttribute('onclick')||'');});
+    var main=document.getElementById('main');
+    if(!navProdutos || !main)return;
+    var nav=document.createElement('div');
+    nav.className='nv';nav.textContent='🔎 Consultar ID do catálogo';
+    nav.setAttribute('role','button');nav.tabIndex=0;
+    nav.onclick=function(){window.bmAbrirConsultaCatalogo();};
+    nav.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();nav.click();}};
+    navProdutos.insertAdjacentElement('afterend',nav);
+    var pg=document.createElement('div');pg.className='pg';pg.id='pg-consulta-catalogo';
+    pg.innerHTML='<div class="ph"><div class="ph-t">🔎 Consulta de ID do catálogo</div><span class="tm">Consulta somente leitura</span></div>'+
+      '<div class="pb"><div class="card" style="max-width:850px"><div class="ct">Leia o código de barras do produto</div>'+
+      '<p class="tm">Use o leitor de código de barras (com Enter automático) ou digite o código e pressione Consultar.</p>'+
+      '<div class="fr" style="gap:10px;flex-wrap:wrap"><input id="bm-consulta-codigo" class="fi" type="text" inputmode="text" autocomplete="off" placeholder="Código de barras / EAN / referência" style="flex:1;min-width:200px;max-width:430px">'+
+      '<button id="bm-consulta-buscar" class="btn bb" type="button">🔎 Consultar</button><button id="bm-consulta-limpar" class="btn bh" type="button">Limpar</button></div>'+
+      '<div id="bm-consulta-resultado" aria-live="polite" style="margin-top:18px"></div></div></div>';
+    main.appendChild(pg);
+    var input=pg.querySelector('#bm-consulta-codigo');
+    pg.querySelector('#bm-consulta-buscar').onclick=function(){window.bmConsultarIdCatalogo();};
+    pg.querySelector('#bm-consulta-limpar').onclick=function(){input.value='';pg.querySelector('#bm-consulta-resultado').replaceChildren();input.focus();};
+    input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();window.bmConsultarIdCatalogo();}});
+    window.bmAbrirConsultaCatalogo=function(){
+      if(typeof ir==='function')ir('consulta-catalogo');
+      else {document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});pg.classList.add('on');}
+      document.querySelectorAll('.nv').forEach(function(n){n.classList.remove('on');});
+      nav.classList.add('on');
+      input.value='';pg.querySelector('#bm-consulta-resultado').replaceChildren();
+      setTimeout(function(){input.focus();},50);
+    };
+    window.bmConsultarIdCatalogo=function(){
+      var codigo=input.value.trim();
+      var resultado=pg.querySelector('#bm-consulta-resultado');
+      resultado.replaceChildren();
+      if(!codigo){resultado.textContent='Leia ou informe um código para consultar.';input.focus();return;}
+      var lista=(typeof DB!=='undefined'&&DB.get('produtos'))||[];
+      function codigos(p){
+        var valores=[p.ean,p.cod,p.codigo,p.codigos_barras,p.codigosBarras,p.codigo_barras,p.gtin];
+        var arr=[];
+        valores.forEach(function(v){
+          if(Array.isArray(v)){v.forEach(function(x){arr.push(String(x||'').trim());});}
+          else if(v!=null){String(v).split(/[;,\n\r|]+/).forEach(function(x){arr.push(x.trim());});}
+        });
+        return arr.filter(Boolean);
+      }
+      var encontrados=lista.filter(function(p){return p&&codigos(p).some(function(v){return v.toLowerCase()===codigo.toLowerCase();});});
+      var titulo=document.createElement('div');titulo.className='ct';
+      titulo.textContent=encontrados.length?encontrados.length+' produto(s) encontrado(s)':'Produto não encontrado';
+      resultado.appendChild(titulo);
+      if(!encontrados.length){var aviso=document.createElement('p');aviso.textContent='Nenhum produto cadastrado com o código '+codigo+'. Confira o código de barras ou a referência.';resultado.appendChild(aviso);}
+      encontrados.forEach(function(p){
+        var card=document.createElement('div');card.className='card';card.style.cssText='margin-top:10px;padding:14px;border:1px solid #8885';
+        function campo(rotulo,valor,realce){
+          var linha=document.createElement('div');linha.style.cssText='margin:7px 0;overflow-wrap:anywhere';
+          var b=document.createElement('strong');b.textContent=rotulo+': ';linha.appendChild(b);
+          var span=document.createElement('span');span.textContent=String(valor==null?'—':valor);
+          if(realce)span.style.cssText='font-weight:800;font-size:19px;color:var(--gold,#a16b12)';
+          linha.appendChild(span);card.appendChild(linha);
+        }
+        campo('Produto',p.nome||'—');campo('Referência',p.cod||p.codigo||'—');
+        campo('EAN',p.ean||'—');campo('ID do catálogo',p.id_catalogo||'NÃO CADASTRADO',true);
+        campo('Estoque',typeof estoqueProdBM==='function'?estoqueProdBM(p):(p.estq||0));
+        resultado.appendChild(card);
+      });
+      input.select();input.focus();
+    };
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',iniciar);
+  else iniciar();
+})();
