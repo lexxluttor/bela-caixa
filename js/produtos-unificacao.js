@@ -128,11 +128,6 @@
     bar.className='bmu-toolbar';
     bar.innerHTML='<div class="bmu-toolbar-left">🔗 Unificação de produtos <span class="bmu-count" id="bmu-count">0 selecionado(s)</span><span class="tm">Marque produtos parecidos e unifique em um principal.</span></div><button class="bmu-btn" id="bmu-open" type="button" disabled onclick="BMUnificacaoProdutos.abrirModal()">🔗 Unificar selecionados</button>';
     wrap.parentElement.insertBefore(bar, wrap);
-    // renderProds é substituído por este módulo; instalar o botão
-    // depois da barra de unificação, na área visível da lista.
-    if(typeof window.bmInstalarBotaoCatalogo === 'function'){
-      window.bmInstalarBotaoCatalogo();
-    }
   }
 
   function atualizarToolbar(){
