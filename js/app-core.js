@@ -1601,24 +1601,42 @@ function bmPreviaAgrupamentoCatalogo(){
   titulo.textContent='Prévia de agrupamentos para o catálogo (somente leitura)';
   painel.appendChild(titulo);
   var info=document.createElement('p');
-  info.textContent=candidatos.length+' possíveis grupos encontrados. Nenhum identificador será criado ou salvo nesta tela.';
+  info.textContent=candidatos.length+' possíveis grupos encontrados. Você pode remover itens sugeridos antes de confirmar em uma etapa futura. Nenhum identificador será criado ou salvo nesta tela.';
   painel.appendChild(info);
   candidatos.slice(0,60).forEach(function(entry){
+    var itensAtivos=entry[1].slice();
     var bloco=document.createElement('div');
     bloco.style.cssText='border-top:1px solid #8885;padding:10px 0';
     var cab=document.createElement('strong');
-    cab.textContent=entry[0]+' ('+entry[1].length+' tamanhos)';
+    function atualizarCabecalho(){cab.textContent=entry[0]+' ('+itensAtivos.length+' tamanhos selecionados)';}
+    atualizarCabecalho();
     bloco.appendChild(cab);
     entry[1].forEach(function(i){
       var linha=document.createElement('div');
       linha.style.cssText='font-size:13px;margin-top:4px';
-      linha.textContent=i.nome+' | tamanho '+i.tamanho+' | estoque '+i.estoque;
+      linha.style.cssText+=';display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap';
+      var descricao=document.createElement('span');
+      descricao.textContent=i.nome+' | tamanho '+i.tamanho+' | estoque '+i.estoque;
+      linha.appendChild(descricao);
+      var remover=document.createElement('button');
+      remover.type='button';remover.textContent='Remover do grupo';
+      remover.style.cssText='padding:5px 9px;border:1px solid #888;border-radius:6px;cursor:pointer';
+      remover.onclick=function(){
+        itensAtivos=itensAtivos.filter(function(item){return item.id!==i.id;});
+        linha.remove();atualizarCabecalho();
+        if(itensAtivos.length<2){
+          var alerta=bloco.querySelector('[data-bm-grupo-aviso]');
+          if(!alerta){alerta=document.createElement('p');alerta.setAttribute('data-bm-grupo-aviso','');bloco.appendChild(alerta);}
+          alerta.textContent='Grupo com menos de 2 produtos: não poderá ser confirmado.';
+        }
+      };
+      linha.appendChild(remover);
       bloco.appendChild(linha);
     });
     painel.appendChild(bloco);
   });
   var aviso=document.createElement('p');
-  aviso.textContent='Revise modelo e cor: nomes semelhantes podem representar produtos diferentes. A atribuição dos IDs será uma etapa separada, com confirmação.';
+  aviso.textContent='Revise modelo e cor: nomes semelhantes podem representar produtos diferentes. Remover aqui apenas ajusta a prévia, sem excluir produtos. A atribuição dos IDs será uma etapa separada, com confirmação.';
   painel.appendChild(aviso);
   var fechar=document.createElement('button');
   fechar.type='button';fechar.textContent='Fechar prévia';
