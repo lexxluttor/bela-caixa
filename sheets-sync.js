@@ -266,6 +266,7 @@ function normalizarProduto(p) {
   const estoque = numeroSeguro(p.estoque ?? p.estq);
 
   return {
+    id_catalogo: String(p.id_catalogo == null ? "" : p.id_catalogo).trim(),
     id: p.id,
     cod: p.cod || "",
     nome: p.nome || "",
@@ -433,6 +434,7 @@ function normalizarProdutoRestauracao(p) {
   const estoque = numeroSeguro(p.estoque ?? p.estq);
 
   return {
+    id_catalogo: String(p.id_catalogo == null ? "" : p.id_catalogo).trim(),
     id: p.id || "",
     cod: p.cod || "",
     nome: p.nome || "",
