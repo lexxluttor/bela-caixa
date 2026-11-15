@@ -1598,10 +1598,10 @@ function bmPreviaAgrupamentoCatalogo(){
   var painel=document.createElement('div');
   painel.style.cssText='background:var(--s1,#fff);color:var(--txt,#222);border-radius:12px;padding:18px;max-width:750px;width:100%;max-height:85vh;overflow:auto';
   var titulo=document.createElement('h3');
-  titulo.textContent='Prévia de agrupamentos para o catálogo (somente leitura)';
+  titulo.textContent='Agrupamentos para o catálogo — revisão e confirmação';
   painel.appendChild(titulo);
   var info=document.createElement('p');
-  info.textContent=candidatos.length+' possíveis grupos encontrados. Você pode remover itens sugeridos antes de confirmar em uma etapa futura. Nenhum identificador será criado ou salvo nesta tela.';
+  info.textContent=candidatos.length+' possíveis grupos encontrados. Revise cada grupo, remova itens incorretos e informe um código-base de 4 letras/números. Somente o grupo confirmado será gravado.';
   painel.appendChild(info);
   candidatos.slice(0,60).forEach(function(entry){
     var itensAtivos=entry[1].slice();
@@ -1633,10 +1633,61 @@ function bmPreviaAgrupamentoCatalogo(){
       linha.appendChild(remover);
       bloco.appendChild(linha);
     });
+    var controles=document.createElement('div');
+    controles.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px';
+    var entrada=document.createElement('input');
+    entrada.type='text';entrada.maxLength=4;entrada.placeholder='Ex.: 5g44';
+    entrada.setAttribute('aria-label','Código-base do grupo');
+    entrada.style.cssText='width:115px;padding:9px;border:1px solid #888;border-radius:6px';
+    var confirmar=document.createElement('button');
+    confirmar.type='button';confirmar.textContent='Confirmar este grupo';
+    confirmar.style.cssText='padding:9px 12px;background:#287eb8;color:white;border:0;border-radius:7px;cursor:pointer';
+    var status=document.createElement('span');
+    status.style.cssText='font-size:12px;flex-basis:100%';
+    confirmar.onclick=function(){
+      if(itensAtivos.length<2){status.textContent='É necessário manter pelo menos 2 produtos.';return;}
+      var base=entrada.value.trim().toLowerCase();
+      if(!/^[a-z0-9]{4}$/.test(base)){status.textContent='Informe exatamente 4 letras ou números.';return;}
+      var lista=DB.get('produtos')||[];
+      var selecionados=new Set(itensAtivos.map(function(i){return i.id;}));
+      var atualizados=0,erro='';
+      var idsNovos=new Set(itensAtivos.map(function(i){return base+'-'+i.tamanho;}));
+      if(idsNovos.size!==itensAtivos.length){status.textContent='Há tamanhos repetidos no grupo.';return;}
+      var existentes=new Map(lista.map(function(p){return [String(p.id),p];}));
+      itensAtivos.forEach(function(i){
+        var p=existentes.get(i.id);
+        if(!p)erro='Um produto não existe mais. Reabra a prévia.';
+        else if(String(p.id_catalogo||'').trim())erro='Um produto já possui id_catalogo. Reabra a prévia.';
+      });
+      lista.forEach(function(p){
+        var id=String(p.id_catalogo||'').trim().toLowerCase();
+        if(id && (idsNovos.has(id) || id===base || id.indexOf(base+'-')===0))
+          erro='O código-base já está em uso por outro produto.';
+      });
+      if(erro){status.textContent=erro;return;}
+      var resumo=itensAtivos.map(function(i){return i.nome+' → '+base+'-'+i.tamanho;}).join('\\n');
+      if(!window.confirm('Confirmar identificação destes '+itensAtivos.length+' produtos?\\n\\n'+resumo+'\\n\\nOs cadastros e estoques não serão unificados.'))return;
+      lista.forEach(function(p){
+        var i=itensAtivos.find(function(item){return item.id===String(p.id);});
+        if(i){p.id_catalogo=base+'-'+i.tamanho;atualizados++;}
+      });
+      if(atualizados!==itensAtivos.length){status.textContent='Produtos mudaram; nenhuma alteração gravada.';return;}
+      try{
+        DB.set('produtos',lista);
+        status.textContent='Grupo confirmado: '+atualizados+' produtos identificados. Sincronize com a planilha.';
+        confirmar.disabled=true;entrada.disabled=true;
+        bloco.querySelectorAll('button').forEach(function(btn){btn.disabled=true;});
+        if(typeof renderProds==='function')renderProds();
+      }catch(e){
+        status.textContent='Erro ao salvar: '+(e&&e.message||e);
+      }
+    };
+    controles.appendChild(entrada);controles.appendChild(confirmar);controles.appendChild(status);
+    bloco.appendChild(controles);
     painel.appendChild(bloco);
   });
   var aviso=document.createElement('p');
-  aviso.textContent='Revise modelo e cor: nomes semelhantes podem representar produtos diferentes. Remover aqui apenas ajusta a prévia, sem excluir produtos. A atribuição dos IDs será uma etapa separada, com confirmação.';
+  aviso.textContent='Revise modelo e cor: nomes semelhantes podem representar produtos diferentes. Remover aqui apenas ajusta o grupo, sem excluir produtos. Cada grupo exige confirmação antes de gravar os IDs.';
   painel.appendChild(aviso);
   var fechar=document.createElement('button');
   fechar.type='button';fechar.textContent='Fechar prévia';
