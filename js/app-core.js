@@ -2569,10 +2569,39 @@ function alterarPrecoVendaXML(idx, valor){
   importacaoXMLAtual.itens[idx].precoVenda = isFinite(n) ? n : 0;
 }
 
-function confirmarImportacaoXML(){
+var importacaoXMLEmAndamento=false;
+async function confirmarImportacaoXML(){
+  if(importacaoXMLEmAndamento) return;
+  importacaoXMLEmAndamento=true;
+  try {
   if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens.length){
     toast('⚠️ Carregue um XML primeiro!','warn');
     return;
+  }
+  var modoIDB = window.BELA_CAIXA_STORAGE_MODE === 'indexeddb';
+  var chaveNota = [
+    somenteDigitosFiscalBM(importacaoXMLAtual.cnpj || ''),
+    String(importacaoXMLAtual.serie || '').trim(),
+    String(importacaoXMLAtual.numero || '').trim()
+  ].join(':');
+  var entradasXML = null;
+  if(modoIDB){
+    if(!window.BelaIndexedDB || !window.BelaIDBBridge || !window.BelaIDBBridge.status().ready)
+      throw new Error('IndexedDB indisponivel. Nenhum estoque foi alterado.');
+    entradasXML = await window.BelaIndexedDB.get('bm_entradas_xml');
+    if(entradasXML === undefined) entradasXML = [];
+    if(!Array.isArray(entradasXML)) throw new Error('Registro de entradas XML invalido.');
+    if(!chaveNota.split(':').every(Boolean)) throw new Error('Nota sem identificacao completa (emitente, serie e numero).');
+    if(entradasXML.some(function(e){return e && e.chaveNota === chaveNota;})){
+      toast('⚠️ Esta nota ja foi registrada ou possui uma importacao pendente. Estoque nao alterado.','warn');
+      return;
+    }
+    // A NF 705861 foi importada quatro vezes antes da criacao do registro de entradas.
+    // Impedir uma quinta importacao ate que o estoque seja conciliado.
+    if(String(importacaoXMLAtual.numero).trim() === '705861' && String(importacaoXMLAtual.serie).trim() === '4'){
+      toast('⚠️ NF 705861 ja importada anteriormente. Conferir estoque antes de repetir.','warn');
+      return;
+    }
   }
   var produtos = DB.get('produtos') || [];
   var agora = nowLocalISO();
@@ -2651,11 +2680,9 @@ function confirmarImportacaoXML(){
     }
   });
 
-  DB.set('produtos', produtos);
-
-  var entradas = DB.get('entradas') || [];
-  entradas.push({
+  var registroEntrada = {
     id: DB.uid(),
+    chaveNota: chaveNota,
     fornecedor: importacaoXMLAtual.fornecedor,
     cnpj: importacaoXMLAtual.cnpj,
     destinatarioCnpj: importacaoXMLAtual.destinatarioCnpj || '',
@@ -2664,14 +2691,37 @@ function confirmarImportacaoXML(){
     emissao: importacaoXMLAtual.emissao,
     itens: importacaoXMLAtual.itens,
     createdAt: agora
-  });
-  DB.set('entradas', entradas);
+  };
+  if(modoIDB){
+    // Registrar a intencao ANTES de gravar estoque; se ocorrer falha,
+    // uma nova tentativa fica bloqueada para evitar duplicidade.
+    registroEntrada.status='pendente';
+    entradasXML.push(registroEntrada);
+    await window.BelaIndexedDB.set('bm_entradas_xml', entradasXML);
+    await window.BelaIDBBridge.set('produtos', produtos);
+    await window.BelaIDBBridge.flush();
+    registroEntrada.status='concluida';
+    await window.BelaIndexedDB.set('bm_entradas_xml', entradasXML);
+    if(window.BelaSheetsSync && typeof window.BelaSheetsSync.scheduleSync === 'function')
+      window.BelaSheetsSync.scheduleSync('xml_importado');
+  }else{
+    var entradas = DB.get('entradas') || [];
+    entradas.push(registroEntrada);
+    DB.set('entradas', entradas);
+    DB.set('produtos', produtos);
+  }
 
   renderProds();
   renderPGrid();
   fMd('mo-importa-xml');
   limparImportacaoXML();
   toast('✅ Entrada da nota importada!','ok');
+  }catch(erro){
+    console.error('Falha na importacao XML; confira o registro antes de tentar novamente:',erro);
+    toast('❌ Nao foi possivel concluir a entrada. Nao repita a nota sem conferir o estoque.','erro');
+  }finally{
+    importacaoXMLEmAndamento=false;
+  }
 }
 
 function selF(btn,f){document.querySelectorAll('.bf').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');vForma=f;}
