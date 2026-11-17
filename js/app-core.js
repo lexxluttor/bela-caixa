@@ -2596,12 +2596,7 @@ async function confirmarImportacaoXML(){
       toast('⚠️ Esta nota ja foi registrada ou possui uma importacao pendente. Estoque nao alterado.','warn');
       return;
     }
-    // A NF 705861 foi importada quatro vezes antes da criacao do registro de entradas.
-    // Impedir uma quinta importacao ate que o estoque seja conciliado.
-    if(String(importacaoXMLAtual.numero).trim() === '705861' && String(importacaoXMLAtual.serie).trim() === '4'){
-      toast('⚠️ NF 705861 ja importada anteriormente. Conferir estoque antes de repetir.','warn');
-      return;
-    }
+
   }
   var produtos = DB.get('produtos') || [];
   var agora = nowLocalISO();
