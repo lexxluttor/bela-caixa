@@ -2398,6 +2398,44 @@ function normalizarCodigosBarrasXML(valor){
     return chave && invalidos.indexOf(chave)<0;
   }).join(',');
 }
+// Identificador do catalogo: base alfanumerica de 4 caracteres por modelo/cor,
+// com sufixo de tamanho. Nao modifica identificadores ja existentes.
+function gerarIdsCatalogoXML(itens, produtos){
+  var ocupados=Object.create(null), porGrupo=Object.create(null);
+  (produtos||[]).forEach(function(p){
+    var id=String(p.id_catalogo||'').trim();
+    if(!id)return;
+    var base=id.split('-')[0].toLowerCase();
+    if(base.length===4) ocupados[base]=true;
+    if(p.xml_modelo_base && p.xml_cor_catalogo){
+      var chave=String(p.xml_modelo_base).trim().toLowerCase()+'|'+String(p.xml_cor_catalogo).trim().toLowerCase();
+      if(base.length===4 && !porGrupo[chave])porGrupo[chave]=base;
+    }
+  });
+  function hash4(chave,sal){
+    var h=2166136261;
+    var str=chave+'|'+sal;
+    for(var i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),16777619);}
+    return (h>>>0).toString(36).padStart(4,'0').slice(-4);
+  }
+  (itens||[]).forEach(function(it){
+    var existente=buscarProdutoImportacaoXML(it,produtos);
+    if(existente && existente.id_catalogo){it.id_catalogo=existente.id_catalogo;return;}
+    var modelo=String(it.nomeBase||it.nome||'').trim().toLowerCase();
+    var cor=String(it.corXML||'').trim().toLowerCase();
+    var tamanho=String(it.tamanhoXML||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    // Sem modelo identificado, nao presumir que dois produtos sao iguais.
+    var chave=(modelo||String(it.cod||''))+'|'+cor;
+    if(!porGrupo[chave]){
+      for(var tentativa=0;tentativa<10000;tentativa++){
+        var base=hash4(chave,tentativa);
+        if(!ocupados[base]){ocupados[base]=true;porGrupo[chave]=base;break;}
+      }
+      if(!porGrupo[chave])throw new Error('Nao foi possivel gerar id_catalogo unico.');
+    }
+    it.id_catalogo=porGrupo[chave]+(tamanho?'-'+tamanho:'');
+  });
+}
 function buscarProdutoImportacaoXML(item, produtos){
   produtos=produtos || (DB.get('produtos')||[]);
   var cod=String(item && item.cod || '').trim();
@@ -2464,6 +2502,8 @@ function lerArquivoXML(ev){
           cod: cod || ('REF'+Math.random().toString(36).slice(2,7).toUpperCase()),
           nome: nome.trim(),
           nomeBase:nomeBase,
+          corXML:info.cor || '',
+          tamanhoXML:info.tam || '',
           ean: ean,
           eanInformadoXML: Boolean(ean),
           ncm: ncm || NCM_POR_CATEGORIA[subcat] || '',
@@ -2599,6 +2639,7 @@ async function confirmarImportacaoXML(){
 
   }
   var produtos = DB.get('produtos') || [];
+  gerarIdsCatalogoXML(importacaoXMLAtual.itens, produtos);
   var agora = nowLocalISO();
   var destinatarioCnpj = somenteDigitosFiscalBM(importacaoXMLAtual.destinatarioCnpj || '');
   var origemFiscalStatusXML = classificarOrigemFiscalProdutoApp({origem_estoque:'xml_nfe', xml_destinatario_cnpj:destinatarioCnpj});
@@ -2611,6 +2652,7 @@ async function confirmarImportacaoXML(){
     if(idx >= 0){
       var p = produtos[idx];
       p.estq = Number(p.estq||0) + Number(it.qtd||0);
+      if(!p.id_catalogo) p.id_catalogo=it.id_catalogo;
       if(it.custo) p.custo = it.custo;
       if(it.ncm){ p.ncm = it.ncm; p.ncm_origem = it.ncm_origem || 'xml_entrada'; p.origem_ncm = p.ncm_origem; }
       if(it.ean){ var listaMerge=extrairCodigosBarras((p.ean||'')+','+it.ean); p.ean = listaMerge.join(','); }
@@ -2643,6 +2685,9 @@ async function confirmarImportacaoXML(){
         id: DB.uid(),
         cod: it.cod,
         nome: it.nome,
+        id_catalogo:it.id_catalogo,
+        xml_modelo_base:it.nomeBase || it.nome,
+        xml_cor_catalogo:it.corXML || '',
         grupo: it.grupo || categoriaPrincipalPorSubcategoria(it.subcategoria || it.subcat || it.cat || '') || 'OUTROS',
         cat: it.subcategoria || it.subcat || it.cat || 'Outros',
         subcat: it.subcategoria || it.subcat || it.cat || 'Outros',
