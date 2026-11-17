@@ -628,30 +628,6 @@ function somaVendasPorForma(vendas){
 }
 function ajustarEstoqueVenda(itens, modo){
   modo = (modo === 'somar') ? 'somar' : 'subtrair';
-  // Impede clique duplo e importacoes repetidas antes de alterar o estoque.
-  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
-    if(!window.BelaIndexedDB || !window.BelaIDBBridge || !window.BelaIDBBridge.status().ready){
-      toast('❌ IndexedDB indisponível. Entrada não iniciada!','warn'); return;
-    }
-  }
-  var notaImportada=importacaoXMLAtual;
-  var chaveNota=chaveNotaImportadaBM(notaImportada);
-  if(!notaImportada.numero || !notaImportada.cnpj){
-    toast('⚠️ Nota sem número ou emitente. Entrada bloqueada para evitar duplicidade.','warn'); return;
-  }
-  importacaoXMLGravando=true;
-  var entradaGravada=false;
-  try{
-    var registroEntradas=[];
-    if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
-      registroEntradas=await window.BelaIndexedDB.get('bm_entradas_xml') || [];
-    }else{
-      registroEntradas=JSON.parse(localStorage.getItem('bm_entradas_xml')||'[]');
-    }
-    if(!Array.isArray(registroEntradas)) throw new Error('Registro de notas invalido');
-    if(registroEntradas.some(function(e){return e.chave===chaveNota;})){
-      toast('⚠️ Esta nota já foi importada. Estoque não alterado!','warn'); return;
-    }
   var produtos = DB.get('produtos') || [];
   var alterou = false;
 
@@ -1580,177 +1556,7 @@ function renderProdsDebounced(){
   clearTimeout(_timerRenderProds);
   _timerRenderProds=setTimeout(renderProds, 180);
 }
-
-/* Bela Modas: prévia de agrupamento, somente leitura.
-   Não gera IDs nem altera produtos, vendas ou estoque. */
-function bmPreviaAgrupamentoCatalogo(){
-  var produtos=DB.get('produtos')||[];
-  var grupos=new Map();
-  function normalizar(s){
-    return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
-  }
-  function identificar(p){
-    var nome=String(p.nome||'').trim();
-    var descricao=String(p.desc2||'').trim();
-    var padrao=/(?:^|[\s/—,-])(?:TAM(?:ANHO)?\s*[:.-]?\s*)?(\d{2,3}|PP|P|M|G|GG|XG|XGG|G[1-4])\s*$/i;
-    var achado=nome.match(padrao);
-    if(!achado) achado=descricao.match(/(?:^|[\s/—,-])TAM(?:ANHO)?\s*[:.-]?\s*(\d{2,3}|PP|P|M|G|GG|XG|XGG|G[1-4])(?:\s|$)/i);
-    if(!achado) return null;
-    var tamanho=normalizar(achado[1]);
-    var modelo=normalizar(nome.replace(padrao,'').replace(/[\s/—,-]+$/,''));
-    if(!modelo || !tamanho) return null;
-    return {modelo:modelo,tamanho:tamanho};
-  }
-  produtos.forEach(function(p){
-    if(!p || !p.id || String(p.id_catalogo||'').trim()) return;
-    var dado=identificar(p);
-    if(!dado) return;
-    var chave=dado.modelo;
-    if(!grupos.has(chave)) grupos.set(chave,[]);
-    grupos.get(chave).push({id:String(p.id),nome:String(p.nome||''),tamanho:dado.tamanho,estoque:estoqueProdBM(p)});
-  });
-  var candidatos=Array.from(grupos.entries()).filter(function(entry){
-    var itens=entry[1];
-    return itens.length>1 && new Set(itens.map(function(i){return i.tamanho;})).size===itens.length;
-  });
-  candidatos.sort(function(a,b){return b[1].length-a[1].length;});
-  var anterior=document.getElementById('bm-previa-catalogo');
-  if(anterior) anterior.remove();
-  var fundo=document.createElement('div');
-  fundo.id='bm-previa-catalogo';
-  fundo.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:12px';
-  var painel=document.createElement('div');
-  painel.style.cssText='background:var(--s1,#fff);color:var(--txt,#222);border-radius:12px;padding:18px;max-width:750px;width:100%;max-height:85vh;overflow:auto';
-  var titulo=document.createElement('h3');
-  titulo.textContent='Agrupamentos para o catálogo — revisão e confirmação';
-  painel.appendChild(titulo);
-  var info=document.createElement('p');
-  info.textContent=candidatos.length+' possíveis grupos encontrados. Revise cada grupo, remova itens incorretos e informe um código-base de 4 letras/números. Somente o grupo confirmado será gravado.';
-  painel.appendChild(info);
-  candidatos.slice(0,60).forEach(function(entry){
-    var itensAtivos=entry[1].slice();
-    var bloco=document.createElement('div');
-    bloco.style.cssText='border-top:1px solid #8885;padding:10px 0';
-    var cab=document.createElement('strong');
-    function atualizarCabecalho(){cab.textContent=entry[0]+' ('+itensAtivos.length+' tamanhos selecionados)';}
-    atualizarCabecalho();
-    bloco.appendChild(cab);
-    entry[1].forEach(function(i){
-      var linha=document.createElement('div');
-      linha.style.cssText='font-size:13px;margin-top:4px';
-      linha.style.cssText+=';display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap';
-      var descricao=document.createElement('span');
-      descricao.textContent=i.nome+' | tamanho '+i.tamanho+' | estoque '+i.estoque;
-      linha.appendChild(descricao);
-      var remover=document.createElement('button');
-      remover.type='button';remover.textContent='Remover do grupo';
-      remover.style.cssText='padding:5px 9px;border:1px solid #888;border-radius:6px;cursor:pointer';
-      remover.onclick=function(){
-        itensAtivos=itensAtivos.filter(function(item){return item.id!==i.id;});
-        linha.remove();atualizarCabecalho();
-        if(itensAtivos.length<2){
-          var alerta=bloco.querySelector('[data-bm-grupo-aviso]');
-          if(!alerta){alerta=document.createElement('p');alerta.setAttribute('data-bm-grupo-aviso','');bloco.appendChild(alerta);}
-          alerta.textContent='Grupo com menos de 2 produtos: não poderá ser confirmado.';
-        }
-      };
-      linha.appendChild(remover);
-      bloco.appendChild(linha);
-    });
-    var controles=document.createElement('div');
-    controles.style.cssText='display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px';
-    var entrada=document.createElement('input');
-    entrada.type='text';entrada.maxLength=4;entrada.placeholder='Ex.: 5g44';
-    entrada.setAttribute('aria-label','Código-base do grupo');
-    entrada.style.cssText='width:115px;padding:9px;border:1px solid #888;border-radius:6px';
-    var confirmar=document.createElement('button');
-    confirmar.type='button';confirmar.textContent='Confirmar este grupo';
-    confirmar.style.cssText='padding:9px 12px;background:#287eb8;color:white;border:0;border-radius:7px;cursor:pointer';
-    var status=document.createElement('span');
-    status.style.cssText='font-size:12px;flex-basis:100%';
-    confirmar.onclick=function(){
-      if(itensAtivos.length<2){status.textContent='É necessário manter pelo menos 2 produtos.';return;}
-      var base=entrada.value.trim().toLowerCase();
-      if(!/^[a-z0-9]{4}$/.test(base)){status.textContent='Informe exatamente 4 letras ou números.';return;}
-      var lista=DB.get('produtos')||[];
-      var selecionados=new Set(itensAtivos.map(function(i){return i.id;}));
-      var atualizados=0,erro='';
-      var idsNovos=new Set(itensAtivos.map(function(i){return base+'-'+i.tamanho;}));
-      if(idsNovos.size!==itensAtivos.length){status.textContent='Há tamanhos repetidos no grupo.';return;}
-      var existentes=new Map(lista.map(function(p){return [String(p.id),p];}));
-      itensAtivos.forEach(function(i){
-        var p=existentes.get(i.id);
-        if(!p)erro='Um produto não existe mais. Reabra a prévia.';
-        else if(String(p.id_catalogo||'').trim())erro='Um produto já possui id_catalogo. Reabra a prévia.';
-      });
-      lista.forEach(function(p){
-        var id=String(p.id_catalogo||'').trim().toLowerCase();
-        if(id && (idsNovos.has(id) || id===base || id.indexOf(base+'-')===0))
-          erro='O código-base já está em uso por outro produto.';
-      });
-      if(erro){status.textContent=erro;return;}
-      var resumo=itensAtivos.map(function(i){return i.nome+' → '+base+'-'+i.tamanho;}).join('\\n');
-      if(!window.confirm('Confirmar identificação destes '+itensAtivos.length+' produtos?\\n\\n'+resumo+'\\n\\nOs cadastros e estoques não serão unificados.'))return;
-      lista.forEach(function(p){
-        var i=itensAtivos.find(function(item){return item.id===String(p.id);});
-        if(i){p.id_catalogo=base+'-'+i.tamanho;atualizados++;}
-      });
-      if(atualizados!==itensAtivos.length){status.textContent='Produtos mudaram; nenhuma alteração gravada.';return;}
-      try{
-        DB.set('produtos',lista);
-        status.textContent='Grupo confirmado: '+atualizados+' produtos identificados. Sincronize com a planilha.';
-        confirmar.disabled=true;entrada.disabled=true;
-        bloco.querySelectorAll('button').forEach(function(btn){btn.disabled=true;});
-        if(typeof renderProds==='function')renderProds();
-      }catch(e){
-        status.textContent='Erro ao salvar: '+(e&&e.message||e);
-      }
-    };
-    controles.appendChild(entrada);controles.appendChild(confirmar);controles.appendChild(status);
-    bloco.appendChild(controles);
-    painel.appendChild(bloco);
-  });
-  var aviso=document.createElement('p');
-  aviso.textContent='Revise modelo e cor: nomes semelhantes podem representar produtos diferentes. Remover aqui apenas ajusta o grupo, sem excluir produtos. Cada grupo exige confirmação antes de gravar os IDs.';
-  painel.appendChild(aviso);
-  var fechar=document.createElement('button');
-  fechar.type='button';fechar.textContent='Fechar prévia';
-  fechar.onclick=function(){fundo.remove();};
-  painel.appendChild(fechar);fundo.appendChild(painel);
-  fundo.addEventListener('click',function(e){if(e.target===fundo)fundo.remove();});
-  document.body.appendChild(fundo);
-}
-function bmInstalarBotaoCatalogo(){
-  if(document.getElementById('bm-botao-previa-catalogo'))return;
-  var busca=document.getElementById('p-sc');
-  if(!busca)return;
-  var candidatos=Array.from(document.querySelectorAll('button'));
-  var unificar=candidatos.find(function(el){
-    return /unificar selecionados/i.test(el.textContent||'');
-  });
-  var faixa=document.createElement('div');
-  faixa.id='bm-faixa-previa-catalogo';
-  faixa.style.cssText='display:flex;justify-content:flex-end;padding:10px 12px;clear:both;width:100%;box-sizing:border-box';
-  var botao=document.createElement('button');
-  botao.id='bm-botao-previa-catalogo';botao.type='button';
-  botao.textContent='🔎 Prévia grupos catálogo';
-  botao.style.cssText='display:inline-block!important;visibility:visible!important;opacity:1!important;background:#287eb8;color:white;border:0;padding:12px 18px;border-radius:9px;font-weight:700;cursor:pointer;min-height:42px';
-  botao.onclick=bmPreviaAgrupamentoCatalogo;
-  faixa.appendChild(botao);
-  if(unificar){
-    var barra=unificar.closest('div');
-    var nivel=barra && barra.parentElement;
-    if(nivel && nivel !== document.body){
-      nivel.insertAdjacentElement('afterend',faixa);
-      return;
-    }
-  }
-  var linhaBusca=busca.parentElement;
-  if(linhaBusca)linhaBusca.insertAdjacentElement('afterend',faixa);
-}
-
 function renderProds(){
-  bmInstalarBotaoCatalogo();
   if(!_estoquesNormalizadosUmaVez){
     normalizarEstoquesProdutosBM();
     _estoquesNormalizadosUmaVez=true;
@@ -2763,13 +2569,7 @@ function alterarPrecoVendaXML(idx, valor){
   importacaoXMLAtual.itens[idx].precoVenda = isFinite(n) ? n : 0;
 }
 
-var importacaoXMLGravando=false;
-function chaveNotaImportadaBM(nota){
-  return [somenteDigitosFiscalBM(nota.cnpj||''), String(nota.serie||'').trim(), String(nota.numero||'').trim(), somenteDigitosFiscalBM(nota.destinatarioCnpj||'')].join('|');
-}
-async function confirmarImportacaoXML(){
-  if(importacaoXMLGravando) return;
-
+function confirmarImportacaoXML(){
   if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens.length){
     toast('⚠️ Carregue um XML primeiro!','warn');
     return;
@@ -2852,39 +2652,26 @@ async function confirmarImportacaoXML(){
   });
 
   DB.set('produtos', produtos);
-  entradaGravada=true;
-  // A ponte nao possui colecao 'entradas'; registro separado no mesmo IndexedDB.
-  // Aguarda persistencia local, nunca a planilha remota.
-  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb') await window.BelaIDBBridge.flush();
-  registroEntradas.push({
-    id: DB.uid(), chave:chaveNota,
-    fornecedor:notaImportada.fornecedor, cnpj:notaImportada.cnpj,
-    destinatarioCnpj:notaImportada.destinatarioCnpj||'',
-    numero:notaImportada.numero, serie:notaImportada.serie,
-    emissao:notaImportada.emissao, itens:notaImportada.itens, createdAt:agora
+
+  var entradas = DB.get('entradas') || [];
+  entradas.push({
+    id: DB.uid(),
+    fornecedor: importacaoXMLAtual.fornecedor,
+    cnpj: importacaoXMLAtual.cnpj,
+    destinatarioCnpj: importacaoXMLAtual.destinatarioCnpj || '',
+    numero: importacaoXMLAtual.numero,
+    serie: importacaoXMLAtual.serie,
+    emissao: importacaoXMLAtual.emissao,
+    itens: importacaoXMLAtual.itens,
+    createdAt: agora
   });
-  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
-    await window.BelaIndexedDB.set('bm_entradas_xml',registroEntradas);
-  }else{
-    localStorage.setItem('bm_entradas_xml',JSON.stringify(registroEntradas));
-  }
+  DB.set('entradas', entradas);
+
+  renderProds();
+  renderPGrid();
   fMd('mo-importa-xml');
   limparImportacaoXML();
-  toast('✅ Entrada da nota importada e salva!','ok');
-  setTimeout(function(){
-    try{renderProds();}catch(e){console.warn(e);}
-    try{renderPGrid();}catch(e){console.warn(e);}
-  },0);
-  }catch(err){
-    console.error('Falha ao registrar entrada XML:',err);
-    if(entradaGravada){
-      toast('⚠️ Estoque atualizado, mas houve falha no registro da nota. NÃO importe novamente.','warn');
-    }else{
-      toast('❌ Entrada não realizada: '+String(err.message||err),'warn');
-    }
-  }finally{
-    importacaoXMLGravando=false;
-  }
+  toast('✅ Entrada da nota importada!','ok');
 }
 
 function selF(btn,f){document.querySelectorAll('.bf').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');vForma=f;}
@@ -5735,77 +5522,3 @@ document.addEventListener('change', function(e){
     atualizarNCMAutomatico();
   }
 });
-
-/* BM CONSULTA ID CATALOGO POR CODIGO DE BARRAS */
-(function(){
-  function iniciar(){
-    if(document.getElementById('pg-consulta-catalogo'))return;
-    var navProdutos=Array.from(document.querySelectorAll('.nv')).find(function(n){return /Produtos/.test(n.textContent||'') && /ir\('produtos'\)/.test(n.getAttribute('onclick')||'');});
-    var main=document.getElementById('main');
-    if(!navProdutos || !main)return;
-    var nav=document.createElement('div');
-    nav.className='nv';nav.textContent='🔎 Consultar ID do catálogo';
-    nav.setAttribute('role','button');nav.tabIndex=0;
-    nav.onclick=function(){window.bmAbrirConsultaCatalogo();};
-    nav.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();nav.click();}};
-    navProdutos.insertAdjacentElement('afterend',nav);
-    var pg=document.createElement('div');pg.className='pg';pg.id='pg-consulta-catalogo';
-    pg.innerHTML='<div class="ph"><div class="ph-t">🔎 Consulta de ID do catálogo</div><span class="tm">Consulta somente leitura</span></div>'+
-      '<div class="pb"><div class="card" style="max-width:850px"><div class="ct">Leia o código de barras do produto</div>'+
-      '<p class="tm">Use o leitor de código de barras (com Enter automático) ou digite o código e pressione Consultar.</p>'+
-      '<div class="fr" style="gap:10px;flex-wrap:wrap"><input id="bm-consulta-codigo" class="fi" type="text" inputmode="text" autocomplete="off" placeholder="Código de barras / EAN / referência" style="flex:1;min-width:200px;max-width:430px">'+
-      '<button id="bm-consulta-buscar" class="btn bb" type="button">🔎 Consultar</button><button id="bm-consulta-limpar" class="btn bh" type="button">Limpar</button></div>'+
-      '<div id="bm-consulta-resultado" aria-live="polite" style="margin-top:18px"></div></div></div>';
-    main.appendChild(pg);
-    var input=pg.querySelector('#bm-consulta-codigo');
-    pg.querySelector('#bm-consulta-buscar').onclick=function(){window.bmConsultarIdCatalogo();};
-    pg.querySelector('#bm-consulta-limpar').onclick=function(){input.value='';pg.querySelector('#bm-consulta-resultado').replaceChildren();input.focus();};
-    input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();window.bmConsultarIdCatalogo();}});
-    window.bmAbrirConsultaCatalogo=function(){
-      if(typeof ir==='function')ir('consulta-catalogo');
-      else {document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});pg.classList.add('on');}
-      document.querySelectorAll('.nv').forEach(function(n){n.classList.remove('on');});
-      nav.classList.add('on');
-      input.value='';pg.querySelector('#bm-consulta-resultado').replaceChildren();
-      setTimeout(function(){input.focus();},50);
-    };
-    window.bmConsultarIdCatalogo=function(){
-      var codigo=input.value.trim();
-      var resultado=pg.querySelector('#bm-consulta-resultado');
-      resultado.replaceChildren();
-      if(!codigo){resultado.textContent='Leia ou informe um código para consultar.';input.focus();return;}
-      var lista=(typeof DB!=='undefined'&&DB.get('produtos'))||[];
-      function codigos(p){
-        var valores=[p.ean,p.cod,p.codigo,p.codigos_barras,p.codigosBarras,p.codigo_barras,p.gtin];
-        var arr=[];
-        valores.forEach(function(v){
-          if(Array.isArray(v)){v.forEach(function(x){arr.push(String(x||'').trim());});}
-          else if(v!=null){String(v).split(/[;,\n\r|]+/).forEach(function(x){arr.push(x.trim());});}
-        });
-        return arr.filter(Boolean);
-      }
-      var encontrados=lista.filter(function(p){return p&&codigos(p).some(function(v){return v.toLowerCase()===codigo.toLowerCase();});});
-      var titulo=document.createElement('div');titulo.className='ct';
-      titulo.textContent=encontrados.length?encontrados.length+' produto(s) encontrado(s)':'Produto não encontrado';
-      resultado.appendChild(titulo);
-      if(!encontrados.length){var aviso=document.createElement('p');aviso.textContent='Nenhum produto cadastrado com o código '+codigo+'. Confira o código de barras ou a referência.';resultado.appendChild(aviso);}
-      encontrados.forEach(function(p){
-        var card=document.createElement('div');card.className='card';card.style.cssText='margin-top:10px;padding:14px;border:1px solid #8885';
-        function campo(rotulo,valor,realce){
-          var linha=document.createElement('div');linha.style.cssText='margin:7px 0;overflow-wrap:anywhere';
-          var b=document.createElement('strong');b.textContent=rotulo+': ';linha.appendChild(b);
-          var span=document.createElement('span');span.textContent=String(valor==null?'—':valor);
-          if(realce)span.style.cssText='font-weight:800;font-size:19px;color:var(--gold,#a16b12)';
-          linha.appendChild(span);card.appendChild(linha);
-        }
-        campo('Produto',p.nome||'—');campo('Referência',p.cod||p.codigo||'—');
-        campo('EAN',p.ean||'—');campo('ID do catálogo',p.id_catalogo||'NÃO CADASTRADO',true);
-        campo('Estoque',typeof estoqueProdBM==='function'?estoqueProdBM(p):(p.estq||0));
-        resultado.appendChild(card);
-      });
-      input.select();input.focus();
-    };
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',iniciar);
-  else iniciar();
-})();
