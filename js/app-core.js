@@ -628,6 +628,30 @@ function somaVendasPorForma(vendas){
 }
 function ajustarEstoqueVenda(itens, modo){
   modo = (modo === 'somar') ? 'somar' : 'subtrair';
+  // Impede clique duplo e importacoes repetidas antes de alterar o estoque.
+  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+    if(!window.BelaIndexedDB || !window.BelaIDBBridge || !window.BelaIDBBridge.status().ready){
+      toast('❌ IndexedDB indisponível. Entrada não iniciada!','warn'); return;
+    }
+  }
+  var notaImportada=importacaoXMLAtual;
+  var chaveNota=chaveNotaImportadaBM(notaImportada);
+  if(!notaImportada.numero || !notaImportada.cnpj){
+    toast('⚠️ Nota sem número ou emitente. Entrada bloqueada para evitar duplicidade.','warn'); return;
+  }
+  importacaoXMLGravando=true;
+  var entradaGravada=false;
+  try{
+    var registroEntradas=[];
+    if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+      registroEntradas=await window.BelaIndexedDB.get('bm_entradas_xml') || [];
+    }else{
+      registroEntradas=JSON.parse(localStorage.getItem('bm_entradas_xml')||'[]');
+    }
+    if(!Array.isArray(registroEntradas)) throw new Error('Registro de notas invalido');
+    if(registroEntradas.some(function(e){return e.chave===chaveNota;})){
+      toast('⚠️ Esta nota já foi importada. Estoque não alterado!','warn'); return;
+    }
   var produtos = DB.get('produtos') || [];
   var alterou = false;
 
@@ -2739,7 +2763,13 @@ function alterarPrecoVendaXML(idx, valor){
   importacaoXMLAtual.itens[idx].precoVenda = isFinite(n) ? n : 0;
 }
 
-function confirmarImportacaoXML(){
+var importacaoXMLGravando=false;
+function chaveNotaImportadaBM(nota){
+  return [somenteDigitosFiscalBM(nota.cnpj||''), String(nota.serie||'').trim(), String(nota.numero||'').trim(), somenteDigitosFiscalBM(nota.destinatarioCnpj||'')].join('|');
+}
+async function confirmarImportacaoXML(){
+  if(importacaoXMLGravando) return;
+
   if(!importacaoXMLAtual || !importacaoXMLAtual.itens || !importacaoXMLAtual.itens.length){
     toast('⚠️ Carregue um XML primeiro!','warn');
     return;
@@ -2822,26 +2852,39 @@ function confirmarImportacaoXML(){
   });
 
   DB.set('produtos', produtos);
-
-  var entradas = DB.get('entradas') || [];
-  entradas.push({
-    id: DB.uid(),
-    fornecedor: importacaoXMLAtual.fornecedor,
-    cnpj: importacaoXMLAtual.cnpj,
-    destinatarioCnpj: importacaoXMLAtual.destinatarioCnpj || '',
-    numero: importacaoXMLAtual.numero,
-    serie: importacaoXMLAtual.serie,
-    emissao: importacaoXMLAtual.emissao,
-    itens: importacaoXMLAtual.itens,
-    createdAt: agora
+  entradaGravada=true;
+  // A ponte nao possui colecao 'entradas'; registro separado no mesmo IndexedDB.
+  // Aguarda persistencia local, nunca a planilha remota.
+  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb') await window.BelaIDBBridge.flush();
+  registroEntradas.push({
+    id: DB.uid(), chave:chaveNota,
+    fornecedor:notaImportada.fornecedor, cnpj:notaImportada.cnpj,
+    destinatarioCnpj:notaImportada.destinatarioCnpj||'',
+    numero:notaImportada.numero, serie:notaImportada.serie,
+    emissao:notaImportada.emissao, itens:notaImportada.itens, createdAt:agora
   });
-  DB.set('entradas', entradas);
-
-  renderProds();
-  renderPGrid();
+  if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+    await window.BelaIndexedDB.set('bm_entradas_xml',registroEntradas);
+  }else{
+    localStorage.setItem('bm_entradas_xml',JSON.stringify(registroEntradas));
+  }
   fMd('mo-importa-xml');
   limparImportacaoXML();
-  toast('✅ Entrada da nota importada!','ok');
+  toast('✅ Entrada da nota importada e salva!','ok');
+  setTimeout(function(){
+    try{renderProds();}catch(e){console.warn(e);}
+    try{renderPGrid();}catch(e){console.warn(e);}
+  },0);
+  }catch(err){
+    console.error('Falha ao registrar entrada XML:',err);
+    if(entradaGravada){
+      toast('⚠️ Estoque atualizado, mas houve falha no registro da nota. NÃO importe novamente.','warn');
+    }else{
+      toast('❌ Entrada não realizada: '+String(err.message||err),'warn');
+    }
+  }finally{
+    importacaoXMLGravando=false;
+  }
 }
 
 function selF(btn,f){document.querySelectorAll('.bf').forEach(function(b){b.classList.remove('on');});btn.classList.add('on');vForma=f;}
