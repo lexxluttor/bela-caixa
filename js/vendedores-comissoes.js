@@ -712,8 +712,23 @@
   window.BMVendedoresComissoes = MOD;
   window.BMVC = MOD;
 
-  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
-
-  setTimeout(init, 300);
+  // O app-core prepara o IndexedDB de forma assincrona no evento load.
+  // Inicializar este modulo somente depois de a ponte estar pronta.
+  var iniciou=false;
+  var tentativas=0;
+  function iniciarQuandoPronto(){
+    if(iniciou) return;
+    if(window.BELA_CAIXA_STORAGE_MODE === 'indexeddb'){
+      var ponte=window.BelaIDBBridge;
+      if(!ponte || !ponte.status || !ponte.status().ready){
+        if(++tentativas <= 300) setTimeout(iniciarQuandoPronto, 100);
+        else console.error('Vendedores: IndexedDB indisponivel; modulo nao inicializado.');
+        return;
+      }
+    }
+    iniciou=true;
+    try{init();}catch(e){console.error('Vendedores: falha na inicializacao',e);}
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciarQuandoPronto);
+  else iniciarQuandoPronto();
 })();
